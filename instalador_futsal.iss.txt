@@ -1,0 +1,43 @@
+#define MyAppName "UPSA Campeonatos"
+#define MyAppVersion "1.0.0"
+#define MyAppPublisher "UPSA"
+#define MyAppExeName "futsal.exe"
+#define MyAppSourceDir "C:\Users\PERSONAL\Desktop\Universidad\Progra aplicada\futsal\futsal\build\windows\x64\runner\Release"
+#define MyIconPath "C:\Users\PERSONAL\Desktop\Universidad\Progra aplicada\futsal\futsal\windows\runner\resources\app_icon.ico"
+
+[Setup]
+AppId={{A8B7B145-4DF9-4E7A-86EF-9E2F7D4B29A1}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+DefaultDirName={localappdata}\Programs\{#MyAppName}
+DefaultGroupName={#MyAppName}
+DisableProgramGroupPage=yes
+OutputDir=C:\Users\PERSONAL\Desktop
+OutputBaseFilename=Instalador_UPSA_Campeonatos
+Compression=lzma
+SolidCompression=yes
+WizardStyle=modern
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+PrivilegesRequired=lowest
+SetupIconFile={#MyIconPath}
+UninstallDisplayIcon={app}\{#MyAppExeName}
+CloseApplications=yes
+RestartIfNeededByRun=no
+
+[Languages]
+Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "Crear acceso directo en el escritorio"; GroupDescription: "Accesos directos:"; Flags: checkedonce
+
+[Files]
+Source: "{#MyAppSourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\{#MyAppExeName}"; Description: "Abrir {#MyAppName}"; Flags: nowait postinstall skipifsilent
