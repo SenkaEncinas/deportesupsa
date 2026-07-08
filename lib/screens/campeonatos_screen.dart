@@ -9,9 +9,9 @@ import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
+import 'reciclaje/app_hero_card.dart';
 import 'reciclaje/app_inline_empty_state.dart';
 import 'reciclaje/app_loading.dart';
-import 'reciclaje/app_logo_mark.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_section_header.dart';
@@ -161,9 +161,26 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _CampeonatosHero(
-                        total: campeonatos.length,
-                        onCreate: _openForm,
+                      AppHeroCard(
+                        title: 'Gestión de campeonatos',
+                        description:
+                            'Crea campeonatos, revisa su estado y entra al detalle para administrar equipos, jugadores, fixture, resultados y documentos.',
+                        badges: const [
+                          AppBadge(
+                            text: 'Administración',
+                            type: AppBadgeType.success,
+                            icon: Icons.admin_panel_settings_outlined,
+                          ),
+                          AppBadge(
+                            text: 'Campeonatos UPSA',
+                            type: AppBadgeType.primary,
+                            icon: Icons.emoji_events_outlined,
+                          ),
+                        ],
+                        side: _HeroActionBox(
+                          total: campeonatos.length,
+                          onCreate: _openForm,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       _CampeonatosStats(campeonatos: campeonatos),
@@ -232,129 +249,10 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
   }
 }
 
-class _CampeonatosHero extends StatelessWidget {
-  final int total;
-  final VoidCallback onCreate;
-
-  const _CampeonatosHero({
-    required this.total,
-    required this.onCreate,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
-    return AppCard(
-      showBorder: false,
-      padding: EdgeInsets.zero,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF003D2D),
-              Color(0xFF005C45),
-              AppColors.primary,
-            ],
-          ),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(isMobile ? 22 : 30),
-          child: isMobile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const AppLogoMark(),
-                    const SizedBox(height: 20),
-                    const _HeroText(),
-                    const SizedBox(height: 20),
-                    _HeroActionBox(
-                      total: total,
-                      onCreate: onCreate,
-                    ),
-                  ],
-                )
-              : Row(
-                  children: [
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AppLogoMark(),
-                          SizedBox(height: 22),
-                          _HeroText(),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 28),
-                    _HeroActionBox(
-                      total: total,
-                      onCreate: onCreate,
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroText extends StatelessWidget {
-  const _HeroText();
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: const [
-            AppBadge(
-              text: 'Administración',
-              type: AppBadgeType.success,
-              icon: Icons.admin_panel_settings_outlined,
-            ),
-            AppBadge(
-              text: 'Campeonatos UPSA',
-              type: AppBadgeType.primary,
-              icon: Icons.emoji_events_outlined,
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        Text(
-          'Gestión de campeonatos',
-          style: AppTextStyles.heading1.copyWith(
-            color: AppColors.white,
-            fontSize: isMobile ? 26 : 34,
-            letterSpacing: -0.4,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          constraints: const BoxConstraints(maxWidth: 660),
-          child: Text(
-            'Crea campeonatos, revisa su estado y entra al detalle para administrar equipos, jugadores, fixture, resultados y documentos.',
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.white.withOpacity(0.88),
-              fontSize: isMobile ? 14 : 15,
-              height: 1.55,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
+/// Caja lateral del hero con el conteo de campeonatos y el botón de
+/// creación. AppHeroCard ya la ubica a ancho completo en móvil y a
+/// 300px fija junto al texto en desktop, así que no necesita conocer
+/// el breakpoint por sí misma.
 class _HeroActionBox extends StatelessWidget {
   final int total;
   final VoidCallback onCreate;
@@ -366,16 +264,14 @@ class _HeroActionBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
     return Container(
-      width: isMobile ? double.infinity : 300,
+      width: Responsive.isMobile(context) ? double.infinity : 300,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(0.12),
+        color: AppColors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.white.withOpacity(0.18),
+          color: AppColors.white.withValues(alpha: 0.18),
         ),
       ),
       child: Column(
@@ -390,7 +286,7 @@ class _HeroActionBox extends StatelessWidget {
           Text(
             'Crea un nuevo campeonato cuando inicie una nueva competencia universitaria.',
             style: AppTextStyles.small.copyWith(
-              color: AppColors.white.withOpacity(0.76),
+              color: AppColors.white.withValues(alpha: 0.76),
               height: 1.4,
             ),
           ),
@@ -432,7 +328,7 @@ class _HeroStatLine extends StatelessWidget {
           child: Text(
             label,
             style: AppTextStyles.body.copyWith(
-              color: AppColors.white.withOpacity(0.80),
+              color: AppColors.white.withValues(alpha: 0.80),
             ),
           ),
         ),

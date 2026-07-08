@@ -12,16 +12,13 @@ import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
 import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_page.dart';
+import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_text_styles.dart';
-import 'reciclaje/responsive.dart';
 
 class EquiposScreen extends StatelessWidget {
   final String campeonatoId;
 
-  const EquiposScreen({
-    super.key,
-    required this.campeonatoId,
-  });
+  const EquiposScreen({super.key, required this.campeonatoId});
 
   @override
   Widget build(BuildContext context) {
@@ -38,9 +35,7 @@ class EquiposScreen extends StatelessWidget {
             stream: equipoService.streamEquipos(campeonatoId),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const AppLoading(
-                  message: 'Cargando equipos...',
-                );
+                return const AppLoading(message: 'Cargando equipos...');
               }
 
               if (snapshot.hasError) {
@@ -73,9 +68,8 @@ class EquiposScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => EquipoFormScreen(
-                                campeonatoId: campeonatoId,
-                              ),
+                              builder: (_) =>
+                                  EquipoFormScreen(campeonatoId: campeonatoId),
                             ),
                           );
                         },
@@ -89,21 +83,21 @@ class EquiposScreen extends StatelessWidget {
                               'Registra los equipos participantes para poder cargar jugadores y generar el fixture.',
                           buttonText:
                               campeonato?.estado == CampeonatoEstado.finalizado
-                                  ? null
-                                  : 'Registrar equipo',
+                              ? null
+                              : 'Registrar equipo',
                           onPressed:
                               campeonato?.estado == CampeonatoEstado.finalizado
-                                  ? null
-                                  : () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => EquipoFormScreen(
-                                            campeonatoId: campeonatoId,
-                                          ),
-                                        ),
-                                      );
-                                    },
+                              ? null
+                              : () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => EquipoFormScreen(
+                                        campeonatoId: campeonatoId,
+                                      ),
+                                    ),
+                                  );
+                                },
                         )
                       : _EquiposGrid(
                           campeonatoId: campeonatoId,
@@ -133,21 +127,15 @@ class _EquiposGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final columns = Responsive.gridColumns(context);
-
-    return GridView.builder(
-      itemCount: equipos.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-        childAspectRatio: Responsive.isMobile(context) ? 1.25 : 1.35,
-      ),
-      itemBuilder: (context, index) {
-        final equipo = equipos[index];
-
+    // AppResponsiveGrid (Wrap + LayoutBuilder) deja que cada card tome su
+    // altura natural: se reemplazó el GridView con childAspectRatio rígido
+    // que cortaba el contenido en móvil.
+    return AppResponsiveGrid(
+      mobileColumns: 1,
+      tabletColumns: 2,
+      desktopColumns: 3,
+      spacing: 14,
+      children: equipos.map((equipo) {
         return AppCard(
           onTap: campeonato?.estado == CampeonatoEstado.finalizado
               ? null
@@ -186,7 +174,7 @@ class _EquiposGrid extends StatelessWidget {
                   color: AppColors.textSecondary,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 12),
               const Divider(),
               _InfoLine(
                 icon: Icons.school_outlined,
@@ -208,7 +196,7 @@ class _EquiposGrid extends StatelessWidget {
             ],
           ),
         );
-      },
+      }).toList(),
     );
   }
 }
@@ -228,17 +216,11 @@ class _InfoLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 17,
-          color: AppColors.textSecondary,
-        ),
+        Icon(icon, size: 17, color: AppColors.textSecondary),
         const SizedBox(width: 7),
         Text(
           '$label: ',
-          style: AppTextStyles.small.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: AppTextStyles.small.copyWith(fontWeight: FontWeight.w700),
         ),
         Expanded(
           child: Text(

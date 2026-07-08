@@ -8,15 +8,15 @@ import '../services/public_home_service.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
-import 'reciclaje/app_info_line.dart';
+import 'reciclaje/app_hero_card.dart';
 import 'reciclaje/app_inline_empty_state.dart';
 import 'reciclaje/app_loading.dart';
-import 'reciclaje/app_logo_mark.dart';
 import 'reciclaje/app_match_card.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_responsive_pair.dart';
 import 'reciclaje/app_section_header.dart';
+import 'reciclaje/app_standing_card.dart';
 import 'reciclaje/app_table_container.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/championship_public_card.dart';
@@ -24,16 +24,11 @@ import 'reciclaje/responsive.dart';
 import 'reciclaje/stat_card.dart';
 
 const Color _upsaGold = Color(0xFFD6A100);
-const Color _upsaGreenDeep = Color(0xFF003D2D);
-const Color _upsaGreenHero = Color(0xFF005C45);
 
 class ChampionshipDetailScreen extends StatelessWidget {
   final CampeonatoModel campeonato;
 
-  const ChampionshipDetailScreen({
-    super.key,
-    required this.campeonato,
-  });
+  const ChampionshipDetailScreen({super.key, required this.campeonato});
 
   @override
   Widget build(BuildContext context) {
@@ -71,9 +66,56 @@ class ChampionshipDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _HeroSection(
-                    campeonato: campeonato,
-                    estadoTexto: estadoTexto,
+                  AppHeroCard(
+                    title: campeonato.nombre,
+                    description: campeonato.descripcion.trim().isEmpty
+                        ? 'Consulta la información pública del campeonato: partidos programados, resultados, tabla de posiciones y ranking de goleadores.'
+                        : campeonato.descripcion,
+                    badges: [
+                      AppBadge(
+                        text: estadoTexto,
+                        type: ChampionshipPublicCard.badgeType(
+                          campeonato.estado,
+                        ),
+                        icon: Icons.sports_soccer,
+                      ),
+                    ],
+                    chips: const [
+                      AppHeroChipData(
+                        icon: Icons.school_outlined,
+                        text: 'Universidad Privada de Santa Cruz',
+                      ),
+                      AppHeroChipData(
+                        icon: Icons.public_outlined,
+                        text: 'Vista pública',
+                      ),
+                    ],
+                    infoItems: [
+                      AppHeroInfoItem(
+                        icon: Icons.place_outlined,
+                        label: 'Cancha',
+                        value: campeonato.cancha,
+                      ),
+                      AppHeroInfoItem(
+                        icon: Icons.category_outlined,
+                        label: 'Modalidad',
+                        value: ChampionshipPublicCard.formatLabel(
+                          campeonato.modalidad,
+                        ),
+                      ),
+                      AppHeroInfoItem(
+                        icon: Icons.account_tree_outlined,
+                        label: 'Formato',
+                        value: ChampionshipPublicCard.formatLabel(
+                          campeonato.tipoCampeonato,
+                        ),
+                      ),
+                      AppHeroInfoItem(
+                        icon: Icons.calendar_today_outlined,
+                        label: 'Temporada',
+                        value: campeonato.temporada,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
                   _StatsSection(
@@ -98,11 +140,11 @@ class ChampionshipDetailScreen extends StatelessWidget {
                     secondFlex: 2,
                     first: _TableSection(
                       service: service,
-                      campeonatoId: campeonato.id,
+                      campeonato: campeonato,
                     ),
                     second: _ScorersSection(
                       service: service,
-                      campeonatoId: campeonato.id,
+                      campeonato: campeonato,
                     ),
                   ),
                   const SizedBox(height: 28),
@@ -111,285 +153,6 @@ class ChampionshipDetailScreen extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _HeroSection extends StatelessWidget {
-  final CampeonatoModel campeonato;
-  final String estadoTexto;
-
-  const _HeroSection({
-    required this.campeonato,
-    required this.estadoTexto,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
-    return AppCard(
-      showBorder: false,
-      padding: EdgeInsets.zero,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              _upsaGreenDeep,
-              _upsaGreenHero,
-              AppColors.primary,
-            ],
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -42,
-                top: -50,
-                child: _DecorativeCircle(
-                  size: isMobile ? 140 : 190,
-                  opacity: 0.10,
-                ),
-              ),
-              Positioned(
-                right: isMobile ? 14 : 36,
-                bottom: -38,
-                child: _DecorativeCircle(
-                  size: isMobile ? 90 : 130,
-                  opacity: 0.08,
-                ),
-              ),
-              Padding(
-                padding: EdgeInsets.all(isMobile ? 22 : 30),
-                child: isMobile
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _HeroText(
-                            campeonato: campeonato,
-                            estadoTexto: estadoTexto,
-                          ),
-                          const SizedBox(height: 20),
-                          _HeroInfoBox(campeonato: campeonato),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          Expanded(
-                            child: _HeroText(
-                              campeonato: campeonato,
-                              estadoTexto: estadoTexto,
-                            ),
-                          ),
-                          const SizedBox(width: 28),
-                          _HeroInfoBox(campeonato: campeonato),
-                        ],
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DecorativeCircle extends StatelessWidget {
-  final double size;
-  final double opacity;
-
-  const _DecorativeCircle({
-    required this.size,
-    required this.opacity,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(opacity),
-        shape: BoxShape.circle,
-      ),
-    );
-  }
-}
-
-class _HeroText extends StatelessWidget {
-  final CampeonatoModel campeonato;
-  final String estadoTexto;
-
-  const _HeroText({
-    required this.campeonato,
-    required this.estadoTexto,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            AppLogoMark(
-              compact: isMobile,
-              dark: false,
-            ),
-            AppBadge(
-              text: estadoTexto,
-              type: ChampionshipPublicCard.badgeType(campeonato.estado),
-              icon: Icons.sports_soccer,
-            ),
-          ],
-        ),
-        const SizedBox(height: 22),
-        Text(
-          campeonato.nombre,
-          style: AppTextStyles.heading1.copyWith(
-            color: AppColors.white,
-            fontSize: isMobile ? 26 : 34,
-            letterSpacing: -0.4,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: Text(
-            campeonato.descripcion.trim().isEmpty
-                ? 'Consulta la información pública del campeonato: partidos programados, resultados, tabla de posiciones y ranking de goleadores.'
-                : campeonato.descripcion,
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.white.withOpacity(0.88),
-              fontSize: isMobile ? 14 : 15,
-              height: 1.55,
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: const [
-            _HeroChip(
-              icon: Icons.school_outlined,
-              text: 'Universidad Privada de Santa Cruz',
-            ),
-            _HeroChip(
-              icon: Icons.public_outlined,
-              text: 'Vista pública',
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _HeroChip extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _HeroChip({
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 11,
-        vertical: 7,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(0.11),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: AppColors.white.withOpacity(0.14),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: AppColors.white),
-          const SizedBox(width: 7),
-          Text(
-            text,
-            style: AppTextStyles.small.copyWith(
-              color: AppColors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroInfoBox extends StatelessWidget {
-  final CampeonatoModel campeonato;
-
-  const _HeroInfoBox({
-    required this.campeonato,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
-    return Container(
-      width: isMobile ? double.infinity : 305,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.white.withOpacity(0.18),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AppInfoLine(
-            icon: Icons.place_outlined,
-            label: 'Cancha',
-            value: campeonato.cancha,
-            dark: true,
-          ),
-          const SizedBox(height: 14),
-          AppInfoLine(
-            icon: Icons.category_outlined,
-            label: 'Modalidad',
-            value: ChampionshipPublicCard.formatLabel(campeonato.modalidad),
-            dark: true,
-          ),
-          const SizedBox(height: 14),
-          AppInfoLine(
-            icon: Icons.account_tree_outlined,
-            label: 'Formato',
-            value: ChampionshipPublicCard.formatLabel(campeonato.tipoCampeonato),
-            dark: true,
-          ),
-          const SizedBox(height: 14),
-          AppInfoLine(
-            icon: Icons.calendar_today_outlined,
-            label: 'Temporada',
-            value: campeonato.temporada,
-            dark: true,
-          ),
-        ],
       ),
     );
   }
@@ -437,24 +200,44 @@ class _StatsSection extends StatelessWidget {
           );
         },
       ),
-      StreamBuilder<List<RankingGoleadorModel>>(
-        stream: service.streamRankingGoleadores(campeonato.id),
-        builder: (context, snapshot) {
-          final ranking = snapshot.data ?? [];
-          final totalGoles = ranking.fold<int>(
-            0,
-            (total, item) => total + item.totalGoles,
-          );
+      // Para fútbol se muestran los goles registrados; para vóley y
+      // básquet se muestran los partidos finalizados.
+      if (campeonato.esFutbol)
+        StreamBuilder<List<RankingGoleadorModel>>(
+          stream: service.streamRankingGoleadores(campeonato.id),
+          builder: (context, snapshot) {
+            final ranking = snapshot.data ?? [];
+            final totalGoles = ranking.fold<int>(
+              0,
+              (total, item) => total + item.totalGoles,
+            );
 
-          return StatCard(
-            title: 'Goles',
-            value: '$totalGoles',
-            icon: Icons.emoji_events_outlined,
-            subtitle: 'Registrados',
-            color: AppColors.info,
-          );
-        },
-      ),
+            return StatCard(
+              title: 'Goles',
+              value: '$totalGoles',
+              icon: Icons.emoji_events_outlined,
+              subtitle: 'Registrados',
+              color: AppColors.info,
+            );
+          },
+        )
+      else
+        StreamBuilder<List<PartidoModel>>(
+          stream: service.streamPartidos(campeonato.id),
+          builder: (context, snapshot) {
+            final finalizados = (snapshot.data ?? [])
+                .where((p) => p.resultadoRegistrado)
+                .length;
+
+            return StatCard(
+              title: 'Finalizados',
+              value: '$finalizados',
+              icon: Icons.emoji_events_outlined,
+              subtitle: 'Con resultado',
+              color: AppColors.info,
+            );
+          },
+        ),
       StatCard(
         title: 'Estado',
         value: estadoTexto,
@@ -564,10 +347,7 @@ class _LastResultsSection extends StatelessWidget {
                     padding: EdgeInsets.only(
                       bottom: index < partidos.length - 1 ? 10 : 0,
                     ),
-                    child: AppMatchCard(
-                      partido: partido,
-                      showResult: true,
-                    ),
+                    child: AppMatchCard(partido: partido, showResult: true),
                   );
                 }),
             ],
@@ -580,73 +360,204 @@ class _LastResultsSection extends StatelessWidget {
 
 class _TableSection extends StatelessWidget {
   final PublicHomeService service;
-  final String campeonatoId;
+  final CampeonatoModel campeonato;
 
-  const _TableSection({
-    required this.service,
-    required this.campeonatoId,
-  });
+  const _TableSection({required this.service, required this.campeonato});
+
+  /// Encabezados según el deporte:
+  /// - Fútbol: PJ, G, E, P, GF, GC, DG, Pts.
+  /// - Vóley: PJ, G, P, SF, SC, DS, PF, PC, DP, Pts (sets y puntos).
+  /// - Básquet: PJ, G, P, PF, PC, DP, Pts.
+  List<String> _headers() {
+    if (campeonato.esVolley) {
+      return const [
+        '#',
+        'Equipo',
+        'PJ',
+        'G',
+        'P',
+        'SF',
+        'SC',
+        'DS',
+        'PF',
+        'PC',
+        'DP',
+        'Pts',
+      ];
+    }
+
+    if (campeonato.esBasket) {
+      return const ['#', 'Equipo', 'PJ', 'G', 'P', 'PF', 'PC', 'DP', 'Pts'];
+    }
+
+    return const ['#', 'Equipo', 'PJ', 'G', 'E', 'P', 'GF', 'GC', 'DG', 'Pts'];
+  }
+
+  /// Estadísticas por equipo para la card compacta de móvil, sin
+  /// posición/nombre/puntos (esos van en la cabecera de la card).
+  List<MapEntry<String, String>> _statsCompactos(TablaPosicionModel item) {
+    if (campeonato.esVolley) {
+      return [
+        MapEntry('PJ', '${item.partidosJugados}'),
+        MapEntry('G', '${item.partidosGanados}'),
+        MapEntry('P', '${item.partidosPerdidos}'),
+        MapEntry('SF', '${item.golesFavor}'),
+        MapEntry('SC', '${item.golesContra}'),
+        MapEntry('DS', '${item.diferenciaGoles}'),
+        MapEntry('PF', '${item.puntosFavor}'),
+        MapEntry('PC', '${item.puntosContra}'),
+        MapEntry('DP', '${item.diferenciaPuntos}'),
+      ];
+    }
+
+    if (campeonato.esBasket) {
+      return [
+        MapEntry('PJ', '${item.partidosJugados}'),
+        MapEntry('G', '${item.partidosGanados}'),
+        MapEntry('P', '${item.partidosPerdidos}'),
+        MapEntry('PF', '${item.golesFavor}'),
+        MapEntry('PC', '${item.golesContra}'),
+        MapEntry('DP', '${item.diferenciaGoles}'),
+      ];
+    }
+
+    return [
+      MapEntry('PJ', '${item.partidosJugados}'),
+      MapEntry('G', '${item.partidosGanados}'),
+      MapEntry('E', '${item.partidosEmpatados}'),
+      MapEntry('P', '${item.partidosPerdidos}'),
+      MapEntry('GF', '${item.golesFavor}'),
+      MapEntry('GC', '${item.golesContra}'),
+      MapEntry('DG', '${item.diferenciaGoles}'),
+    ];
+  }
+
+  List<Widget> _row(TablaPosicionModel item) {
+    final posicion = _PositionCell(position: item.posicion);
+    // maxWidth acotado: sin esto, TextOverflow.ellipsis no recorta nada
+    // porque DataCell le da a su contenido ancho intrínseco (ilimitado).
+    final nombre = ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 170),
+      child: Text(
+        item.equipoNombre,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.bodyMedium,
+      ),
+    );
+    final puntos = Text(
+      '${item.puntos}',
+      style: AppTextStyles.bodyMedium.copyWith(
+        color: AppColors.primaryDark,
+        fontWeight: FontWeight.w900,
+      ),
+    );
+
+    if (campeonato.esVolley) {
+      // En vóley golesFavor/golesContra guardan sets a favor/en contra.
+      return [
+        posicion,
+        nombre,
+        Text('${item.partidosJugados}'),
+        Text('${item.partidosGanados}'),
+        Text('${item.partidosPerdidos}'),
+        Text('${item.golesFavor}'),
+        Text('${item.golesContra}'),
+        Text('${item.diferenciaGoles}'),
+        Text('${item.puntosFavor}'),
+        Text('${item.puntosContra}'),
+        Text('${item.diferenciaPuntos}'),
+        puntos,
+      ];
+    }
+
+    if (campeonato.esBasket) {
+      return [
+        posicion,
+        nombre,
+        Text('${item.partidosJugados}'),
+        Text('${item.partidosGanados}'),
+        Text('${item.partidosPerdidos}'),
+        Text('${item.golesFavor}'),
+        Text('${item.golesContra}'),
+        Text('${item.diferenciaGoles}'),
+        puntos,
+      ];
+    }
+
+    return [
+      posicion,
+      nombre,
+      Text('${item.partidosJugados}'),
+      Text('${item.partidosGanados}'),
+      Text('${item.partidosEmpatados}'),
+      Text('${item.partidosPerdidos}'),
+      Text('${item.golesFavor}'),
+      Text('${item.golesContra}'),
+      Text('${item.diferenciaGoles}'),
+      puntos,
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = Responsive.isMobile(context);
+
     return StreamBuilder<List<TablaPosicionModel>>(
-      stream: service.streamTabla(campeonatoId),
+      stream: service.streamTabla(campeonato.id),
       builder: (context, snapshot) {
         final tabla = snapshot.data ?? [];
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const AppCard(
-            child: AppLoading(message: 'Cargando tabla...'),
-          );
+          return const AppCard(child: AppLoading(message: 'Cargando tabla...'));
         }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const AppSectionHeader(
+            AppSectionHeader(
               title: 'Tabla de posiciones',
-              subtitle: 'Desempeño general de los equipos.',
+              subtitle: campeonato.esVolley
+                  ? 'Partidos, sets y puntos de cada equipo.'
+                  : 'Desempeño general de los equipos.',
             ),
             const SizedBox(height: 14),
-            AppTableContainer(
-              headers: const [
-                '#',
-                'Equipo',
-                'PJ',
-                'G',
-                'E',
-                'P',
-                'GF',
-                'GC',
-                'DG',
-                'Pts',
-              ],
-              rows: tabla.map((item) {
-                return [
-                  _PositionCell(position: item.posicion),
-                  Text(
-                    item.equipoNombre,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.bodyMedium,
-                  ),
-                  Text('${item.partidosJugados}'),
-                  Text('${item.partidosGanados}'),
-                  Text('${item.partidosEmpatados}'),
-                  Text('${item.partidosPerdidos}'),
-                  Text('${item.golesFavor}'),
-                  Text('${item.golesContra}'),
-                  Text('${item.diferenciaGoles}'),
-                  Text(
-                    '${item.puntos}',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.primaryDark,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ];
-              }).toList(),
-              emptyMessage: 'Todavía no hay tabla de posiciones.',
-            ),
+            // En móvil una DataTable con hasta 12 columnas obliga a un
+            // scroll horizontal poco descubrible y filas muy angostas.
+            // Se reemplaza por una card por equipo con sus estadísticas
+            // en una grilla compacta, igual que se hizo con AppHeroCard.
+            if (isMobile)
+              tabla.isEmpty
+                  ? AppCard(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Text(
+                            'Todavía no hay tabla de posiciones.',
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : Column(
+                      children: tabla.map((item) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: AppStandingCard(
+                            item: item,
+                            stats: _statsCompactos(item),
+                          ),
+                        );
+                      }).toList(),
+                    )
+            else
+              AppTableContainer(
+                headers: _headers(),
+                rows: tabla.map(_row).toList(),
+                emptyMessage: 'Todavía no hay tabla de posiciones.',
+              ),
           ],
         );
       },
@@ -657,9 +568,7 @@ class _TableSection extends StatelessWidget {
 class _PositionCell extends StatelessWidget {
   final int position;
 
-  const _PositionCell({
-    required this.position,
-  });
+  const _PositionCell({required this.position});
 
   @override
   Widget build(BuildContext context) {
@@ -673,7 +582,9 @@ class _PositionCell extends StatelessWidget {
         color: isTop ? AppColors.primaryLight : AppColors.surfaceSoft,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isTop ? AppColors.primary.withOpacity(0.18) : AppColors.border,
+          color: isTop
+              ? AppColors.primary.withValues(alpha: 0.18)
+              : AppColors.border,
         ),
       ),
       child: Text(
@@ -689,18 +600,58 @@ class _PositionCell extends StatelessWidget {
 
 class _ScorersSection extends StatelessWidget {
   final PublicHomeService service;
-  final String campeonatoId;
+  final CampeonatoModel campeonato;
 
-  const _ScorersSection({
-    required this.service,
-    required this.campeonatoId,
-  });
+  const _ScorersSection({required this.service, required this.campeonato});
 
   @override
   Widget build(BuildContext context) {
+    // El ranking individual solo existe para fútbol/futsal.
+    // Vóley y básquet quedan preparados para estadísticas de jugadores
+    // en una siguiente fase.
+    if (campeonato.esVolley) {
+      return const AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppSectionHeader(
+              title: 'Estadísticas',
+              subtitle: 'Estadísticas individuales de vóley.',
+            ),
+            SizedBox(height: 16),
+            AppInlineEmptyState(
+              icon: Icons.sports_volleyball_outlined,
+              text:
+                  'Las estadísticas por jugador de vóley estarán disponibles próximamente. Mientras tanto revisa la tabla con sets y puntos.',
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (campeonato.esBasket) {
+      return const AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppSectionHeader(
+              title: 'Anotadores',
+              subtitle: 'Ranking individual de puntos.',
+            ),
+            SizedBox(height: 16),
+            AppInlineEmptyState(
+              icon: Icons.sports_basketball_outlined,
+              text:
+                  'El registro de puntos por jugador estará disponible próximamente. El marcador por equipo ya se registra en Resultados.',
+            ),
+          ],
+        ),
+      );
+    }
+
     return AppCard(
       child: StreamBuilder<List<RankingGoleadorModel>>(
-        stream: service.streamRankingGoleadores(campeonatoId),
+        stream: service.streamRankingGoleadores(campeonato.id),
         builder: (context, snapshot) {
           final ranking = snapshot.data ?? [];
 
@@ -727,10 +678,7 @@ class _ScorersSection extends StatelessWidget {
                     padding: EdgeInsets.only(
                       bottom: index < ranking.length - 1 ? 10 : 0,
                     ),
-                    child: _ScorerTile(
-                      position: index + 1,
-                      item: item,
-                    ),
+                    child: _ScorerTile(position: index + 1, item: item),
                   );
                 }),
             ],
@@ -745,10 +693,7 @@ class _ScorerTile extends StatelessWidget {
   final int position;
   final RankingGoleadorModel item;
 
-  const _ScorerTile({
-    required this.position,
-    required this.item,
-  });
+  const _ScorerTile({required this.position, required this.item});
 
   @override
   Widget build(BuildContext context) {
@@ -760,11 +705,13 @@ class _ScorerTile extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isTop
-            ? AppColors.primaryLight.withOpacity(0.65)
+            ? AppColors.primaryLight.withValues(alpha: 0.65)
             : AppColors.surfaceSoft,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: isTop ? AppColors.primary.withOpacity(0.14) : AppColors.border,
+          color: isTop
+              ? AppColors.primary.withValues(alpha: 0.14)
+              : AppColors.border,
         ),
       ),
       child: Row(

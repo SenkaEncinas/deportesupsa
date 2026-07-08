@@ -16,10 +16,7 @@ import 'reciclaje/app_text_styles.dart';
 class AuditoriaScreen extends StatelessWidget {
   final String campeonatoId;
 
-  const AuditoriaScreen({
-    super.key,
-    required this.campeonatoId,
-  });
+  const AuditoriaScreen({super.key, required this.campeonatoId});
 
   Stream<List<AuditoriaModel>> _streamAuditoria() {
     return FirebaseFirestore.instance
@@ -30,10 +27,10 @@ class AuditoriaScreen extends StatelessWidget {
         .limit(80)
         .snapshots()
         .map((snap) {
-      return snap.docs.map((doc) {
-        return AuditoriaModel.fromMap(doc.id, doc.data());
-      }).toList();
-    });
+          return snap.docs.map((doc) {
+            return AuditoriaModel.fromMap(doc.id, doc.data());
+          }).toList();
+        });
   }
 
   String _fechaTexto(DateTime? fecha) {
@@ -103,18 +100,22 @@ class AuditoriaScreen extends StatelessWidget {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
+                                    // Wrap en vez de Row + Spacer: con textos
+                                    // largos la fila desbordaba en móvil.
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
                                       children: [
                                         AppBadge(
                                           text: item.modulo,
                                           type: AppBadgeType.primary,
                                         ),
-                                        const SizedBox(width: 8),
                                         AppBadge(
                                           text: item.accion,
                                           type: AppBadgeType.info,
                                         ),
-                                        const Spacer(),
                                         Text(
                                           _fechaTexto(item.fecha),
                                           style: AppTextStyles.small,
@@ -134,15 +135,18 @@ class AuditoriaScreen extends StatelessWidget {
                                       ),
                                     ),
                                     if (item.observacion != null &&
-                                        item.observacion!.trim().isNotEmpty) ...[
+                                        item.observacion!
+                                            .trim()
+                                            .isNotEmpty) ...[
                                       const SizedBox(height: 8),
                                       Container(
                                         width: double.infinity,
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           color: AppColors.primaryLight,
-                                          borderRadius:
-                                              BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
                                         ),
                                         child: Text(
                                           item.observacion!,

@@ -4,14 +4,13 @@ import '../models/campeonato_model.dart';
 import '../services/public_home_service.dart';
 import 'championship_detail_screen.dart';
 import 'login_screen.dart';
-import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
+import 'reciclaje/app_hero_card.dart';
 import 'reciclaje/app_inline_empty_state.dart';
 import 'reciclaje/app_loading.dart';
-import 'reciclaje/app_logo_mark.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_section_header.dart';
@@ -137,11 +136,37 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _HomeHero(
-                        totalCampeonatos: campeonatos.length,
-                        activos: campeonatos
-                            .where((item) => item.estado == CampeonatoEstado.activo)
-                            .length,
+                      AppHeroCard(
+                        title: 'Portal público de campeonatos UPSA',
+                        description:
+                            'Consulta campeonatos activos, fixtures, resultados, tablas de posiciones y ranking de goleadores desde un solo lugar.',
+                        chips: const [
+                          AppHeroChipData(
+                            icon: Icons.school_outlined,
+                            text: 'UPSA',
+                          ),
+                          AppHeroChipData(
+                            icon: Icons.sports_soccer,
+                            text: 'Fútbol y futsal',
+                          ),
+                          AppHeroChipData(
+                            icon: Icons.public_outlined,
+                            text: 'Vista pública',
+                          ),
+                        ],
+                        infoItems: [
+                          AppHeroInfoItem(
+                            icon: Icons.emoji_events_outlined,
+                            label: 'Campeonatos',
+                            value: '${campeonatos.length}',
+                          ),
+                          AppHeroInfoItem(
+                            icon: Icons.verified_outlined,
+                            label: 'Activos',
+                            value:
+                                '${campeonatos.where((item) => item.estado == CampeonatoEstado.activo).length}',
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 22),
                       _FiltersCard(
@@ -209,255 +234,6 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _HomeHero extends StatelessWidget {
-  final int totalCampeonatos;
-  final int activos;
-
-  const _HomeHero({
-    required this.totalCampeonatos,
-    required this.activos,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
-    return AppCard(
-      showBorder: false,
-      padding: EdgeInsets.zero,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF003D2D),
-              Color(0xFF005C45),
-              AppColors.primary,
-            ],
-          ),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(isMobile ? 22 : 30),
-          child: isMobile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const AppLogoMark(),
-                    const SizedBox(height: 20),
-                    _HeroText(),
-                    const SizedBox(height: 20),
-                    _HeroStats(
-                      totalCampeonatos: totalCampeonatos,
-                      activos: activos,
-                    ),
-                  ],
-                )
-              : Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          AppLogoMark(),
-                          SizedBox(height: 22),
-                          _HeroText(),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 28),
-                    _HeroStats(
-                      totalCampeonatos: totalCampeonatos,
-                      activos: activos,
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeroText extends StatelessWidget {
-  const _HeroText();
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Portal público de campeonatos UPSA',
-          style: AppTextStyles.heading1.copyWith(
-            color: AppColors.white,
-            fontSize: isMobile ? 26 : 34,
-            letterSpacing: -0.4,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          constraints: const BoxConstraints(maxWidth: 660),
-          child: Text(
-            'Consulta campeonatos activos, fixtures, resultados, tablas de posiciones y ranking de goleadores desde un solo lugar.',
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.white.withOpacity(0.88),
-              fontSize: isMobile ? 14 : 15,
-              height: 1.55,
-            ),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: const [
-            _HeroChip(
-              icon: Icons.school_outlined,
-              text: 'UPSA',
-            ),
-            _HeroChip(
-              icon: Icons.sports_soccer,
-              text: 'Fútbol y futsal',
-            ),
-            _HeroChip(
-              icon: Icons.public_outlined,
-              text: 'Vista pública',
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _HeroStats extends StatelessWidget {
-  final int totalCampeonatos;
-  final int activos;
-
-  const _HeroStats({
-    required this.totalCampeonatos,
-    required this.activos,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
-    return Container(
-      width: isMobile ? double.infinity : 280,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.white.withOpacity(0.18),
-        ),
-      ),
-      child: Column(
-        children: [
-          _HeroStatLine(
-            label: 'Campeonatos',
-            value: '$totalCampeonatos',
-            icon: Icons.emoji_events_outlined,
-          ),
-          const SizedBox(height: 14),
-          _HeroStatLine(
-            label: 'Activos',
-            value: '$activos',
-            icon: Icons.verified_outlined,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroStatLine extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-
-  const _HeroStatLine({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: AppColors.white,
-          size: 22,
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            label,
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.white.withOpacity(0.78),
-            ),
-          ),
-        ),
-        Text(
-          value,
-          style: AppTextStyles.heading2.copyWith(
-            color: AppColors.white,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _HeroChip extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _HeroChip({
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 11,
-        vertical: 7,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.white.withOpacity(0.11),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: AppColors.white.withOpacity(0.14),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: AppColors.white),
-          const SizedBox(width: 7),
-          Text(
-            text,
-            style: AppTextStyles.small.copyWith(
-              color: AppColors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
       ),
     );
   }

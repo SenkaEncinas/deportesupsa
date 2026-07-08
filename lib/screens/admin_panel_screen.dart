@@ -13,8 +13,8 @@ import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
+import 'reciclaje/app_hero_card.dart';
 import 'reciclaje/app_loading.dart';
-import 'reciclaje/app_logo_mark.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_section_header.dart';
@@ -171,11 +171,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _AdminHeaderCard(
-                            admin: admin,
-                            loadingAdmin: loadingAdmin,
-                            totalCampeonatos: campeonatos.length,
-                            onOpenCampeonatos: _openCampeonatos,
+                          AppHeroCard(
+                            title: loadingAdmin
+                                ? 'Cargando...'
+                                : admin != null
+                                    ? 'Bienvenido, ${admin.nombre}'
+                                    : 'Panel Administrativo',
+                            description:
+                                'Gestiona campeonatos, equipos y resultados desde aquí.',
+                            side: _AdminResumeBox(
+                              totalCampeonatos: campeonatos.length,
+                              onOpenCampeonatos: _openCampeonatos,
+                            ),
                           ),
                           const SizedBox(height: 20),
                           _AdminStats(campeonatos: campeonatos),
@@ -205,117 +212,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   }
 }
 
-class _AdminHeaderCard extends StatelessWidget {
-  final AdminModel? admin;
-  final bool loadingAdmin;
-  final int totalCampeonatos;
-  final VoidCallback onOpenCampeonatos;
-
-  const _AdminHeaderCard({
-    required this.admin,
-    required this.loadingAdmin,
-    required this.totalCampeonatos,
-    required this.onOpenCampeonatos,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
-    return AppCard(
-      showBorder: false,
-      padding: EdgeInsets.zero,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF003D2D),
-              Color(0xFF005C45),
-              AppColors.primary,
-            ],
-          ),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(isMobile ? 22 : 30),
-          child: isMobile
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const AppLogoMark(),
-                    const SizedBox(height: 20),
-                    _HeaderText(
-                      admin: admin,
-                      loadingAdmin: loadingAdmin,
-                    ),
-                    const SizedBox(height: 20),
-                    _AdminResumeBox(
-                      totalCampeonatos: totalCampeonatos,
-                      onOpenCampeonatos: onOpenCampeonatos,
-                    ),
-                  ],
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const AppLogoMark(),
-                    const SizedBox(width: 24),
-                    Expanded(
-                      child: _HeaderText(
-                        admin: admin,
-                        loadingAdmin: loadingAdmin,
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                    _AdminResumeBox(
-                      totalCampeonatos: totalCampeonatos,
-                      onOpenCampeonatos: onOpenCampeonatos,
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderText extends StatelessWidget {
-  final AdminModel? admin;
-  final bool loadingAdmin;
-
-  const _HeaderText({
-    required this.admin,
-    required this.loadingAdmin,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          loadingAdmin
-              ? 'Cargando...'
-              : admin != null
-                  ? 'Bienvenido, ${admin!.nombre}'
-                  : 'Panel Administrativo',
-          style: AppTextStyles.heading1.copyWith(color: Colors.white),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Gestiona campeonatos, equipos y resultados desde aquí.',
-          style: AppTextStyles.body.copyWith(
-            color: Colors.white.withOpacity(0.75),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _AdminResumeBox extends StatelessWidget {
   final int totalCampeonatos;
   final VoidCallback onOpenCampeonatos;
@@ -332,9 +228,9 @@ class _AdminResumeBox extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
+          color: Colors.white.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [
@@ -345,7 +241,7 @@ class _AdminResumeBox extends StatelessWidget {
             Text(
               'Campeonatos',
               style: AppTextStyles.small.copyWith(
-                color: Colors.white.withOpacity(0.75),
+                color: Colors.white.withValues(alpha: 0.75),
               ),
             ),
           ],

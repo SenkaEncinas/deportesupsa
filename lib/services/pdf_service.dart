@@ -56,7 +56,6 @@ class PdfRankingGoleadorItem {
 }
 
 class PdfService {
-  static final PdfColor _verde = PdfColor.fromHex('006B4F');
   static final PdfColor _verdeOscuro = PdfColor.fromHex('004D3A');
   static final PdfColor _verdeTexto = PdfColor.fromHex('4F7F3A');
   static final PdfColor _grisClaro = PdfColor.fromHex('E5E7EB');
@@ -145,9 +144,22 @@ class PdfService {
     return '${_fechaCorta(inicio)} - ${_fechaCorta(fin)}';
   }
 
+  /// Etiqueta del deporte en mayúsculas para títulos de PDF.
+  /// Los campeonatos antiguos sin deporte se tratan como fútbol.
+  String _deporteLabel(CampeonatoModel campeonato) {
+    switch (campeonato.deporteEfectivo) {
+      case DeporteTipo.volley:
+        return 'VÓLEY';
+      case DeporteTipo.basket:
+        return 'BÁSQUET';
+      default:
+        return 'FÚTBOL';
+    }
+  }
+
   String _tituloCampeonato(CampeonatoModel campeonato) {
     return campeonato.nombre.trim().isEmpty
-        ? 'FÚTBOL INTERCARRERAS'
+        ? '${_deporteLabel(campeonato)} INTERCARRERAS'
         : campeonato.nombre.trim().toUpperCase();
   }
 
@@ -313,7 +325,7 @@ class PdfService {
               logos: logos,
             ),
             pw.SizedBox(height: 24),
-            pw.Table.fromTextArray(
+            pw.TableHelper.fromTextArray(
               headers: const [
                 'POS.',
                 'JUGADOR',
@@ -727,11 +739,17 @@ class PdfService {
                   borderRadius: pw.BorderRadius.circular(8),
                 ),
                 child: pw.Text(
-                  '${partido.golesLocal ?? 0} - ${partido.golesVisitante ?? 0}',
+                  // Incluye penales si el partido se definió así,
+                  // por ejemplo: "1 - 1 (4 - 3 pen.)".
+                  partido.definidoPorPenales &&
+                          partido.penalesLocal != null &&
+                          partido.penalesVisitante != null
+                      ? '${partido.golesLocal ?? 0} - ${partido.golesVisitante ?? 0} (${partido.penalesLocal} - ${partido.penalesVisitante} pen.)'
+                      : '${partido.golesLocal ?? 0} - ${partido.golesVisitante ?? 0}',
                   textAlign: pw.TextAlign.center,
                   style: pw.TextStyle(
                     color: PdfColors.white,
-                    fontSize: 20,
+                    fontSize: partido.definidoPorPenales ? 11 : 20,
                     fontWeight: pw.FontWeight.bold,
                   ),
                 ),
@@ -877,7 +895,10 @@ class PdfService {
                     style: const pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(
-                    'FÚTBOL',
+                    // La planilla usa el deporte del campeonato. La versión
+                    // específica para vóley (sets) y básquet (faltas) queda
+                    // preparada para una siguiente fase.
+                    _deporteLabel(campeonato),
                     style: pw.TextStyle(
                       fontSize: 11,
                       fontWeight: pw.FontWeight.bold,
@@ -1244,7 +1265,7 @@ class PdfService {
   }
 
   pw.Widget _listaEquipoTable(List<JugadorModel> jugadores) {
-    return pw.Table.fromTextArray(
+    return pw.TableHelper.fromTextArray(
       headers: const [
         'N°',
         'Número de registro',

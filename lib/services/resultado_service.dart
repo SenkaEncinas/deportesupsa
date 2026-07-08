@@ -82,6 +82,15 @@ class ResultadoService {
     return _campeonato(campeonatoId).collection('ranking_goleadores');
   }
 
+  /// Registra el resultado de un partido según el deporte del campeonato.
+  ///
+  /// - Fútbol/futsal: [golesLocal]/[golesVisitante] son goles. Si el
+  ///   formato no permite empate y el marcador queda igualado, se exigen
+  ///   [penalesLocal]/[penalesVisitante] con un ganador.
+  /// - Vóley: se envía [sets] con el detalle de cada set;
+  ///   [golesLocal]/[golesVisitante] guardan los sets ganados.
+  /// - Básquet: [golesLocal]/[golesVisitante] son puntos; no se permite
+  ///   empate y puede marcarse [definidoPorProrroga].
   Future<void> registrarResultado({
     required String campeonatoId,
     required String partidoId,
@@ -92,9 +101,13 @@ class ResultadoService {
     String tipoResultado = TipoResultado.normal,
     String? observacionResultado,
     required String usuarioId,
+    int? penalesLocal,
+    int? penalesVisitante,
+    bool definidoPorProrroga = false,
+    List<SetPartido> sets = const [],
   }) async {
     if (golesLocal < 0 || golesVisitante < 0) {
-      throw Exception('Los goles no pueden ser negativos.');
+      throw Exception('El marcador no puede tener valores negativos.');
     }
 
     final campeonatoDoc = await _campeonato(campeonatoId).get();
@@ -144,7 +157,16 @@ class ResultadoService {
       );
     }
 
-    if (tipoResultado == TipoResultado.normal) {
+    final sistemaResultado = campeonato.sistemaResultadoEfectivo;
+    final esFutbol = sistemaResultado == SistemaResultado.goles;
+
+    if (!esFutbol && golesJugadores.isNotEmpty) {
+      throw Exception(
+        'El registro de goles por jugador solo aplica a fútbol/futsal.',
+      );
+    }
+
+    if (esFutbol && tipoResultado == TipoResultado.normal) {
       final sumaLocal = golesJugadores
           .where((gol) => gol.equipoId == partido.equipoLocalId)
           .fold<int>(0, (total, gol) => total + gol.cantidad);
@@ -200,13 +222,126 @@ class ResultadoService {
       }
     }
 
-    final empate = golesLocal == golesVisitante;
+    var empate = golesLocal == golesVisitante;
     String? ganadorId;
+    var tipoDefinicion = TipoDefinicion.normal;
+    int? penalesLocalFinal;
+    int? penalesVisitanteFinal;
+    var definidoPorPenales = false;
+    var prorrogaFinal = false;
+    var setsFinal = <SetPartido>[];
+
+    if (tipoResultado == TipoResultado.walkover) {
+      tipoDefinicion = TipoDefinicion.walkover;
+    } else if (tipoResultado == TipoResultado.sancion) {
+      tipoDefinicion = TipoDefinicion.sancion;
+    }
 
     if (!empate) {
       ganadorId = golesLocal > golesVisitante
           ? partido.equipoLocalId
           : partido.equipoVisitanteId;
+    }
+
+    if (tipoResultado == TipoResultado.normal) {
+      if (sistemaResultado == SistemaResultado.sets) {
+        // ---- Vóley: resultado por sets, sin empates. ----
+        if (sets.isEmpty) {
+          throw Exception('Debes registrar el detalle de los sets.');
+        }
+
+        var setsGanadosLocal = 0;
+        var setsGanadosVisitante = 0;
+
+        for (final set in sets) {
+          if (set.local < 0 || set.visitante < 0) {
+            throw Exception('Los puntos de un set no pueden ser negativos.');
+          }
+          if (set.local == set.visitante) {
+            throw Exception(
+              'Un set no puede terminar empatado (${set.local}-${set.visitante}).',
+            );
+          }
+          if (set.local > set.visitante) {
+            setsGanadosLocal++;
+          } else {
+            setsGanadosVisitante++;
+          }
+        }
+
+        final setsParaGanar = campeonato.configuracion.setsParaGanar;
+
+        if (setsGanadosLocal != golesLocal ||
+            setsGanadosVisitante != golesVisitante) {
+          throw Exception(
+            'El marcador de sets no coincide con el detalle registrado.',
+          );
+        }
+
+        if (setsGanadosLocal < setsParaGanar &&
+            setsGanadosVisitante < setsParaGanar) {
+          throw Exception(
+            'Ningún equipo alcanzó los $setsParaGanar sets necesarios para ganar.',
+          );
+        }
+
+        if (setsGanadosLocal >= setsParaGanar &&
+            setsGanadosVisitante >= setsParaGanar) {
+          throw Exception('Ambos equipos no pueden ganar el partido.');
+        }
+
+        empate = false;
+        ganadorId = setsGanadosLocal > setsGanadosVisitante
+            ? partido.equipoLocalId
+            : partido.equipoVisitanteId;
+        setsFinal = sets;
+      } else if (sistemaResultado == SistemaResultado.puntos) {
+        // ---- Básquet: resultado por puntos, sin empate final. ----
+        if (golesLocal == golesVisitante) {
+          throw Exception(
+            'El básquet no permite empate. Registra los puntos finales después de la prórroga.',
+          );
+        }
+
+        empate = false;
+        prorrogaFinal = definidoPorProrroga;
+
+        if (prorrogaFinal) {
+          tipoDefinicion = TipoDefinicion.prorroga;
+        }
+      } else {
+        // ---- Fútbol/futsal: goles, con penales si no se permite empate. ----
+        final requiereGanador =
+            !campeonato.configuracion.permiteEmpate ||
+                campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
+
+        if (empate && requiereGanador) {
+          if (penalesLocal == null || penalesVisitante == null) {
+            throw Exception(
+              'Este formato no permite empates: registra los penales para definir un ganador.',
+            );
+          }
+
+          if (penalesLocal < 0 || penalesVisitante < 0) {
+            throw Exception('Los penales no pueden ser negativos.');
+          }
+
+          if (penalesLocal == penalesVisitante) {
+            throw Exception(
+              'Los penales no pueden terminar empatados. Debe haber un ganador.',
+            );
+          }
+
+          empate = false;
+          definidoPorPenales = true;
+          tipoDefinicion = TipoDefinicion.penales;
+          penalesLocalFinal = penalesLocal;
+          penalesVisitanteFinal = penalesVisitante;
+          ganadorId = penalesLocal > penalesVisitante
+              ? partido.equipoLocalId
+              : partido.equipoVisitanteId;
+        }
+      }
     }
 
     final golesAnteriores = await _goles(campeonatoId)
@@ -236,6 +371,12 @@ class ResultadoService {
       'resultadoRegistrado': true,
       'tipoResultado': tipoResultado,
       'observacionResultado': observacionResultado?.trim(),
+      'penalesLocal': penalesLocalFinal,
+      'penalesVisitante': penalesVisitanteFinal,
+      'definidoPorPenales': definidoPorPenales,
+      'definidoPorProrroga': prorrogaFinal,
+      'tipoDefinicion': tipoDefinicion,
+      'sets': setsFinal.map((set) => set.toMap()).toList(),
       'fechaActualizacion': FieldValue.serverTimestamp(),
     });
 
@@ -333,6 +474,22 @@ class ResultadoService {
       visitante.golesFavor += partido.golesVisitante!;
       visitante.golesContra += partido.golesLocal!;
 
+      // Puntos favor/contra: en vóley se suman los puntos de cada set;
+      // en fútbol/básquet coinciden con el marcador del partido.
+      if (partido.sets.isNotEmpty) {
+        for (final set in partido.sets) {
+          local.puntosFavor += set.local;
+          local.puntosContra += set.visitante;
+          visitante.puntosFavor += set.visitante;
+          visitante.puntosContra += set.local;
+        }
+      } else {
+        local.puntosFavor += partido.golesLocal!;
+        local.puntosContra += partido.golesVisitante!;
+        visitante.puntosFavor += partido.golesVisitante!;
+        visitante.puntosContra += partido.golesLocal!;
+      }
+
       if (partido.golesLocal! > partido.golesVisitante!) {
         local.partidosGanados++;
         visitante.partidosPerdidos++;
@@ -355,6 +512,7 @@ class ResultadoService {
 
     for (final item in tablaOrdenada) {
       item.diferenciaGoles = item.golesFavor - item.golesContra;
+      item.diferenciaPuntos = item.puntosFavor - item.puntosContra;
     }
 
     tablaOrdenada.sort((a, b) {
@@ -397,6 +555,9 @@ class ResultadoService {
         puntos: item.puntos,
         posicion: i + 1,
         fechaActualizacion: DateTime.now(),
+        puntosFavor: item.puntosFavor,
+        puntosContra: item.puntosContra,
+        diferenciaPuntos: item.diferenciaPuntos,
       );
 
       batch.set(
@@ -488,6 +649,9 @@ class _TablaAcumulada {
   int golesContra = 0;
   int diferenciaGoles = 0;
   int puntos = 0;
+  int puntosFavor = 0;
+  int puntosContra = 0;
+  int diferenciaPuntos = 0;
 
   _TablaAcumulada({
     required this.equipoId,

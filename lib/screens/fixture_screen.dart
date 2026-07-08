@@ -13,10 +13,18 @@ import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
+import 'reciclaje/app_filter_pill.dart';
 import 'reciclaje/app_loading.dart';
+import 'reciclaje/app_match_card.dart';
 import 'reciclaje/app_page.dart';
+import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
+import 'reciclaje/responsive.dart';
+import 'reciclaje/stat_card.dart';
+
+/// Filtros disponibles para la lista de partidos del fixture.
+enum _FixtureFiltro { todos, sinProgramar, programados, manuales, automaticos }
 
 class FixtureScreen extends StatefulWidget {
   final String campeonatoId;
@@ -37,19 +45,23 @@ class _FixtureScreenState extends State<FixtureScreen> {
   final PdfService _pdfService = PdfService();
 
   bool _loading = false;
+  _FixtureFiltro _filtro = _FixtureFiltro.todos;
 
-  Future<void> _generarFixture() async {
+  Future<void> _generarFixture(CampeonatoModel campeonato) async {
     setState(() {
       _loading = true;
     });
 
     try {
-      await _partidoService.generarFixtureIdaVueltaAleatorio(
-        campeonatoId: widget.campeonatoId,
+      await _partidoService.generarFixtureSegunFormato(
+        campeonato: campeonato,
       );
 
       if (!mounted) return;
-      AppSnackbars.success(context, 'Fixture aleatorio generado correctamente.');
+      AppSnackbars.success(
+        context,
+        'Fixture generado respetando el formato "${_tipoTexto(campeonato.tipoCampeonato)}".',
+      );
     } catch (e) {
       if (!mounted) return;
       AppSnackbars.error(
@@ -98,6 +110,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
         equipoVisitante: result.visitante,
         jornada: result.jornada,
         idaYVuelta: result.idaYVuelta,
+        grupoId: result.grupoId,
       );
 
       if (!mounted) return;
@@ -186,20 +199,81 @@ class _FixtureScreenState extends State<FixtureScreen> {
     );
   }
 
-  String _fechaTexto(DateTime? fecha) {
-    if (fecha == null) return 'Sin programar';
-
-    final d = fecha.day.toString().padLeft(2, '0');
-    final m = fecha.month.toString().padLeft(2, '0');
-    final y = fecha.year;
-    final h = fecha.hour.toString().padLeft(2, '0');
-    final min = fecha.minute.toString().padLeft(2, '0');
-
-    return '$d/$m/$y $h:$min';
+  List<PartidoModel> _aplicarFiltro(List<PartidoModel> partidos) {
+    switch (_filtro) {
+      case _FixtureFiltro.sinProgramar:
+        return partidos.where((p) => p.fechaHora == null).toList();
+      case _FixtureFiltro.programados:
+        return partidos.where((p) => p.fechaHora != null).toList();
+      case _FixtureFiltro.manuales:
+        return partidos.where((p) => !p.generadoPorSistema).toList();
+      case _FixtureFiltro.automaticos:
+        return partidos.where((p) => p.generadoPorSistema).toList();
+      case _FixtureFiltro.todos:
+        return partidos;
+    }
   }
 
-  String _modoTexto(PartidoModel partido) {
-    return partido.generadoPorSistema ? 'Aleatorio' : 'Manual';
+  /// Agrupa los partidos para mostrarlos por secciones:
+  /// primero por grupo (si existe), luego por vuelta.
+  Map<String, List<PartidoModel>> _agruparPartidos(
+    List<PartidoModel> partidos,
+    CampeonatoModel? campeonato,
+  ) {
+    final grupos = <String, List<PartidoModel>>{};
+
+    final tieneGrupos =
+        partidos.any((p) => p.grupoId != null && p.grupoId!.isNotEmpty);
+    final tieneVarias = partidos.any((p) => p.vuelta > 1);
+    final esEliminacion =
+        campeonato?.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
+
+    for (final partido in partidos) {
+      String clave;
+
+      if (tieneGrupos) {
+        clave = (partido.grupoId == null || partido.grupoId!.isEmpty)
+            ? 'Fase final'
+            : partido.grupoId!;
+      } else if (esEliminacion) {
+        clave = 'Llaves · Ronda ${partido.jornada}';
+      } else if (tieneVarias) {
+        clave = 'Vuelta ${partido.vuelta}';
+      } else {
+        clave = 'Partidos';
+      }
+
+      grupos.putIfAbsent(clave, () => []).add(partido);
+    }
+
+    for (final lista in grupos.values) {
+      lista.sort((a, b) {
+        final vuelta = a.vuelta.compareTo(b.vuelta);
+        if (vuelta != 0) return vuelta;
+        return a.jornada.compareTo(b.jornada);
+      });
+    }
+
+    return grupos;
+  }
+
+  bool _esFormatoDosFases(CampeonatoModel campeonato) {
+    return campeonato.tipoCampeonato == TipoCampeonato.ligaFinal ||
+        campeonato.tipoCampeonato == TipoCampeonato.ligaPlayoffs ||
+        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
+  }
+
+  String _mensajeDosFases(CampeonatoModel campeonato) {
+    switch (campeonato.tipoCampeonato) {
+      case TipoCampeonato.ligaFinal:
+        return 'Liga + final: cuando termine la liga y la tabla esté completa, crea la final con "Agregar cruce manual" usando a los mejores clasificados. La generación automática de la final queda preparada para una siguiente fase.';
+      case TipoCampeonato.ligaPlayoffs:
+        return 'Liga + playoffs: al terminar la fase de liga, crea las llaves de playoffs con "Agregar cruce manual" según la tabla final (${campeonato.configuracion.clasificadosPlayoffs} clasificados).';
+      case TipoCampeonato.gruposEliminacion:
+        return 'Grupos + eliminación: al terminar la fase de grupos, crea las llaves con "Agregar cruce manual" usando a los ${campeonato.configuracion.clasificanPorGrupo} mejores de cada grupo.';
+      default:
+        return '';
+    }
   }
 
   @override
@@ -226,29 +300,40 @@ class _FixtureScreenState extends State<FixtureScreen> {
               }
 
               final partidos = snapshot.data ?? [];
+              final filtrados = _aplicarFiltro(partidos);
+              final secciones = _agruparPartidos(filtrados, campeonato);
 
               final puedeEditarFixture =
                   campeonato != null &&
                   campeonato.estado != CampeonatoEstado.finalizado;
+
+              final programados =
+                  partidos.where((p) => p.fechaHora != null).length;
+              final pendientes =
+                  partidos.where((p) => p.fechaHora == null).length;
+              final manuales =
+                  partidos.where((p) => !p.generadoPorSistema).length;
 
               return SingleChildScrollView(
                 child: AppPage(
                   title: 'Fixture',
                   subtitle: campeonato == null
                       ? 'Cruces y programación de partidos.'
-                      : campeonato.nombre,
+                      : '${campeonato.nombre} · ${_tipoTexto(campeonato.tipoCampeonato)}',
                   actions: [
                     AppButton.secondary(
                       text: 'Volver',
                       icon: Icons.arrow_back,
                       onPressed: () => Navigator.pop(context),
                     ),
-                    if (puedeEditarFixture && partidos.isEmpty)
+                    if (puedeEditarFixture &&
+                        partidos.isEmpty &&
+                        campeonato.configuracion.generaCrucesAleatorios)
                       AppButton.primary(
-                        text: 'Modo aleatorio',
+                        text: 'Generar fixture',
                         icon: Icons.shuffle,
                         loading: _loading,
-                        onPressed: _generarFixture,
+                        onPressed: () => _generarFixture(campeonato),
                       ),
                     if (puedeEditarFixture)
                       AppButton.secondary(
@@ -268,84 +353,315 @@ class _FixtureScreenState extends State<FixtureScreen> {
                       ),
                   ],
                   child: partidos.isEmpty
-                      ? AppEmptyState(
-                          icon: Icons.calendar_month_outlined,
-                          title: 'No hay fixture generado',
-                          message:
-                              'Puedes generar el fixture completo en modo aleatorio o agregar cruces manuales uno por uno.',
-                          buttonText:
-                              puedeEditarFixture ? 'Agregar cruce manual' : null,
-                          onPressed:
-                              puedeEditarFixture ? _crearCruceManual : null,
+                      ? Column(
+                          children: [
+                            AppEmptyState(
+                              icon: Icons.calendar_month_outlined,
+                              title: 'No hay fixture generado',
+                              message: campeonato == null
+                                  ? 'Puedes generar el fixture completo o agregar cruces manuales uno por uno.'
+                                  : 'El botón "Generar fixture" creará los cruces según el formato "${_tipoTexto(campeonato.tipoCampeonato)}". También puedes agregar cruces manuales uno por uno.',
+                              buttonText: puedeEditarFixture
+                                  ? 'Agregar cruce manual'
+                                  : null,
+                              onPressed:
+                                  puedeEditarFixture ? _crearCruceManual : null,
+                            ),
+                          ],
                         )
                       : Column(
-                          children: partidos.map((partido) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: AppCard(
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Wrap(
-                                            spacing: 8,
-                                            runSpacing: 8,
-                                            children: [
-                                              AppBadge(
-                                                text: partido.estado,
-                                                type: AppBadge.typeFromEstado(
-                                                  partido.estado,
-                                                ),
-                                              ),
-                                              AppBadge(
-                                                text: _modoTexto(partido),
-                                                type: partido.generadoPorSistema
-                                                    ? AppBadgeType.info
-                                                    : AppBadgeType.primary,
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 10),
-                                          Text(
-                                            '${partido.equipoLocalNombre} vs ${partido.equipoVisitanteNombre}',
-                                            style: AppTextStyles.heading3,
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            'Vuelta ${partido.vuelta} · Jornada ${partido.jornada}',
-                                            style: AppTextStyles.small,
-                                          ),
-                                          Text(
-                                            _fechaTexto(partido.fechaHora),
-                                            style: AppTextStyles.bodyMedium,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    AppButton.secondary(
-                                      text: partido.fechaHora == null
-                                          ? 'Programar'
-                                          : 'Reprogramar',
-                                      icon: Icons.edit_calendar_outlined,
-                                      onPressed: campeonato?.estado ==
-                                              CampeonatoEstado.finalizado
-                                          ? null
-                                          : () => _programarPartido(partido),
-                                    ),
-                                  ],
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppResponsiveGrid(
+                              mobileColumns: 2,
+                              tabletColumns: 2,
+                              desktopColumns: 4,
+                              spacing: 12,
+                              children: [
+                                StatCard(
+                                  title: 'Partidos',
+                                  value: '${partidos.length}',
+                                  icon: Icons.sports_outlined,
+                                  subtitle: 'Totales',
+                                  color: AppColors.primary,
                                 ),
-                              ),
-                            );
-                          }).toList(),
+                                StatCard(
+                                  title: 'Programados',
+                                  value: '$programados',
+                                  icon: Icons.event_available_outlined,
+                                  subtitle: 'Con fecha y hora',
+                                  color: AppColors.success,
+                                ),
+                                StatCard(
+                                  title: 'Pendientes',
+                                  value: '$pendientes',
+                                  icon: Icons.pending_actions_outlined,
+                                  subtitle: 'Sin programar',
+                                  color: const Color(0xFFD6A100),
+                                ),
+                                StatCard(
+                                  title: 'Manuales',
+                                  value: '$manuales',
+                                  icon: Icons.pan_tool_alt_outlined,
+                                  subtitle: 'Cruces manuales',
+                                  color: AppColors.info,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                AppFilterPill(
+                                  text: 'Todos',
+                                  count: partidos.length,
+                                  selected: _filtro == _FixtureFiltro.todos,
+                                  onTap: () => setState(() {
+                                    _filtro = _FixtureFiltro.todos;
+                                  }),
+                                ),
+                                AppFilterPill(
+                                  text: 'Sin programar',
+                                  count: pendientes,
+                                  selected:
+                                      _filtro == _FixtureFiltro.sinProgramar,
+                                  onTap: () => setState(() {
+                                    _filtro = _FixtureFiltro.sinProgramar;
+                                  }),
+                                ),
+                                AppFilterPill(
+                                  text: 'Programados',
+                                  count: programados,
+                                  selected:
+                                      _filtro == _FixtureFiltro.programados,
+                                  onTap: () => setState(() {
+                                    _filtro = _FixtureFiltro.programados;
+                                  }),
+                                ),
+                                AppFilterPill(
+                                  text: 'Manuales',
+                                  count: manuales,
+                                  selected: _filtro == _FixtureFiltro.manuales,
+                                  onTap: () => setState(() {
+                                    _filtro = _FixtureFiltro.manuales;
+                                  }),
+                                ),
+                                AppFilterPill(
+                                  text: 'Automáticos',
+                                  count: partidos.length - manuales,
+                                  selected:
+                                      _filtro == _FixtureFiltro.automaticos,
+                                  onTap: () => setState(() {
+                                    _filtro = _FixtureFiltro.automaticos;
+                                  }),
+                                ),
+                              ],
+                            ),
+                            if (campeonato != null &&
+                                _esFormatoDosFases(campeonato)) ...[
+                              const SizedBox(height: 16),
+                              _InfoBox(text: _mensajeDosFases(campeonato)),
+                            ],
+                            const SizedBox(height: 20),
+                            if (filtrados.isEmpty)
+                              const AppEmptyState(
+                                icon: Icons.filter_alt_off_outlined,
+                                title: 'Sin partidos para este filtro',
+                                message:
+                                    'Prueba con otro filtro para ver los partidos del fixture.',
+                              )
+                            else
+                              ...secciones.entries.map((entry) {
+                                return _SeccionFixture(
+                                  titulo: entry.key,
+                                  partidos: entry.value,
+                                  puedeEditar: puedeEditarFixture,
+                                  onProgramar: _programarPartido,
+                                );
+                              }),
+                          ],
                         ),
                 ),
               );
             },
           );
         },
+      ),
+    );
+  }
+}
+
+class _SeccionFixture extends StatelessWidget {
+  final String titulo;
+  final List<PartidoModel> partidos;
+  final bool puedeEditar;
+  final void Function(PartidoModel) onProgramar;
+
+  const _SeccionFixture({
+    required this.titulo,
+    required this.partidos,
+    required this.puedeEditar,
+    required this.onProgramar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12, top: 6),
+          child: Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(titulo, style: AppTextStyles.heading3),
+              ),
+              AppBadge(
+                text: '${partidos.length} partidos',
+                type: AppBadgeType.neutral,
+              ),
+            ],
+          ),
+        ),
+        ...partidos.map((partido) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _FixturePartidoCard(
+              partido: partido,
+              puedeEditar: puedeEditar,
+              onProgramar: () => onProgramar(partido),
+            ),
+          );
+        }),
+        const SizedBox(height: 10),
+      ],
+    );
+  }
+}
+
+class _FixturePartidoCard extends StatelessWidget {
+  final PartidoModel partido;
+  final bool puedeEditar;
+  final VoidCallback onProgramar;
+
+  const _FixturePartidoCard({
+    required this.partido,
+    required this.puedeEditar,
+    required this.onProgramar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isMobile = Responsive.isMobile(context);
+
+    final badges = Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        AppBadge(
+          text: _estadoTexto(partido.estado),
+          type: AppBadge.typeFromEstado(partido.estado),
+        ),
+        AppBadge(
+          text: partido.generadoPorSistema ? 'Aleatorio' : 'Manual',
+          type: partido.generadoPorSistema
+              ? AppBadgeType.info
+              : AppBadgeType.primary,
+        ),
+        AppBadge(
+          text: 'J${partido.jornada} · V${partido.vuelta}',
+          type: AppBadgeType.neutral,
+        ),
+      ],
+    );
+
+    final boton = AppButton.secondary(
+      text: partido.fechaHora == null ? 'Programar' : 'Reprogramar',
+      icon: Icons.edit_calendar_outlined,
+      onPressed: puedeEditar ? onProgramar : null,
+    );
+
+    if (isMobile) {
+      return AppCard(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            badges,
+            const SizedBox(height: 12),
+            AppMatchCard(partido: partido),
+            const SizedBox(height: 12),
+            SizedBox(width: double.infinity, child: boton),
+          ],
+        ),
+      );
+    }
+
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          badges,
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: AppMatchCard(partido: partido)),
+              const SizedBox(width: 14),
+              boton,
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoBox extends StatelessWidget {
+  final String text;
+
+  const _InfoBox({
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.infoLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.info.withValues(alpha: 0.16),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline, color: AppColors.info, size: 21),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.body.copyWith(
+                color: AppColors.info,
+                fontWeight: FontWeight.w600,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -369,10 +685,12 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
 
   final TextEditingController _jornadaController =
       TextEditingController(text: '1');
+  final TextEditingController _grupoController = TextEditingController();
 
   @override
   void dispose() {
     _jornadaController.dispose();
+    _grupoController.dispose();
     super.dispose();
   }
 
@@ -390,6 +708,9 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
         visitante: _visitante!,
         jornada: jornada,
         idaYVuelta: _idaYVuelta,
+        grupoId: _grupoController.text.trim().isEmpty
+            ? null
+            : _grupoController.text.trim(),
       ),
     );
   }
@@ -409,78 +730,89 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
       ),
       content: SizedBox(
         width: 470,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _EquipoDropdown(
-              label: 'Equipo local',
-              value: _local,
-              equipos: widget.equipos,
-              onChanged: (value) {
-                setState(() {
-                  _local = value;
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _EquipoDropdown(
+                label: 'Equipo local',
+                value: _local,
+                equipos: widget.equipos,
+                onChanged: (value) {
+                  setState(() {
+                    _local = value;
 
-                  if (_visitante?.id == value?.id) {
-                    _visitante = null;
-                  }
-                });
-              },
-            ),
-            const SizedBox(height: 14),
-            _EquipoDropdown(
-              label: 'Equipo visitante',
-              value: _visitante,
-              equipos: visitantes,
-              onChanged: (value) {
-                setState(() {
-                  _visitante = value;
-                });
-              },
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _jornadaController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Jornada / fase',
-                hintText: 'Ejemplo: 1, 2, 3...',
-                prefixIcon: Icon(Icons.calendar_today_outlined),
+                    if (_visitante?.id == value?.id) {
+                      _visitante = null;
+                    }
+                  });
+                },
               ),
-            ),
-            const SizedBox(height: 14),
-            SwitchListTile(
-              value: _idaYVuelta,
-              onChanged: (value) {
-                setState(() {
-                  _idaYVuelta = value;
-                });
-              },
-              title: const Text('Crear ida y vuelta'),
-              subtitle: const Text(
-                'Desactívalo para semifinales, finales o partido único.',
+              const SizedBox(height: 14),
+              _EquipoDropdown(
+                label: 'Equipo visitante',
+                value: _visitante,
+                equipos: visitantes,
+                onChanged: (value) {
+                  setState(() {
+                    _visitante = value;
+                  });
+                },
               ),
-              activeColor: AppColors.primary,
-              contentPadding: EdgeInsets.zero,
-            ),
-            const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                _idaYVuelta
-                    ? 'Se crearán dos partidos: ida y vuelta con localía invertida.'
-                    : 'Se creará un solo partido. Útil para semifinales, finales o partidos especiales.',
-                style: AppTextStyles.body.copyWith(
-                  color: AppColors.primaryDark,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(height: 14),
+              TextField(
+                controller: _jornadaController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Jornada / fase',
+                  hintText: 'Ejemplo: 1, 2, 3...',
+                  prefixIcon: Icon(Icons.calendar_today_outlined),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 14),
+              TextField(
+                controller: _grupoController,
+                decoration: const InputDecoration(
+                  labelText: 'Grupo o fase (opcional)',
+                  hintText: 'Ejemplo: Grupo A, Semifinal, Final...',
+                  prefixIcon: Icon(Icons.grid_view_rounded),
+                ),
+              ),
+              const SizedBox(height: 14),
+              SwitchListTile(
+                value: _idaYVuelta,
+                onChanged: (value) {
+                  setState(() {
+                    _idaYVuelta = value;
+                  });
+                },
+                title: const Text('Crear ida y vuelta'),
+                subtitle: const Text(
+                  'Desactívalo para semifinales, finales o partido único.',
+                ),
+                activeThumbColor: AppColors.primary,
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _idaYVuelta
+                      ? 'Se crearán dos partidos: ida y vuelta con localía invertida.'
+                      : 'Se creará un solo partido. Útil para semifinales, finales o partidos especiales.',
+                  style: AppTextStyles.body.copyWith(
+                    color: AppColors.primaryDark,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -517,7 +849,7 @@ class _EquipoDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<EquipoModel>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       items: equipos.map((equipo) {
         return DropdownMenuItem(
@@ -539,11 +871,49 @@ class _CruceManualResult {
   final EquipoModel visitante;
   final int jornada;
   final bool idaYVuelta;
+  final String? grupoId;
 
   const _CruceManualResult({
     required this.local,
     required this.visitante,
     required this.jornada,
     required this.idaYVuelta,
+    this.grupoId,
   });
+}
+
+String _tipoTexto(String tipo) {
+  switch (tipo) {
+    case TipoCampeonato.soloIda:
+      return 'Liga solo ida';
+    case TipoCampeonato.idaVuelta:
+      return 'Liga ida y vuelta';
+    case TipoCampeonato.eliminacionDirecta:
+      return 'Eliminación directa';
+    case TipoCampeonato.faseGrupos:
+      return 'Fase de grupos';
+    case TipoCampeonato.gruposEliminacion:
+      return 'Grupos + eliminación';
+    case TipoCampeonato.ligaFinal:
+      return 'Liga + final';
+    case TipoCampeonato.ligaPlayoffs:
+      return 'Liga + playoffs';
+    default:
+      return tipo.replaceAll('_', ' ');
+  }
+}
+
+String _estadoTexto(String estado) {
+  switch (estado) {
+    case PartidoEstado.pendienteProgramacion:
+      return 'Sin programar';
+    case PartidoEstado.programado:
+      return 'Programado';
+    case PartidoEstado.finalizado:
+      return 'Finalizado';
+    case PartidoEstado.suspendido:
+      return 'Suspendido';
+    default:
+      return estado.replaceAll('_', ' ');
+  }
 }

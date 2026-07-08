@@ -15,8 +15,8 @@ class AppLogoMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = dark ? AppColors.white.withOpacity(0.12) : AppColors.white;
-    final borderColor = dark ? AppColors.white.withOpacity(0.18) : AppColors.border;
+    final backgroundColor = dark ? AppColors.white.withValues(alpha: 0.12) : AppColors.white;
+    final borderColor = dark ? AppColors.white.withValues(alpha: 0.18) : AppColors.border;
 
     return Container(
       height: compact ? 46 : 56,
@@ -32,7 +32,7 @@ class AppLogoMark extends StatelessWidget {
       child: Image.asset(
         'assets/images/logo_upsa.png',
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) {
+        errorBuilder: (_, _, _) {
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -40,7 +40,7 @@ class AppLogoMark extends StatelessWidget {
                 'assets/images/logo_upsa_40.png',
                 width: 30,
                 height: 30,
-                errorBuilder: (_, __, ___) {
+                errorBuilder: (_, _, _) {
                   return Icon(
                     Icons.school_outlined,
                     color: dark ? AppColors.white : AppColors.primary,

@@ -13,6 +13,50 @@ class TipoResultado {
   static const String sancion = 'sancion';
 }
 
+/// Cómo se definió el ganador del partido.
+class TipoDefinicion {
+  static const String normal = 'normal';
+  static const String penales = 'penales';
+  static const String prorroga = 'prorroga';
+  static const String walkover = 'walkover';
+  static const String sancion = 'sancion';
+}
+
+/// Resultado de un set individual (vóley). Se guarda embebido en el
+/// documento del partido para no crear colecciones nuevas.
+class SetPartido {
+  final int local;
+  final int visitante;
+
+  const SetPartido({
+    required this.local,
+    required this.visitante,
+  });
+
+  factory SetPartido.fromMap(Map<String, dynamic> map) {
+    return SetPartido(
+      local: intFromJson(map['local']),
+      visitante: intFromJson(map['visitante']),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'local': local,
+      'visitante': visitante,
+    };
+  }
+}
+
+List<SetPartido> _setsFromJson(dynamic value) {
+  if (value is! List) return const [];
+
+  return value
+      .whereType<Map>()
+      .map((item) => SetPartido.fromMap(Map<String, dynamic>.from(item)))
+      .toList();
+}
+
 class PartidoModel {
   final String id;
   final int jornada;
@@ -35,6 +79,15 @@ class PartidoModel {
   final DateTime? fechaCreacion;
   final DateTime? fechaActualizacion;
 
+  // Campos opcionales para definiciones (penales, prórroga) y
+  // deportes por sets. Los partidos antiguos usan los defaults.
+  final int? penalesLocal;
+  final int? penalesVisitante;
+  final bool definidoPorPenales;
+  final bool definidoPorProrroga;
+  final String tipoDefinicion;
+  final List<SetPartido> sets;
+
   const PartidoModel({
     required this.id,
     required this.jornada,
@@ -56,6 +109,12 @@ class PartidoModel {
     this.observacionResultado,
     this.fechaCreacion,
     this.fechaActualizacion,
+    this.penalesLocal,
+    this.penalesVisitante,
+    this.definidoPorPenales = false,
+    this.definidoPorProrroga = false,
+    this.tipoDefinicion = TipoDefinicion.normal,
+    this.sets = const [],
   });
 
   factory PartidoModel.fromMap(String id, Map<String, dynamic> map) {
@@ -94,6 +153,21 @@ class PartidoModel {
           : stringFromJson(map['observacionResultado']),
       fechaCreacion: dateFromJson(map['fechaCreacion']),
       fechaActualizacion: dateFromJson(map['fechaActualizacion']),
+      // Campos nuevos con defaults: los partidos antiguos no los tienen.
+      penalesLocal:
+          map['penalesLocal'] == null ? null : intFromJson(map['penalesLocal']),
+      penalesVisitante: map['penalesVisitante'] == null
+          ? null
+          : intFromJson(map['penalesVisitante']),
+      definidoPorPenales:
+          boolFromJson(map['definidoPorPenales'], defaultValue: false),
+      definidoPorProrroga:
+          boolFromJson(map['definidoPorProrroga'], defaultValue: false),
+      tipoDefinicion: stringFromJson(
+        map['tipoDefinicion'],
+        defaultValue: TipoDefinicion.normal,
+      ),
+      sets: _setsFromJson(map['sets']),
     );
   }
 
@@ -118,6 +192,12 @@ class PartidoModel {
       'observacionResultado': observacionResultado,
       'fechaCreacion': dateToJson(fechaCreacion),
       'fechaActualizacion': dateToJson(fechaActualizacion),
+      'penalesLocal': penalesLocal,
+      'penalesVisitante': penalesVisitante,
+      'definidoPorPenales': definidoPorPenales,
+      'definidoPorProrroga': definidoPorProrroga,
+      'tipoDefinicion': tipoDefinicion,
+      'sets': sets.map((set) => set.toMap()).toList(),
     };
   }
 
@@ -129,4 +209,27 @@ class PartidoModel {
   bool get estaFinalizado => estado == PartidoEstado.finalizado;
 
   bool get estaSuspendido => estado == PartidoEstado.suspendido;
+
+  /// Marcador legible: "1 - 1 (4 - 3 pen.)", "2 - 1" (sets) o "Sin resultado".
+  String get marcadorTexto {
+    if (golesLocal == null || golesVisitante == null) return 'Sin resultado';
+
+    final base = '$golesLocal - $golesVisitante';
+
+    if (definidoPorPenales && penalesLocal != null && penalesVisitante != null) {
+      return '$base ($penalesLocal - $penalesVisitante pen.)';
+    }
+
+    if (definidoPorProrroga) {
+      return '$base (prórroga)';
+    }
+
+    return base;
+  }
+
+  /// Detalle de sets para vóley: "25-20 · 23-25 · 15-12".
+  String get setsTexto {
+    if (sets.isEmpty) return '';
+    return sets.map((set) => '${set.local}-${set.visitante}').join(' · ');
+  }
 }

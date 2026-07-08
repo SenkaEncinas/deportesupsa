@@ -14,6 +14,13 @@ class TablaPosicionModel {
   final int posicion;
   final DateTime? fechaActualizacion;
 
+  // Campos preparados para vóley/básquet. En vóley, golesFavor/Contra
+  // guardan sets ganados/perdidos y estos campos guardan los puntos
+  // jugados dentro de los sets. En básquet, guardan los puntos anotados.
+  final int puntosFavor;
+  final int puntosContra;
+  final int diferenciaPuntos;
+
   const TablaPosicionModel({
     required this.equipoId,
     required this.equipoNombre,
@@ -27,6 +34,9 @@ class TablaPosicionModel {
     required this.puntos,
     required this.posicion,
     this.fechaActualizacion,
+    this.puntosFavor = 0,
+    this.puntosContra = 0,
+    this.diferenciaPuntos = 0,
   });
 
   factory TablaPosicionModel.empty({
@@ -63,6 +73,9 @@ class TablaPosicionModel {
       puntos: intFromJson(map['puntos']),
       posicion: intFromJson(map['posicion']),
       fechaActualizacion: dateFromJson(map['fechaActualizacion']),
+      puntosFavor: intFromJson(map['puntosFavor']),
+      puntosContra: intFromJson(map['puntosContra']),
+      diferenciaPuntos: intFromJson(map['diferenciaPuntos']),
     );
   }
 
@@ -80,6 +93,9 @@ class TablaPosicionModel {
       'puntos': puntos,
       'posicion': posicion,
       'fechaActualizacion': dateToJson(fechaActualizacion),
+      'puntosFavor': puntosFavor,
+      'puntosContra': puntosContra,
+      'diferenciaPuntos': diferenciaPuntos,
     };
   }
 }

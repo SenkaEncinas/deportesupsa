@@ -6,6 +6,59 @@ class CampeonatoEstado {
   static const String finalizado = 'finalizado';
 }
 
+/// Deportes soportados. Los campeonatos antiguos sin campo `deporte`
+/// se asumen como fútbol/futsal.
+class DeporteTipo {
+  static const String futbol = 'futbol';
+  static const String volley = 'volley';
+  static const String basket = 'basket';
+
+  static const List<String> todos = [futbol, volley, basket];
+}
+
+/// Modalidades por deporte. `volley_mixto` y `basket_3x3` quedan
+/// preparadas para una siguiente fase sin romper nada.
+class ModalidadDeporte {
+  static const String futsal = 'futsal';
+  static const String futbol7 = 'futbol_7';
+  static const String futbol11 = 'futbol_11';
+
+  static const String volleySala = 'volley_sala';
+  static const String volleyMixto = 'volley_mixto';
+
+  static const String basket5 = 'basket_5';
+  static const String basket3x3 = 'basket_3x3';
+
+  static List<String> porDeporte(String deporte) {
+    switch (deporte) {
+      case DeporteTipo.volley:
+        return const [volleySala, volleyMixto];
+      case DeporteTipo.basket:
+        return const [basket5, basket3x3];
+      default:
+        return const [futsal, futbol7, futbol11];
+    }
+  }
+}
+
+/// Cómo se registra el marcador de un partido según el deporte.
+class SistemaResultado {
+  static const String goles = 'goles';
+  static const String sets = 'sets';
+  static const String puntos = 'puntos';
+
+  static String porDeporte(String deporte) {
+    switch (deporte) {
+      case DeporteTipo.volley:
+        return sets;
+      case DeporteTipo.basket:
+        return puntos;
+      default:
+        return goles;
+    }
+  }
+}
+
 class TipoCampeonato {
   static const String soloIda = 'solo_ida';
   static const String idaVuelta = 'ida_vuelta';
@@ -48,6 +101,18 @@ class CampeonatoConfig {
   final bool fixtureManualPermitido;
   final String rondaEliminatoriaInicial;
 
+  // Configuración por deporte. Todos tienen defaults seguros para
+  // que los campeonatos antiguos (solo fútbol) sigan funcionando.
+  final String deporte;
+  final String modalidad;
+  final String sistemaResultado;
+  final int setsParaGanar;
+  final int puntosSetNormal;
+  final int puntosSetDecisivo;
+  final int cantidadPeriodos;
+  final bool permitePenales;
+  final bool permiteProrroga;
+
   const CampeonatoConfig({
     required this.formato,
     required this.cantidadVueltas,
@@ -67,6 +132,15 @@ class CampeonatoConfig {
     this.generaFaseEliminatoria = false,
     this.fixtureManualPermitido = true,
     this.rondaEliminatoriaInicial = 'no_aplica',
+    this.deporte = DeporteTipo.futbol,
+    this.modalidad = ModalidadDeporte.futsal,
+    this.sistemaResultado = SistemaResultado.goles,
+    this.setsParaGanar = 2,
+    this.puntosSetNormal = 25,
+    this.puntosSetDecisivo = 15,
+    this.cantidadPeriodos = 0,
+    this.permitePenales = false,
+    this.permiteProrroga = false,
   });
 
   factory CampeonatoConfig.futsalIdaVuelta() {
@@ -131,6 +205,28 @@ class CampeonatoConfig {
         map['rondaEliminatoriaInicial'],
         defaultValue: 'no_aplica',
       ),
+      // Campos nuevos: si el documento antiguo no los tiene,
+      // se asume fútbol/futsal con resultado por goles.
+      deporte: stringFromJson(
+        map['deporte'],
+        defaultValue: DeporteTipo.futbol,
+      ),
+      modalidad: stringFromJson(
+        map['modalidad'],
+        defaultValue: ModalidadDeporte.futsal,
+      ),
+      sistemaResultado: stringFromJson(
+        map['sistemaResultado'],
+        defaultValue: SistemaResultado.goles,
+      ),
+      setsParaGanar: intFromJson(map['setsParaGanar'], defaultValue: 2),
+      puntosSetNormal: intFromJson(map['puntosSetNormal'], defaultValue: 25),
+      puntosSetDecisivo:
+          intFromJson(map['puntosSetDecisivo'], defaultValue: 15),
+      cantidadPeriodos: intFromJson(map['cantidadPeriodos'], defaultValue: 0),
+      permitePenales: boolFromJson(map['permitePenales'], defaultValue: false),
+      permiteProrroga:
+          boolFromJson(map['permiteProrroga'], defaultValue: false),
     );
   }
 
@@ -154,6 +250,15 @@ class CampeonatoConfig {
       'generaFaseEliminatoria': generaFaseEliminatoria,
       'fixtureManualPermitido': fixtureManualPermitido,
       'rondaEliminatoriaInicial': rondaEliminatoriaInicial,
+      'deporte': deporte,
+      'modalidad': modalidad,
+      'sistemaResultado': sistemaResultado,
+      'setsParaGanar': setsParaGanar,
+      'puntosSetNormal': puntosSetNormal,
+      'puntosSetDecisivo': puntosSetDecisivo,
+      'cantidadPeriodos': cantidadPeriodos,
+      'permitePenales': permitePenales,
+      'permiteProrroga': permiteProrroga,
     };
   }
 }
@@ -283,4 +388,32 @@ class CampeonatoModel {
   bool get estaEnInscripcion => estado == CampeonatoEstado.inscripcion;
   bool get estaActivo => estado == CampeonatoEstado.activo;
   bool get estaFinalizado => estado == CampeonatoEstado.finalizado;
+
+  /// Deporte efectivo: los campeonatos antiguos sin deporte son fútbol.
+  String get deporteEfectivo =>
+      deporte.trim().isEmpty ? DeporteTipo.futbol : deporte;
+
+  bool get esFutbol => deporteEfectivo == DeporteTipo.futbol;
+  bool get esVolley => deporteEfectivo == DeporteTipo.volley;
+  bool get esBasket => deporteEfectivo == DeporteTipo.basket;
+
+  /// Sistema de resultado efectivo, con compatibilidad hacia atrás:
+  /// si la configuración no lo trae, se deduce del deporte.
+  String get sistemaResultadoEfectivo {
+    final sistema = configuracion.sistemaResultado.trim();
+    if (sistema.isNotEmpty && !esFutbol) {
+      // Config antigua puede traer 'goles' por default aunque el
+      // campeonato sea vóley/básquet: en ese caso manda el deporte.
+      if (sistema == SistemaResultado.goles) {
+        return SistemaResultado.porDeporte(deporteEfectivo);
+      }
+      return sistema;
+    }
+    if (sistema.isEmpty) return SistemaResultado.porDeporte(deporteEfectivo);
+    return sistema;
+  }
+
+  /// En fases eliminatorias, finales y playoffs no puede quedar empate.
+  bool get formatoEliminaEmpates =>
+      tipoCampeonato == TipoCampeonato.eliminacionDirecta;
 }

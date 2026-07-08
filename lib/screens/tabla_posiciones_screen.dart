@@ -13,14 +13,12 @@ import 'reciclaje/app_empty_state.dart';
 import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_text_styles.dart';
+import 'reciclaje/responsive.dart';
 
 class TablaPosicionesScreen extends StatefulWidget {
   final String campeonatoId;
 
-  const TablaPosicionesScreen({
-    super.key,
-    required this.campeonatoId,
-  });
+  const TablaPosicionesScreen({super.key, required this.campeonatoId});
 
   @override
   State<TablaPosicionesScreen> createState() => _TablaPosicionesScreenState();
@@ -39,8 +37,9 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
   }
 
   Future<_HistorialPartidosData> _loadData() async {
-    final campeonato =
-        await _campeonatoService.getCampeonato(widget.campeonatoId);
+    final campeonato = await _campeonatoService.getCampeonato(
+      widget.campeonatoId,
+    );
 
     final partidos = await _partidoService.getPartidos(widget.campeonatoId);
 
@@ -98,7 +97,8 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
     }
 
     final partidosConHistorial = partidos.where((partido) {
-      final tieneResultado = partido.resultadoRegistrado ||
+      final tieneResultado =
+          partido.resultadoRegistrado ||
           partido.golesLocal != null ||
           partido.golesVisitante != null;
 
@@ -130,10 +130,7 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
       );
     }).toList();
 
-    return _HistorialPartidosData(
-      campeonato: campeonato,
-      partidos: items,
-    );
+    return _HistorialPartidosData(campeonato: campeonato, partidos: items);
   }
 
   Future<void> _refresh() async {
@@ -155,11 +152,8 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
   }
 
   String _resultadoTexto(PartidoModel partido) {
-    if (partido.golesLocal == null || partido.golesVisitante == null) {
-      return 'Sin resultado';
-    }
-
-    return '${partido.golesLocal} - ${partido.golesVisitante}';
+    // Incluye penales o prórroga cuando corresponde.
+    return partido.marcadorTexto;
   }
 
   String _tipoResultadoTexto(String tipo) {
@@ -311,17 +305,12 @@ class _PartidoHistorialCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  partido.equipoLocalNombre,
-                  textAlign: TextAlign.right,
-                  style: AppTextStyles.heading3,
-                ),
-              ),
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
+          // En móvil el marcador y los equipos van apilados: la fila
+          // aplastaba los nombres con marcadores largos como
+          // "1 - 1 (4 - 3 pen.)".
+          Builder(
+            builder: (context) {
+              final marcador = Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
                   vertical: 10,
@@ -332,19 +321,56 @@ class _PartidoHistorialCard extends StatelessWidget {
                 ),
                 child: Text(
                   resultadoTexto(partido),
+                  textAlign: TextAlign.center,
                   style: AppTextStyles.heading2.copyWith(
                     color: AppColors.white,
                   ),
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  partido.equipoVisitanteNombre,
-                  textAlign: TextAlign.left,
-                  style: AppTextStyles.heading3,
-                ),
-              ),
-            ],
+              );
+
+              if (Responsive.isMobile(context)) {
+                return Column(
+                  children: [
+                    Text(
+                      partido.equipoLocalNombre,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.heading3,
+                    ),
+                    const SizedBox(height: 8),
+                    marcador,
+                    const SizedBox(height: 8),
+                    Text(
+                      partido.equipoVisitanteNombre,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.heading3,
+                    ),
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      partido.equipoLocalNombre,
+                      textAlign: TextAlign.right,
+                      style: AppTextStyles.heading3,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: marcador,
+                  ),
+                  Expanded(
+                    child: Text(
+                      partido.equipoVisitanteNombre,
+                      textAlign: TextAlign.left,
+                      style: AppTextStyles.heading3,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 8),
           Center(
@@ -373,26 +399,45 @@ class _PartidoHistorialCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 18),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _EquipoHistorialBox(
+          // En móvil las cajas de cada equipo se apilan: dos columnas
+          // de ~150 px eran ilegibles en pantallas chicas.
+          if (Responsive.isMobile(context))
+            Column(
+              children: [
+                _EquipoHistorialBox(
                   equipoNombre: partido.equipoLocalNombre,
                   goles: golesLocal,
                   tarjetas: tarjetasLocal,
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: _EquipoHistorialBox(
+                const SizedBox(height: 14),
+                _EquipoHistorialBox(
                   equipoNombre: partido.equipoVisitanteNombre,
                   goles: golesVisitante,
                   tarjetas: tarjetasVisitante,
                 ),
-              ),
-            ],
-          ),
+              ],
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _EquipoHistorialBox(
+                    equipoNombre: partido.equipoLocalNombre,
+                    goles: golesLocal,
+                    tarjetas: tarjetasLocal,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: _EquipoHistorialBox(
+                    equipoNombre: partido.equipoVisitanteNombre,
+                    goles: golesVisitante,
+                    tarjetas: tarjetasVisitante,
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -424,16 +469,10 @@ class _EquipoHistorialBox extends StatelessWidget {
         children: [
           Text(equipoNombre, style: AppTextStyles.bodyMedium),
           const SizedBox(height: 12),
-          _MiniSectionTitle(
-            icon: Icons.sports_soccer,
-            title: 'Goles',
-          ),
+          _MiniSectionTitle(icon: Icons.sports_soccer, title: 'Goles'),
           const SizedBox(height: 8),
           if (goles.isEmpty)
-            Text(
-              'Sin goles registrados.',
-              style: AppTextStyles.small,
-            )
+            Text('Sin goles registrados.', style: AppTextStyles.small)
           else
             ...goles.map((gol) {
               return Padding(
@@ -441,10 +480,7 @@ class _EquipoHistorialBox extends StatelessWidget {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        gol.jugadorNombre,
-                        style: AppTextStyles.body,
-                      ),
+                      child: Text(gol.jugadorNombre, style: AppTextStyles.body),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -468,16 +504,10 @@ class _EquipoHistorialBox extends StatelessWidget {
               );
             }),
           const SizedBox(height: 14),
-          _MiniSectionTitle(
-            icon: Icons.style_outlined,
-            title: 'Tarjetas',
-          ),
+          _MiniSectionTitle(icon: Icons.style_outlined, title: 'Tarjetas'),
           const SizedBox(height: 8),
           if (tarjetas.isEmpty)
-            Text(
-              'Sin tarjetas registradas.',
-              style: AppTextStyles.small,
-            )
+            Text('Sin tarjetas registradas.', style: AppTextStyles.small)
           else
             ...tarjetas.map((tarjeta) {
               return Padding(
@@ -494,9 +524,7 @@ class _EquipoHistorialBox extends StatelessWidget {
 class _TarjetaRow extends StatelessWidget {
   final _TarjetaHistorial tarjeta;
 
-  const _TarjetaRow({
-    required this.tarjeta,
-  });
+  const _TarjetaRow({required this.tarjeta});
 
   @override
   Widget build(BuildContext context) {
@@ -510,10 +538,7 @@ class _TarjetaRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            tarjeta.jugadorNombre,
-            style: AppTextStyles.bodyMedium,
-          ),
+          Text(tarjeta.jugadorNombre, style: AppTextStyles.bodyMedium),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -550,22 +575,16 @@ class _CardBadge extends StatelessWidget {
   final String text;
   final Color color;
 
-  const _CardBadge({
-    required this.text,
-    required this.color,
-  });
+  const _CardBadge({required this.text, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.35)),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
       ),
       child: Text(
         text,
@@ -582,20 +601,13 @@ class _MiniSectionTitle extends StatelessWidget {
   final IconData icon;
   final String title;
 
-  const _MiniSectionTitle({
-    required this.icon,
-    required this.title,
-  });
+  const _MiniSectionTitle({required this.icon, required this.title});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 17,
-          color: AppColors.primary,
-        ),
+        Icon(icon, size: 17, color: AppColors.primary),
         const SizedBox(width: 6),
         Text(
           title,

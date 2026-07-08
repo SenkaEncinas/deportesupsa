@@ -33,7 +33,7 @@ class AppBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.background,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colors.foreground.withOpacity(0.18)),
+        border: Border.all(color: colors.foreground.withValues(alpha: 0.18)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

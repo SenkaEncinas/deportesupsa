@@ -20,8 +20,8 @@ class AppInfoLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foreground = dark ? AppColors.white : AppColors.textPrimary;
-    final muted = dark ? AppColors.white.withOpacity(0.70) : AppColors.textSecondary;
-    final iconBackground = dark ? AppColors.white.withOpacity(0.14) : AppColors.primaryLight;
+    final muted = dark ? AppColors.white.withValues(alpha: 0.70) : AppColors.textSecondary;
+    final iconBackground = dark ? AppColors.white.withValues(alpha: 0.14) : AppColors.primaryLight;
     final iconColor = dark ? AppColors.white : AppColors.primary;
 
     return Row(

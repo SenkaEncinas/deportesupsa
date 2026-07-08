@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../models/campeonato_model.dart';
 import '../models/jugador_model.dart';
 import '../models/partido_model.dart';
 import '../services/auth_service.dart';
+import '../services/campeonato_service.dart';
 import '../services/jugador_service.dart';
 import '../services/resultado_service.dart';
 import 'reciclaje/app_button.dart';
@@ -13,15 +15,21 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
+import 'reciclaje/responsive.dart';
 
 class ResultadoFormScreen extends StatefulWidget {
   final String campeonatoId;
   final PartidoModel partido;
 
+  /// Si la pantalla anterior ya tiene el campeonato cargado puede
+  /// pasarlo para evitar una lectura extra; si no, se carga aquí.
+  final CampeonatoModel? campeonato;
+
   const ResultadoFormScreen({
     super.key,
     required this.campeonatoId,
     required this.partido,
+    this.campeonato,
   });
 
   @override
@@ -33,19 +41,25 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
 
   final _authService = AuthService();
   final _jugadorService = JugadorService();
+  final _campeonatoService = CampeonatoService();
   final _resultadoService = ResultadoService();
 
   final _golesLocalController = TextEditingController();
   final _golesVisitanteController = TextEditingController();
   final _observacionController = TextEditingController();
 
+  final _penalesLocalController = TextEditingController();
+  final _penalesVisitanteController = TextEditingController();
+
   String _tipoResultado = TipoResultado.normal;
+  bool _definidoPorProrroga = false;
   bool _loading = false;
 
-  late Future<List<JugadorModel>> _jugadoresFuture;
+  late Future<_FormData> _dataFuture;
 
   final List<_GolInputState> _goles = [];
   final List<_TarjetaInputState> _tarjetas = [];
+  final List<_SetInputState> _sets = [];
 
   @override
   void initState() {
@@ -56,11 +70,32 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
         widget.partido.golesVisitante?.toString() ?? '';
     _tipoResultado = widget.partido.tipoResultado;
     _observacionController.text = widget.partido.observacionResultado ?? '';
+    _penalesLocalController.text =
+        widget.partido.penalesLocal?.toString() ?? '';
+    _penalesVisitanteController.text =
+        widget.partido.penalesVisitante?.toString() ?? '';
+    _definidoPorProrroga = widget.partido.definidoPorProrroga;
 
-    _jugadoresFuture = _loadJugadores();
+    for (final set in widget.partido.sets) {
+      _sets.add(_SetInputState(local: set.local, visitante: set.visitante));
+    }
+
+    // Los campos de goles disparan rebuild para mostrar/ocultar penales.
+    _golesLocalController.addListener(_onMarcadorChanged);
+    _golesVisitanteController.addListener(_onMarcadorChanged);
+
+    _dataFuture = _loadData();
   }
 
-  Future<List<JugadorModel>> _loadJugadores() async {
+  void _onMarcadorChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<_FormData> _loadData() async {
+    final campeonato =
+        widget.campeonato ??
+        await _campeonatoService.getCampeonato(widget.campeonatoId);
+
     final local = await _jugadorService.getJugadoresPorEquipo(
       campeonatoId: widget.campeonatoId,
       equipoId: widget.partido.equipoLocalId,
@@ -71,9 +106,12 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
       equipoId: widget.partido.equipoVisitanteId,
     );
 
-    return [...local, ...visitante]
-        .where((jugador) => jugador.estado == JugadorEstado.activo)
-        .toList();
+    final jugadores = [
+      ...local,
+      ...visitante,
+    ].where((jugador) => jugador.estado == JugadorEstado.activo).toList();
+
+    return _FormData(campeonato: campeonato, jugadores: jugadores);
   }
 
   @override
@@ -81,9 +119,15 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
     _golesLocalController.dispose();
     _golesVisitanteController.dispose();
     _observacionController.dispose();
+    _penalesLocalController.dispose();
+    _penalesVisitanteController.dispose();
 
     for (final tarjeta in _tarjetas) {
       tarjeta.dispose();
+    }
+
+    for (final set in _sets) {
+      set.dispose();
     }
 
     super.dispose();
@@ -114,11 +158,68 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
     });
   }
 
+  void _addSet() {
+    setState(() {
+      _sets.add(_SetInputState());
+    });
+  }
+
+  void _removeSet(int index) {
+    setState(() {
+      final item = _sets.removeAt(index);
+      item.dispose();
+    });
+  }
+
   int _parseInt(String value) {
     return int.tryParse(value.trim()) ?? 0;
   }
 
-  Future<void> _guardar(List<JugadorModel> jugadores) async {
+  bool _esFutbol(CampeonatoModel? campeonato) =>
+      campeonato == null || campeonato.esFutbol;
+
+  bool _esVolley(CampeonatoModel? campeonato) =>
+      campeonato != null && campeonato.esVolley;
+
+  bool _esBasket(CampeonatoModel? campeonato) =>
+      campeonato != null && campeonato.esBasket;
+
+  /// El formato exige ganador (sin empate) para fútbol/futsal.
+  bool _futbolRequiereGanador(CampeonatoModel? campeonato) {
+    if (campeonato == null) return false;
+    return !campeonato.configuracion.permiteEmpate ||
+        campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
+  }
+
+  bool _mostrarPenales(CampeonatoModel? campeonato) {
+    if (!_esFutbol(campeonato)) return false;
+    if (_tipoResultado != TipoResultado.normal) return false;
+    if (!_futbolRequiereGanador(campeonato)) return false;
+
+    final local = _golesLocalController.text.trim();
+    final visitante = _golesVisitanteController.text.trim();
+
+    if (local.isEmpty || visitante.isEmpty) return false;
+
+    return _parseInt(local) == _parseInt(visitante);
+  }
+
+  ({int local, int visitante}) _setsGanados() {
+    var local = 0;
+    var visitante = 0;
+
+    for (final set in _sets) {
+      final puntosLocal = _parseInt(set.localController.text);
+      final puntosVisitante = _parseInt(set.visitanteController.text);
+
+      if (puntosLocal > puntosVisitante) local++;
+      if (puntosVisitante > puntosLocal) visitante++;
+    }
+
+    return (local: local, visitante: visitante);
+  }
+
+  Future<void> _guardar(_FormData data) async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -127,17 +228,51 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
 
     try {
       final admin = await _authService.requireAdmin();
+      final campeonato = data.campeonato;
+      final jugadores = data.jugadores;
 
       final golesInputs = <GolJugadorInput>[];
       final tarjetasInputs = <TarjetaJugadorInput>[];
+      var setsInputs = <SetPartido>[];
 
-      if (_tipoResultado == TipoResultado.normal) {
+      int golesLocal;
+      int golesVisitante;
+      int? penalesLocal;
+      int? penalesVisitante;
+
+      if (_esVolley(campeonato)) {
+        // Vóley: el marcador son los sets ganados calculados del detalle.
+        if (_sets.isEmpty) {
+          throw Exception('Agrega al menos un set con su puntaje.');
+        }
+
+        setsInputs = _sets.map((set) {
+          return SetPartido(
+            local: _parseInt(set.localController.text),
+            visitante: _parseInt(set.visitanteController.text),
+          );
+        }).toList();
+
+        final ganados = _setsGanados();
+        golesLocal = ganados.local;
+        golesVisitante = ganados.visitante;
+        penalesLocal = null;
+        penalesVisitante = null;
+      } else {
+        golesLocal = _parseInt(_golesLocalController.text);
+        golesVisitante = _parseInt(_golesVisitanteController.text);
+
+        if (_mostrarPenales(campeonato)) {
+          penalesLocal = _parseInt(_penalesLocalController.text);
+          penalesVisitante = _parseInt(_penalesVisitanteController.text);
+        }
+      }
+
+      if (_esFutbol(campeonato) && _tipoResultado == TipoResultado.normal) {
         for (final item in _goles) {
           if (item.jugadorId == null || item.jugadorId!.isEmpty) continue;
 
-          final jugador = jugadores.firstWhere(
-            (j) => j.id == item.jugadorId,
-          );
+          final jugador = jugadores.firstWhere((j) => j.id == item.jugadorId);
 
           golesInputs.add(
             GolJugadorInput(
@@ -167,9 +302,7 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
             continue;
           }
 
-          final jugador = jugadores.firstWhere(
-            (j) => j.id == item.jugadorId,
-          );
+          final jugador = jugadores.firstWhere((j) => j.id == item.jugadorId);
 
           tarjetasInputs.add(
             TarjetaJugadorInput(
@@ -190,8 +323,8 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
       await _resultadoService.registrarResultado(
         campeonatoId: widget.campeonatoId,
         partidoId: widget.partido.id,
-        golesLocal: _parseInt(_golesLocalController.text),
-        golesVisitante: _parseInt(_golesVisitanteController.text),
+        golesLocal: golesLocal,
+        golesVisitante: golesVisitante,
         golesJugadores: golesInputs,
         tarjetasJugadores: tarjetasInputs,
         tipoResultado: _tipoResultado,
@@ -199,6 +332,12 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
             ? null
             : _observacionController.text.trim(),
         usuarioId: admin.id,
+        penalesLocal: penalesLocal,
+        penalesVisitante: penalesVisitante,
+        definidoPorProrroga: _esBasket(campeonato)
+            ? _definidoPorProrroga
+            : false,
+        sets: setsInputs,
       );
 
       if (!mounted) return;
@@ -227,17 +366,29 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
     return null;
   }
 
+  String _marcadorLabel(CampeonatoModel? campeonato) {
+    if (_esBasket(campeonato)) return 'Puntos';
+    return 'Goles';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: FutureBuilder<List<JugadorModel>>(
-        future: _jugadoresFuture,
+      body: FutureBuilder<_FormData>(
+        future: _dataFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const AppLoading(message: 'Cargando jugadores...');
+            return const AppLoading(message: 'Cargando datos del partido...');
           }
 
-          final jugadores = snapshot.data ?? [];
+          final data =
+              snapshot.data ?? const _FormData(campeonato: null, jugadores: []);
+          final campeonato = data.campeonato;
+          final jugadores = data.jugadores;
+
+          final esVolley = _esVolley(campeonato);
+          final esBasket = _esBasket(campeonato);
+          final esFutbol = _esFutbol(campeonato);
 
           return SingleChildScrollView(
             child: AppPage(
@@ -254,7 +405,7 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
                   text: 'Guardar resultado',
                   icon: Icons.save_outlined,
                   loading: _loading,
-                  onPressed: () => _guardar(jugadores),
+                  onPressed: () => _guardar(data),
                 ),
               ],
               child: AppCard(
@@ -262,31 +413,50 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
                   key: _formKey,
                   child: Column(
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: AppTextField(
-                              label: widget.partido.equipoLocalNombre,
-                              hint: 'Goles local',
-                              controller: _golesLocalController,
-                              keyboardType: TextInputType.number,
-                              prefixIcon: Icons.sports_soccer,
-                              validator: _requiredNumber,
+                      if (!esVolley)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AppTextField(
+                                label: widget.partido.equipoLocalNombre,
+                                hint: '${_marcadorLabel(campeonato)} local',
+                                controller: _golesLocalController,
+                                keyboardType: TextInputType.number,
+                                prefixIcon: esBasket
+                                    ? Icons.sports_basketball_outlined
+                                    : Icons.sports_soccer,
+                                validator: _requiredNumber,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: AppTextField(
-                              label: widget.partido.equipoVisitanteNombre,
-                              hint: 'Goles visitante',
-                              controller: _golesVisitanteController,
-                              keyboardType: TextInputType.number,
-                              prefixIcon: Icons.sports_soccer,
-                              validator: _requiredNumber,
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: AppTextField(
+                                label: widget.partido.equipoVisitanteNombre,
+                                hint: '${_marcadorLabel(campeonato)} visitante',
+                                controller: _golesVisitanteController,
+                                keyboardType: TextInputType.number,
+                                prefixIcon: esBasket
+                                    ? Icons.sports_basketball_outlined
+                                    : Icons.sports_soccer,
+                                validator: _requiredNumber,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      if (esVolley) ...[
+                        _SetsSection(
+                          sets: _sets,
+                          localNombre: widget.partido.equipoLocalNombre,
+                          visitanteNombre: widget.partido.equipoVisitanteNombre,
+                          setsGanados: _setsGanados(),
+                          setsParaGanar:
+                              campeonato?.configuracion.setsParaGanar ?? 2,
+                          onAdd: _addSet,
+                          onRemove: _removeSet,
+                          onChanged: () => setState(() {}),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
                       const SizedBox(height: 18),
                       _DropdownField<String>(
                         label: 'Tipo de resultado',
@@ -339,7 +509,40 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
                           },
                         ),
                       ],
-                      if (_tipoResultado == TipoResultado.normal) ...[
+                      if (_mostrarPenales(campeonato)) ...[
+                        const SizedBox(height: 22),
+                        _PenalesSection(
+                          localNombre: widget.partido.equipoLocalNombre,
+                          visitanteNombre: widget.partido.equipoVisitanteNombre,
+                          penalesLocalController: _penalesLocalController,
+                          penalesVisitanteController:
+                              _penalesVisitanteController,
+                        ),
+                      ],
+                      if (esBasket &&
+                          _tipoResultado == TipoResultado.normal) ...[
+                        const SizedBox(height: 18),
+                        SwitchListTile(
+                          value: _definidoPorProrroga,
+                          onChanged: (value) {
+                            setState(() {
+                              _definidoPorProrroga = value;
+                            });
+                          },
+                          title: const Text('Definido por prórroga'),
+                          subtitle: const Text(
+                            'Activa esta opción si el partido se definió en tiempo extra. El marcador debe incluir los puntos de la prórroga.',
+                          ),
+                          activeThumbColor: AppColors.primary,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        _InfoBox(
+                          text:
+                              'El básquet no permite empate: registra los puntos finales con un ganador.',
+                        ),
+                      ],
+                      if (esFutbol &&
+                          _tipoResultado == TipoResultado.normal) ...[
                         const SizedBox(height: 22),
                         _GolesSection(
                           goles: _goles,
@@ -369,6 +572,237 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
   }
 }
 
+class _FormData {
+  final CampeonatoModel? campeonato;
+  final List<JugadorModel> jugadores;
+
+  const _FormData({required this.campeonato, required this.jugadores});
+}
+
+class _PenalesSection extends StatelessWidget {
+  final String localNombre;
+  final String visitanteNombre;
+  final TextEditingController penalesLocalController;
+  final TextEditingController penalesVisitanteController;
+
+  const _PenalesSection({
+    required this.localNombre,
+    required this.visitanteNombre,
+    required this.penalesLocalController,
+    required this.penalesVisitanteController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.warningLight,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.warning.withValues(alpha: 0.30),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.sports, color: AppColors.warning, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Este formato no permite empate. Registra los penales para definir al ganador.',
+                  style: AppTextStyles.body.copyWith(
+                    color: const Color(0xFF92600A),
+                    fontWeight: FontWeight.w700,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: AppTextField(
+                label: 'Penales $localNombre',
+                controller: penalesLocalController,
+                keyboardType: TextInputType.number,
+                prefixIcon: Icons.sports_soccer,
+                validator: (value) {
+                  final number = int.tryParse(value ?? '');
+                  if (number == null || number < 0) {
+                    return 'Valor inválido.';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: AppTextField(
+                label: 'Penales $visitanteNombre',
+                controller: penalesVisitanteController,
+                keyboardType: TextInputType.number,
+                prefixIcon: Icons.sports_soccer,
+                validator: (value) {
+                  final number = int.tryParse(value ?? '');
+                  if (number == null || number < 0) {
+                    return 'Valor inválido.';
+                  }
+                  return null;
+                },
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SetsSection extends StatelessWidget {
+  final List<_SetInputState> sets;
+  final String localNombre;
+  final String visitanteNombre;
+  final ({int local, int visitante}) setsGanados;
+  final int setsParaGanar;
+  final VoidCallback onAdd;
+  final void Function(int index) onRemove;
+  final VoidCallback onChanged;
+
+  const _SetsSection({
+    required this.sets,
+    required this.localNombre,
+    required this.visitanteNombre,
+    required this.setsGanados,
+    required this.setsParaGanar,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text('Sets del partido', style: AppTextStyles.heading3),
+            ),
+            AppButton.secondary(
+              text: 'Agregar set',
+              icon: Icons.add,
+              onPressed: onAdd,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            'Marcador en sets: $localNombre ${setsGanados.local} - ${setsGanados.visitante} $visitanteNombre · Gana el primero en llegar a $setsParaGanar sets.',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.primaryDark,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (sets.isEmpty)
+          _InfoBox(
+            text:
+                'Agrega cada set con los puntos de ambos equipos. Ejemplo: 25-20, 23-25, 15-12.',
+          )
+        else
+          Column(
+            children: List.generate(sets.length, (index) {
+              final item = sets[index];
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 58,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Set ${index + 1}',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.small.copyWith(
+                          color: AppColors.primaryDark,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: item.localController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Local',
+                          hintText: '25',
+                        ),
+                        onChanged: (_) => onChanged(),
+                        validator: (value) {
+                          final number = int.tryParse(value ?? '');
+                          if (number == null || number < 0) {
+                            return 'Inválido';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextFormField(
+                        controller: item.visitanteController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Visitante',
+                          hintText: '20',
+                        ),
+                        onChanged: (_) => onChanged(),
+                        validator: (value) {
+                          final number = int.tryParse(value ?? '');
+                          if (number == null || number < 0) {
+                            return 'Inválido';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => onRemove(index),
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ),
+      ],
+    );
+  }
+}
+
 class _GolesSection extends StatelessWidget {
   final List<_GolInputState> goles;
   final List<JugadorModel> jugadores;
@@ -391,10 +825,7 @@ class _GolesSection extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text(
-                'Goles por jugador',
-                style: AppTextStyles.heading3,
-              ),
+              child: Text('Goles por jugador', style: AppTextStyles.heading3),
             ),
             AppButton.secondary(
               text: 'Agregar gol',
@@ -413,45 +844,70 @@ class _GolesSection extends StatelessWidget {
           Column(
             children: List.generate(goles.length, (index) {
               final item = goles[index];
+              final isMobile = Responsive.isMobile(context);
+
+              final jugadorDropdown = _DropdownField<String>(
+                label: 'Jugador',
+                value: item.jugadorId,
+                items: jugadores.map((jugador) {
+                  return DropdownMenuItem(
+                    value: jugador.id,
+                    child: Text(
+                      '${jugador.nombreCompleto} - ${jugador.equipoNombre}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  item.jugadorId = value;
+                  onRefresh();
+                },
+              );
+
+              final cantidadField = _SmallNumberField(
+                label: 'Goles',
+                value: item.cantidad,
+                onChanged: (value) {
+                  item.cantidad = value;
+                },
+              );
+
+              final deleteButton = IconButton(
+                onPressed: () => onRemove(index),
+                icon: const Icon(Icons.delete_outline),
+              );
+
+              // En móvil el dropdown va en su propia línea: compartir
+              // fila con el campo numérico lo dejaba ilegible en 375 px.
+              if (isMobile) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Column(
+                    children: [
+                      jugadorDropdown,
+                      const SizedBox(height: 10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(child: cantidadField),
+                          const SizedBox(width: 8),
+                          deleteButton,
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Row(
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: _DropdownField<String>(
-                        label: 'Jugador',
-                        value: item.jugadorId,
-                        items: jugadores.map((jugador) {
-                          return DropdownMenuItem(
-                            value: jugador.id,
-                            child: Text(
-                              '${jugador.nombreCompleto} - ${jugador.equipoNombre}',
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          item.jugadorId = value;
-                          onRefresh();
-                        },
-                      ),
-                    ),
+                    Expanded(flex: 3, child: jugadorDropdown),
                     const SizedBox(width: 12),
-                    Expanded(
-                      child: _SmallNumberField(
-                        label: 'Goles',
-                        value: item.cantidad,
-                        onChanged: (value) {
-                          item.cantidad = value;
-                        },
-                      ),
-                    ),
+                    Expanded(child: cantidadField),
                     const SizedBox(width: 8),
-                    IconButton(
-                      onPressed: () => onRemove(index),
-                      icon: const Icon(Icons.delete_outline),
-                    ),
+                    deleteButton,
                   ],
                 ),
               );
@@ -506,6 +962,83 @@ class _TarjetasSection extends StatelessWidget {
           Column(
             children: List.generate(tarjetas.length, (index) {
               final item = tarjetas[index];
+              final isMobile = Responsive.isMobile(context);
+
+              final jugadorDropdown = _DropdownField<String>(
+                label: 'Jugador',
+                value: item.jugadorId,
+                items: jugadores.map((jugador) {
+                  return DropdownMenuItem(
+                    value: jugador.id,
+                    child: Text(
+                      '${jugador.nombreCompleto} - ${jugador.equipoNombre}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  item.jugadorId = value;
+                  onRefresh();
+                },
+              );
+
+              final amarillasField = _SmallNumberField(
+                label: 'Amarillas',
+                value: item.amarillas,
+                onChanged: (value) {
+                  item.amarillas = value;
+                },
+              );
+
+              final rojasField = _SmallNumberField(
+                label: 'Rojas',
+                value: item.rojas,
+                onChanged: (value) {
+                  item.rojas = value;
+                },
+              );
+
+              final deleteButton = IconButton(
+                onPressed: () => onRemove(index),
+                icon: const Icon(Icons.delete_outline),
+              );
+
+              final motivoField = TextFormField(
+                controller: item.motivoController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Motivo / detalle opcional',
+                  hintText:
+                      'Ejemplo: doble amarilla, conducta antideportiva...',
+                  prefixIcon: Icon(Icons.notes_outlined),
+                ),
+              );
+
+              // En móvil: jugador en su línea y los contadores debajo.
+              // Los 4 elementos en una sola fila desbordaban en 375 px.
+              if (isMobile) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Column(
+                    children: [
+                      jugadorDropdown,
+                      const SizedBox(height: 10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(child: amarillasField),
+                          const SizedBox(width: 12),
+                          Expanded(child: rojasField),
+                          const SizedBox(width: 8),
+                          deleteButton,
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      motivoField,
+                    ],
+                  ),
+                );
+              }
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -513,62 +1046,17 @@ class _TarjetasSection extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Expanded(
-                          flex: 3,
-                          child: _DropdownField<String>(
-                            label: 'Jugador',
-                            value: item.jugadorId,
-                            items: jugadores.map((jugador) {
-                              return DropdownMenuItem(
-                                value: jugador.id,
-                                child: Text(
-                                  '${jugador.nombreCompleto} - ${jugador.equipoNombre}',
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              item.jugadorId = value;
-                              onRefresh();
-                            },
-                          ),
-                        ),
+                        Expanded(flex: 3, child: jugadorDropdown),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: _SmallNumberField(
-                            label: 'Amarillas',
-                            value: item.amarillas,
-                            onChanged: (value) {
-                              item.amarillas = value;
-                            },
-                          ),
-                        ),
+                        Expanded(child: amarillasField),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: _SmallNumberField(
-                            label: 'Rojas',
-                            value: item.rojas,
-                            onChanged: (value) {
-                              item.rojas = value;
-                            },
-                          ),
-                        ),
+                        Expanded(child: rojasField),
                         const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: () => onRemove(index),
-                          icon: const Icon(Icons.delete_outline),
-                        ),
+                        deleteButton,
                       ],
                     ),
                     const SizedBox(height: 10),
-                    TextFormField(
-                      controller: item.motivoController,
-                      maxLines: 2,
-                      decoration: const InputDecoration(
-                        labelText: 'Motivo / detalle opcional',
-                        hintText: 'Ejemplo: doble amarilla, conducta antideportiva...',
-                        prefixIcon: Icon(Icons.notes_outlined),
-                      ),
-                    ),
+                    motivoField,
                   ],
                 ),
               );
@@ -582,9 +1070,7 @@ class _TarjetasSection extends StatelessWidget {
 class _InfoBox extends StatelessWidget {
   final String text;
 
-  const _InfoBox({
-    required this.text,
-  });
+  const _InfoBox({required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -619,6 +1105,22 @@ class _TarjetaInputState {
 
   void dispose() {
     motivoController.dispose();
+  }
+}
+
+class _SetInputState {
+  final TextEditingController localController;
+  final TextEditingController visitanteController;
+
+  _SetInputState({int? local, int? visitante})
+    : localController = TextEditingController(text: local?.toString() ?? ''),
+      visitanteController = TextEditingController(
+        text: visitante?.toString() ?? '',
+      );
+
+  void dispose() {
+    localController.dispose();
+    visitanteController.dispose();
   }
 }
 
@@ -677,7 +1179,7 @@ class _DropdownField<T> extends StatelessWidget {
         Text(label, style: AppTextStyles.label),
         const SizedBox(height: 7),
         DropdownButtonFormField<T>(
-          value: value,
+          initialValue: value,
           items: items,
           onChanged: onChanged,
           decoration: const InputDecoration(),

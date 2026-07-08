@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../models/campeonato_model.dart';
 import '../models/equipo_model.dart';
 import '../models/partido_model.dart';
 
@@ -58,17 +59,56 @@ class PartidoService {
     }).toList();
   }
 
-  Future<void> generarFixtureIdaVueltaAleatorio({
-    required String campeonatoId,
-  }) async {
+  /// Datos base de un partido nuevo. Incluye los campos nuevos con
+  /// valores neutros para que todos los documentos queden completos.
+  Map<String, dynamic> _partidoBase({
+    required int jornada,
+    required int vuelta,
+    String? grupoId,
+    required EquipoModel local,
+    required EquipoModel visitante,
+    required bool generadoPorSistema,
+  }) {
+    return {
+      'jornada': jornada,
+      'vuelta': vuelta,
+      'grupoId': grupoId,
+      'equipoLocalId': local.id,
+      'equipoLocalNombre': local.nombre,
+      'equipoVisitanteId': visitante.id,
+      'equipoVisitanteNombre': visitante.nombre,
+      'fechaHora': null,
+      'estado': PartidoEstado.pendienteProgramacion,
+      'golesLocal': null,
+      'golesVisitante': null,
+      'ganadorId': null,
+      'empate': false,
+      'resultadoRegistrado': false,
+      'generadoPorSistema': generadoPorSistema,
+      'tipoResultado': TipoResultado.normal,
+      'observacionResultado': null,
+      'penalesLocal': null,
+      'penalesVisitante': null,
+      'definidoPorPenales': false,
+      'definidoPorProrroga': false,
+      'tipoDefinicion': TipoDefinicion.normal,
+      'sets': const [],
+      'fechaCreacion': FieldValue.serverTimestamp(),
+      'fechaActualizacion': FieldValue.serverTimestamp(),
+    };
+  }
+
+  Future<void> _validarSinFixture(String campeonatoId) async {
     final partidosExistentes = await _partidos(campeonatoId).limit(1).get();
 
     if (partidosExistentes.docs.isNotEmpty) {
       throw Exception(
-        'Este campeonato ya tiene partidos generados. No se puede generar otro fixture encima.',
+        'Este campeonato ya tiene partidos generados. No se puede generar otro fixture encima. Puedes agregar cruces manuales.',
       );
     }
+  }
 
+  Future<List<EquipoModel>> _equiposActivos(String campeonatoId) async {
     final equiposSnap = await _equipos(campeonatoId)
         .where('estado', isEqualTo: EquipoEstado.activo)
         .get();
@@ -81,22 +121,109 @@ class PartidoService {
       throw Exception('Debe existir al menos 2 equipos activos.');
     }
 
+    return equipos;
+  }
+
+  /// Genera el fixture aleatorio respetando el formato guardado en el
+  /// campeonato (deporte-agnóstico: sirve para fútbol, vóley y básquet).
+  ///
+  /// - Liga solo ida / ida y vuelta: round-robin.
+  /// - Liga + final / liga + playoffs: genera solo la fase de liga; la
+  ///   fase final se crea con cruce manual cuando exista tabla final
+  ///   (preparado para generación automática en una siguiente fase).
+  /// - Fase de grupos / grupos + eliminación: genera la fase de grupos;
+  ///   la eliminatoria se crea después con los clasificados.
+  /// - Eliminación directa: genera la primera ronda con cruces aleatorios.
+  Future<void> generarFixtureSegunFormato({
+    required CampeonatoModel campeonato,
+  }) async {
+    await _validarSinFixture(campeonato.id);
+
+    final equipos = await _equiposActivos(campeonato.id);
+    final config = campeonato.configuracion;
+
+    switch (campeonato.tipoCampeonato) {
+      case TipoCampeonato.soloIda:
+        await _generarRoundRobin(
+          campeonatoId: campeonato.id,
+          equipos: equipos,
+          vueltas: 1,
+        );
+        return;
+
+      case TipoCampeonato.idaVuelta:
+        await _generarRoundRobin(
+          campeonatoId: campeonato.id,
+          equipos: equipos,
+          vueltas: 2,
+        );
+        return;
+
+      case TipoCampeonato.ligaFinal:
+      case TipoCampeonato.ligaPlayoffs:
+        // Se genera solo la liga. La final/playoffs se agregan luego con
+        // cruce manual usando la tabla final (no se inventan clasificados).
+        await _generarRoundRobin(
+          campeonatoId: campeonato.id,
+          equipos: equipos,
+          vueltas: config.cantidadVueltas < 1 ? 1 : config.cantidadVueltas,
+        );
+        return;
+
+      case TipoCampeonato.faseGrupos:
+      case TipoCampeonato.gruposEliminacion:
+        await _generarFaseGrupos(
+          campeonatoId: campeonato.id,
+          equipos: equipos,
+          cantidadGrupos: config.cantidadGrupos < 2 ? 2 : config.cantidadGrupos,
+          idaYVuelta: config.idaYVueltaEnGrupos,
+          aleatorio: config.generaGruposAleatorios,
+        );
+        return;
+
+      case TipoCampeonato.eliminacionDirecta:
+        await _generarEliminacionDirecta(
+          campeonatoId: campeonato.id,
+          equipos: equipos,
+          aleatorio: config.generaCrucesAleatorios,
+        );
+        return;
+
+      default:
+        // Tipo desconocido (documento antiguo o editado a mano):
+        // se mantiene el comportamiento histórico de ida y vuelta.
+        await _generarRoundRobin(
+          campeonatoId: campeonato.id,
+          equipos: equipos,
+          vueltas: 2,
+        );
+    }
+  }
+
+  /// Round-robin clásico (todos contra todos) con 1 o más vueltas.
+  Future<void> _generarRoundRobin({
+    required String campeonatoId,
+    required List<EquipoModel> equipos,
+    required int vueltas,
+    String? grupoId,
+    WriteBatch? batchExterno,
+  }) async {
     final random = Random();
     final equiposAleatorios = [...equipos]..shuffle(random);
 
     List<EquipoModel?> lista = [...equiposAleatorios];
 
     if (lista.length.isOdd) {
-      lista.add(null);
+      lista.add(null); // descanso
     }
 
     final cantidadEquipos = lista.length;
     final cantidadJornadas = cantidadEquipos - 1;
     final partidosPorJornada = cantidadEquipos ~/ 2;
 
-    final batch = _db.batch();
+    final batch = batchExterno ?? _db.batch();
 
-    final partidosVueltaUno = <Map<String, dynamic>>[];
+    final cruces = <({EquipoModel local, EquipoModel visitante, int jornada})>[];
 
     for (int jornada = 1; jornada <= cantidadJornadas; jornada++) {
       for (int i = 0; i < partidosPorJornada; i++) {
@@ -107,78 +234,149 @@ class PartidoService {
 
         final alternarLocalia = (jornada + i).isOdd;
 
-        final local = alternarLocalia ? equipoB : equipoA;
-        final visitante = alternarLocalia ? equipoA : equipoB;
-
-        partidosVueltaUno.add({
-          'jornada': jornada,
-          'vuelta': 1,
-          'grupoId': null,
-          'equipoLocalId': local.id,
-          'equipoLocalNombre': local.nombre,
-          'equipoVisitanteId': visitante.id,
-          'equipoVisitanteNombre': visitante.nombre,
-        });
+        cruces.add((
+          local: alternarLocalia ? equipoB : equipoA,
+          visitante: alternarLocalia ? equipoA : equipoB,
+          jornada: jornada,
+        ));
       }
 
       final fijo = lista.first;
       final resto = lista.sublist(1);
       final ultimo = resto.removeLast();
 
-      lista = [
-        fijo,
-        ultimo,
-        ...resto,
-      ];
+      lista = [fijo, ultimo, ...resto];
     }
 
-    for (final partido in partidosVueltaUno) {
-      final doc = _partidos(campeonatoId).doc();
+    for (int vuelta = 1; vuelta <= vueltas; vuelta++) {
+      final invertir = vuelta.isEven;
 
-      batch.set(doc, {
-        ...partido,
-        'fechaHora': null,
-        'estado': PartidoEstado.pendienteProgramacion,
-        'golesLocal': null,
-        'golesVisitante': null,
-        'ganadorId': null,
-        'empate': false,
-        'resultadoRegistrado': false,
-        'generadoPorSistema': true,
-        'tipoResultado': TipoResultado.normal,
-        'observacionResultado': null,
-        'fechaCreacion': FieldValue.serverTimestamp(),
-        'fechaActualizacion': FieldValue.serverTimestamp(),
-      });
+      for (final cruce in cruces) {
+        final doc = _partidos(campeonatoId).doc();
+
+        batch.set(
+          doc,
+          _partidoBase(
+            jornada: cruce.jornada,
+            vuelta: vuelta,
+            grupoId: grupoId,
+            local: invertir ? cruce.visitante : cruce.local,
+            visitante: invertir ? cruce.local : cruce.visitante,
+            generadoPorSistema: true,
+          ),
+        );
+      }
     }
 
-    for (final partido in partidosVueltaUno) {
-      final doc = _partidos(campeonatoId).doc();
+    if (batchExterno == null) {
+      await batch.commit();
+    }
+  }
 
-      batch.set(doc, {
-        'jornada': partido['jornada'],
-        'vuelta': 2,
-        'grupoId': null,
-        'equipoLocalId': partido['equipoVisitanteId'],
-        'equipoLocalNombre': partido['equipoVisitanteNombre'],
-        'equipoVisitanteId': partido['equipoLocalId'],
-        'equipoVisitanteNombre': partido['equipoLocalNombre'],
-        'fechaHora': null,
-        'estado': PartidoEstado.pendienteProgramacion,
-        'golesLocal': null,
-        'golesVisitante': null,
-        'ganadorId': null,
-        'empate': false,
-        'resultadoRegistrado': false,
-        'generadoPorSistema': true,
-        'tipoResultado': TipoResultado.normal,
-        'observacionResultado': null,
-        'fechaCreacion': FieldValue.serverTimestamp(),
-        'fechaActualizacion': FieldValue.serverTimestamp(),
-      });
+  /// Fase de grupos: reparte los equipos en grupos "Grupo A", "Grupo B",
+  /// etc. y genera round-robin dentro de cada grupo.
+  Future<void> _generarFaseGrupos({
+    required String campeonatoId,
+    required List<EquipoModel> equipos,
+    required int cantidadGrupos,
+    required bool idaYVuelta,
+    required bool aleatorio,
+  }) async {
+    if (cantidadGrupos < 2) {
+      throw Exception('La cantidad de grupos debe ser al menos 2.');
+    }
+
+    if (equipos.length < cantidadGrupos * 2) {
+      throw Exception(
+        'Se necesitan al menos ${cantidadGrupos * 2} equipos activos para formar $cantidadGrupos grupos de mínimo 2 equipos.',
+      );
+    }
+
+    final listaEquipos = [...equipos];
+
+    if (aleatorio) {
+      listaEquipos.shuffle(Random());
+    }
+
+    // Distribución tipo serpiente para que los grupos queden parejos.
+    final grupos = List.generate(cantidadGrupos, (_) => <EquipoModel>[]);
+
+    for (int i = 0; i < listaEquipos.length; i++) {
+      grupos[i % cantidadGrupos].add(listaEquipos[i]);
+    }
+
+    final batch = _db.batch();
+
+    for (int g = 0; g < grupos.length; g++) {
+      final nombreGrupo = 'Grupo ${String.fromCharCode(65 + g)}';
+
+      await _generarRoundRobin(
+        campeonatoId: campeonatoId,
+        equipos: grupos[g],
+        vueltas: idaYVuelta ? 2 : 1,
+        grupoId: nombreGrupo,
+        batchExterno: batch,
+      );
     }
 
     await batch.commit();
+  }
+
+  /// Eliminación directa: primera ronda con cruces aleatorios.
+  /// Las rondas siguientes se agregan con cruce manual cuando existan
+  /// ganadores (preparado para generación automática en una fase futura).
+  Future<void> _generarEliminacionDirecta({
+    required String campeonatoId,
+    required List<EquipoModel> equipos,
+    required bool aleatorio,
+  }) async {
+    if (equipos.length.isOdd) {
+      throw Exception(
+        'La eliminación directa necesita una cantidad par de equipos (hay ${equipos.length}). Ajusta los equipos activos o crea los cruces manualmente.',
+      );
+    }
+
+    final lista = [...equipos];
+
+    if (aleatorio) {
+      lista.shuffle(Random());
+    }
+
+    final batch = _db.batch();
+
+    for (int i = 0; i < lista.length; i += 2) {
+      final doc = _partidos(campeonatoId).doc();
+
+      batch.set(
+        doc,
+        _partidoBase(
+          jornada: 1,
+          vuelta: 1,
+          grupoId: null,
+          local: lista[i],
+          visitante: lista[i + 1],
+          generadoPorSistema: true,
+        ),
+      );
+    }
+
+    await batch.commit();
+  }
+
+  /// Generador histórico (ida y vuelta). Se mantiene por compatibilidad;
+  /// internamente usa el mismo round-robin nuevo.
+  Future<void> generarFixtureIdaVueltaAleatorio({
+    required String campeonatoId,
+  }) async {
+    await _validarSinFixture(campeonatoId);
+
+    final equipos = await _equiposActivos(campeonatoId);
+
+    await _generarRoundRobin(
+      campeonatoId: campeonatoId,
+      equipos: equipos,
+      vueltas: 2,
+    );
   }
 
   Future<void> crearCruceManual({
@@ -187,6 +385,7 @@ class PartidoService {
     required EquipoModel equipoVisitante,
     required int jornada,
     required bool idaYVuelta,
+    String? grupoId,
   }) async {
     if (equipoLocal.id == equipoVisitante.id) {
       throw Exception('Un equipo no puede jugar contra sí mismo.');
@@ -220,52 +419,32 @@ class PartidoService {
 
     final idaDoc = _partidos(campeonatoId).doc();
 
-    batch.set(idaDoc, {
-      'jornada': jornada,
-      'vuelta': 1,
-      'grupoId': null,
-      'equipoLocalId': equipoLocal.id,
-      'equipoLocalNombre': equipoLocal.nombre,
-      'equipoVisitanteId': equipoVisitante.id,
-      'equipoVisitanteNombre': equipoVisitante.nombre,
-      'fechaHora': null,
-      'estado': PartidoEstado.pendienteProgramacion,
-      'golesLocal': null,
-      'golesVisitante': null,
-      'ganadorId': null,
-      'empate': false,
-      'resultadoRegistrado': false,
-      'generadoPorSistema': false,
-      'tipoResultado': TipoResultado.normal,
-      'observacionResultado': null,
-      'fechaCreacion': FieldValue.serverTimestamp(),
-      'fechaActualizacion': FieldValue.serverTimestamp(),
-    });
+    batch.set(
+      idaDoc,
+      _partidoBase(
+        jornada: jornada,
+        vuelta: 1,
+        grupoId: grupoId,
+        local: equipoLocal,
+        visitante: equipoVisitante,
+        generadoPorSistema: false,
+      ),
+    );
 
     if (idaYVuelta) {
       final vueltaDoc = _partidos(campeonatoId).doc();
 
-      batch.set(vueltaDoc, {
-        'jornada': jornada,
-        'vuelta': 2,
-        'grupoId': null,
-        'equipoLocalId': equipoVisitante.id,
-        'equipoLocalNombre': equipoVisitante.nombre,
-        'equipoVisitanteId': equipoLocal.id,
-        'equipoVisitanteNombre': equipoLocal.nombre,
-        'fechaHora': null,
-        'estado': PartidoEstado.pendienteProgramacion,
-        'golesLocal': null,
-        'golesVisitante': null,
-        'ganadorId': null,
-        'empate': false,
-        'resultadoRegistrado': false,
-        'generadoPorSistema': false,
-        'tipoResultado': TipoResultado.normal,
-        'observacionResultado': null,
-        'fechaCreacion': FieldValue.serverTimestamp(),
-        'fechaActualizacion': FieldValue.serverTimestamp(),
-      });
+      batch.set(
+        vueltaDoc,
+        _partidoBase(
+          jornada: jornada,
+          vuelta: 2,
+          grupoId: grupoId,
+          local: equipoVisitante,
+          visitante: equipoLocal,
+          generadoPorSistema: false,
+        ),
+      );
     }
 
     await batch.commit();

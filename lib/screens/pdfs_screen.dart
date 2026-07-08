@@ -408,6 +408,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
     }).toList();
 
     if (ranking.isEmpty) {
+      if (!mounted) return;
       AppSnackbars.warning(context, 'Todavía no hay ranking de goleadores.');
       return;
     }
@@ -630,7 +631,7 @@ class _HeroPrintCard extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: AppColors.white.withOpacity(0.14),
+              color: AppColors.white.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(18),
             ),
             child: const Icon(
@@ -654,7 +655,7 @@ class _HeroPrintCard extends StatelessWidget {
                 Text(
                   'Genera planillas de control, fixture por fechas, resultados, listas de equipos y ranking de goleadores.',
                   style: AppTextStyles.body.copyWith(
-                    color: AppColors.white.withOpacity(0.84),
+                    color: AppColors.white.withValues(alpha: 0.84),
                   ),
                 ),
               ],

@@ -64,19 +64,43 @@ class CampeonatoService {
       'cancha': cancha.trim().isEmpty ? 'Cancha UPSA' : cancha.trim(),
       'configuracion': configuracion.toMap(),
       'reglasPuntuacion': ReglasPuntuacion.defaultRules().toMap(),
-      'reglasDesempate': [
-        'puntos',
-        'diferencia_goles',
-        'goles_favor',
-        'goles_contra',
-        'resultado_directo',
-      ],
+      'reglasDesempate': _reglasDesempatePorDeporte(deporte),
       'fechaCreacion': FieldValue.serverTimestamp(),
       'fechaActualizacion': FieldValue.serverTimestamp(),
       'creadoPor': creadoPor,
     });
 
     return doc.id;
+  }
+
+  /// Reglas de desempate por deporte. Los campeonatos antiguos mantienen
+  /// su lista guardada; esto solo aplica a campeonatos nuevos.
+  List<String> _reglasDesempatePorDeporte(String deporte) {
+    switch (deporte) {
+      case DeporteTipo.volley:
+        return const [
+          'puntos',
+          'diferencia_sets',
+          'sets_favor',
+          'diferencia_puntos',
+          'resultado_directo',
+        ];
+      case DeporteTipo.basket:
+        return const [
+          'puntos',
+          'diferencia_puntos',
+          'puntos_favor',
+          'resultado_directo',
+        ];
+      default:
+        return const [
+          'puntos',
+          'diferencia_goles',
+          'goles_favor',
+          'goles_contra',
+          'resultado_directo',
+        ];
+    }
   }
 
   Future<void> actualizarCampeonato({

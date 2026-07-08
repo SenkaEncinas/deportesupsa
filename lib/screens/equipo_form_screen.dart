@@ -351,7 +351,7 @@ class _DropdownField<T> extends StatelessWidget {
         Text(label, style: AppTextStyles.label),
         const SizedBox(height: 7),
         DropdownButtonFormField<T>(
-          value: value,
+          initialValue: value,
           items: items,
           onChanged: onChanged,
           decoration: const InputDecoration(),

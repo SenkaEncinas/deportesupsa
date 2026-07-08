@@ -41,7 +41,14 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
   final _clasificanPorGrupoController = TextEditingController(text: '2');
   final _clasificadosPlayoffsController = TextEditingController(text: '4');
 
-  String _modalidad = 'futsal';
+  // Configuración específica por deporte.
+  final _periodosController = TextEditingController(text: '4');
+  final _puntosSetNormalController = TextEditingController(text: '25');
+  final _puntosSetDecisivoController = TextEditingController(text: '15');
+
+  String _deporte = DeporteTipo.futbol;
+  String _modalidad = ModalidadDeporte.futsal;
+  int _setsParaGanar = 2; // mejor de 3
   String _tipoCampeonato = TipoCampeonato.idaVuelta;
 
   bool _generaCrucesAleatorios = true;
@@ -110,37 +117,100 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
     _cantidadGruposController.dispose();
     _clasificanPorGrupoController.dispose();
     _clasificadosPlayoffsController.dispose();
+    _periodosController.dispose();
+    _puntosSetNormalController.dispose();
+    _puntosSetDecisivoController.dispose();
     super.dispose();
+  }
+
+  bool get _esVolley => _deporte == DeporteTipo.volley;
+  bool get _esBasket => _deporte == DeporteTipo.basket;
+  bool get _esFutbol => _deporte == DeporteTipo.futbol;
+
+  void _aplicarDeporte(String deporte) {
+    setState(() {
+      _deporte = deporte;
+
+      if (deporte == DeporteTipo.volley) {
+        _modalidad = ModalidadDeporte.volleySala;
+        _jugadoresCanchaController.text = '6';
+        _minJugadoresController.text = '6';
+        _maxJugadoresController.text = '14';
+        _setsParaGanar = 2;
+        _puntosSetNormalController.text = '25';
+        _puntosSetDecisivoController.text = '15';
+        _permiteEmpate = false; // el vóley nunca empata
+      } else if (deporte == DeporteTipo.basket) {
+        _modalidad = ModalidadDeporte.basket5;
+        _jugadoresCanchaController.text = '5';
+        _minJugadoresController.text = '5';
+        _maxJugadoresController.text = '12';
+        _periodosController.text = '4';
+        _permiteEmpate = false; // el básquet no permite empate final
+      } else {
+        _modalidad = ModalidadDeporte.futsal;
+        _jugadoresCanchaController.text = '5';
+        _minJugadoresController.text = '5';
+        _maxJugadoresController.text = '12';
+        _permiteEmpate =
+            _tipoCampeonato != TipoCampeonato.eliminacionDirecta;
+      }
+    });
   }
 
   void _aplicarModalidad(String modalidad) {
     setState(() {
       _modalidad = modalidad;
 
-      if (modalidad == 'futsal') {
-        _jugadoresCanchaController.text = '5';
-        _minJugadoresController.text = '5';
-        _maxJugadoresController.text = '12';
-      } else if (modalidad == 'futbol_11') {
-        _jugadoresCanchaController.text = '11';
-        _minJugadoresController.text = '11';
-        _maxJugadoresController.text = '25';
-      } else if (modalidad == 'futbol_7') {
-        _jugadoresCanchaController.text = '7';
-        _minJugadoresController.text = '7';
-        _maxJugadoresController.text = '16';
+      switch (modalidad) {
+        case ModalidadDeporte.futsal:
+          _jugadoresCanchaController.text = '5';
+          _minJugadoresController.text = '5';
+          _maxJugadoresController.text = '12';
+          break;
+        case ModalidadDeporte.futbol11:
+          _jugadoresCanchaController.text = '11';
+          _minJugadoresController.text = '11';
+          _maxJugadoresController.text = '25';
+          break;
+        case ModalidadDeporte.futbol7:
+          _jugadoresCanchaController.text = '7';
+          _minJugadoresController.text = '7';
+          _maxJugadoresController.text = '16';
+          break;
+        case ModalidadDeporte.volleySala:
+        case ModalidadDeporte.volleyMixto:
+          _jugadoresCanchaController.text = '6';
+          _minJugadoresController.text = '6';
+          _maxJugadoresController.text = '14';
+          break;
+        case ModalidadDeporte.basket5:
+          _jugadoresCanchaController.text = '5';
+          _minJugadoresController.text = '5';
+          _maxJugadoresController.text = '12';
+          _periodosController.text = '4';
+          break;
+        case ModalidadDeporte.basket3x3:
+          _jugadoresCanchaController.text = '3';
+          _minJugadoresController.text = '3';
+          _maxJugadoresController.text = '6';
+          _periodosController.text = '1';
+          break;
       }
     });
   }
 
   void _aplicarFormato(String tipo) {
+    // El empate solo aplica a fútbol/futsal en formatos de liga o grupos.
+    final permiteEmpateBase = _esFutbol;
+
     setState(() {
       _tipoCampeonato = tipo;
 
       switch (tipo) {
         case TipoCampeonato.soloIda:
           _vueltasController.text = '1';
-          _permiteEmpate = true;
+          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = false;
           _idaYVueltaEnGrupos = false;
@@ -149,7 +219,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
 
         case TipoCampeonato.idaVuelta:
           _vueltasController.text = '2';
-          _permiteEmpate = true;
+          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = false;
           _idaYVueltaEnGrupos = false;
@@ -159,7 +229,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
         case TipoCampeonato.ligaFinal:
           _vueltasController.text = '1';
           _clasificadosPlayoffsController.text = '2';
-          _permiteEmpate = true;
+          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = false;
           _idaYVueltaEnGrupos = false;
@@ -169,7 +239,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
         case TipoCampeonato.ligaPlayoffs:
           _vueltasController.text = '1';
           _clasificadosPlayoffsController.text = '4';
-          _permiteEmpate = true;
+          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = false;
           _idaYVueltaEnGrupos = false;
@@ -180,7 +250,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
           _vueltasController.text = '1';
           _cantidadGruposController.text = '2';
           _clasificanPorGrupoController.text = '0';
-          _permiteEmpate = true;
+          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = true;
           _idaYVueltaEnGrupos = false;
@@ -191,7 +261,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
           _vueltasController.text = '1';
           _cantidadGruposController.text = '2';
           _clasificanPorGrupoController.text = '2';
-          _permiteEmpate = true;
+          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = true;
           _idaYVueltaEnGrupos = false;
@@ -307,6 +377,9 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
     final clasificadosPlayoffs =
         _usaPlayoffs ? _intValue(_clasificadosPlayoffsController, 4) : 0;
 
+    // El vóley y el básquet nunca permiten empate.
+    final permiteEmpateFinal = _esFutbol && _permiteEmpate;
+
     return CampeonatoConfig(
       formato: _formatoBase(),
       cantidadVueltas: _usaGrupos
@@ -317,7 +390,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
           : vueltas >= 2 || _tipoCampeonato == TipoCampeonato.idaVuelta,
       generaCrucesAleatorios: _generaCrucesAleatorios,
       generaGruposAleatorios: _usaGrupos ? _generaGruposAleatorios : false,
-      permiteEmpate: _permiteEmpate,
+      permiteEmpate: permiteEmpateFinal,
       generaTablaPosiciones: _generaTablaPosiciones(),
       cantidadJugadoresEnCancha: jugadoresEnCancha,
       cantidadMinimaJugadoresPorEquipo: minJugadores,
@@ -330,6 +403,19 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
       generaFaseEliminatoria: _usaEliminatoria,
       fixtureManualPermitido: true,
       rondaEliminatoriaInicial: _rondaEliminatoriaInicial(),
+      deporte: _deporte,
+      modalidad: _modalidad,
+      sistemaResultado: SistemaResultado.porDeporte(_deporte),
+      setsParaGanar: _esVolley ? _setsParaGanar : 2,
+      puntosSetNormal:
+          _esVolley ? _intValue(_puntosSetNormalController, 25) : 25,
+      puntosSetDecisivo:
+          _esVolley ? _intValue(_puntosSetDecisivoController, 15) : 15,
+      cantidadPeriodos: _esBasket ? _intValue(_periodosController, 4) : 0,
+      // En fútbol, si el formato no permite empate se definen penales.
+      permitePenales: _esFutbol && !permiteEmpateFinal,
+      // El básquet define los empates con prórroga.
+      permiteProrroga: _esBasket,
     );
   }
 
@@ -392,6 +478,29 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
         );
       }
     }
+
+    if (_esVolley) {
+      final setNormal = _intValue(_puntosSetNormalController, 0);
+      final setDecisivo = _intValue(_puntosSetDecisivoController, 0);
+
+      if (setNormal <= 0 || setDecisivo <= 0) {
+        throw Exception('Los puntos por set deben ser mayores a cero.');
+      }
+
+      if (_setsParaGanar != 2 && _setsParaGanar != 3) {
+        throw Exception(
+          'El partido de vóley debe ser al mejor de 3 o al mejor de 5 sets.',
+        );
+      }
+    }
+
+    if (_esBasket) {
+      final periodos = _intValue(_periodosController, 0);
+
+      if (periodos <= 0) {
+        throw Exception('La cantidad de periodos debe ser mayor a cero.');
+      }
+    }
   }
 
   Future<void> _guardar() async {
@@ -410,7 +519,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
       await _campeonatoService.crearCampeonato(
         nombre: _nombreController.text,
         descripcion: _descripcionController.text,
-        deporte: 'futbol',
+        deporte: _deporte,
         modalidad: _modalidad,
         tipoCampeonato: _tipoCampeonato,
         temporada: _temporadaController.text,
@@ -483,6 +592,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                 children: [
                   _HeroCard(
                     tipoCampeonato: _tipoCampeonato,
+                    deporte: _deporte,
                   ),
                   const SizedBox(height: 20),
                   AppCard(
@@ -548,30 +658,37 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                           ),
                           const SizedBox(height: 28),
                           const _SectionTitle(
+                            title: 'Deporte',
+                            subtitle:
+                                'Elige el deporte del campeonato. La modalidad y las reglas base se ajustan automáticamente.',
+                          ),
+                          const SizedBox(height: 18),
+                          _DeporteSelector(
+                            selected: _deporte,
+                            onSelected: _aplicarDeporte,
+                          ),
+                          const SizedBox(height: 28),
+                          const _SectionTitle(
                             title: 'Configuración deportiva',
                             subtitle:
-                                'Define si el campeonato será de futsal, fútbol 7 o fútbol 11.',
+                                'Modalidad, jugadores en cancha y tamaño de plantilla por equipo.',
                           ),
                           const SizedBox(height: 18),
                           _ResponsiveFields(
                             children: [
                               _DropdownField<String>(
+                                // La key fuerza a reconstruir el dropdown
+                                // cuando cambia el deporte seleccionado.
+                                key: ValueKey('modalidad_$_deporte'),
                                 label: 'Modalidad',
                                 value: _modalidad,
-                                items: const [
-                                  DropdownMenuItem(
-                                    value: 'futsal',
-                                    child: Text('Futsal'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'futbol_7',
-                                    child: Text('Fútbol 7'),
-                                  ),
-                                  DropdownMenuItem(
-                                    value: 'futbol_11',
-                                    child: Text('Fútbol 11'),
-                                  ),
-                                ],
+                                items: ModalidadDeporte.porDeporte(_deporte)
+                                    .map((modalidad) {
+                                  return DropdownMenuItem(
+                                    value: modalidad,
+                                    child: Text(_modalidadTexto(modalidad)),
+                                  );
+                                }).toList(),
                                 onChanged: (value) {
                                   if (value == null) return;
                                   _aplicarModalidad(value);
@@ -581,7 +698,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                                 label: 'Jugadores en cancha',
                                 controller: _jugadoresCanchaController,
                                 keyboardType: TextInputType.number,
-                                prefixIcon: Icons.sports_soccer,
+                                prefixIcon: _deporteIcono(_deporte),
                                 validator: _numberValidator,
                               ),
                               AppTextField(
@@ -600,6 +717,75 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                               ),
                             ],
                           ),
+                          if (_esVolley) ...[
+                            const SizedBox(height: 16),
+                            _ResponsiveFields(
+                              children: [
+                                _DropdownField<int>(
+                                  label: 'Formato del partido',
+                                  value: _setsParaGanar,
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 2,
+                                      child: Text('Al mejor de 3 sets'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 3,
+                                      child: Text('Al mejor de 5 sets'),
+                                    ),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value == null) return;
+                                    setState(() {
+                                      _setsParaGanar = value;
+                                    });
+                                  },
+                                ),
+                                AppTextField(
+                                  label: 'Puntos por set normal',
+                                  controller: _puntosSetNormalController,
+                                  keyboardType: TextInputType.number,
+                                  prefixIcon: Icons.scoreboard_outlined,
+                                  validator: _numberValidator,
+                                ),
+                                AppTextField(
+                                  label: 'Puntos set decisivo',
+                                  controller: _puntosSetDecisivoController,
+                                  keyboardType: TextInputType.number,
+                                  prefixIcon: Icons.flag_outlined,
+                                  validator: _numberValidator,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _InfoBox(
+                              title: 'Vóley',
+                              message:
+                                  'Los sets se ganan por diferencia de 2 puntos. No existen empates: gana quien alcance los sets necesarios.',
+                              secondary: true,
+                            ),
+                          ],
+                          if (_esBasket) ...[
+                            const SizedBox(height: 16),
+                            _ResponsiveFields(
+                              children: [
+                                AppTextField(
+                                  label: 'Cantidad de periodos',
+                                  controller: _periodosController,
+                                  keyboardType: TextInputType.number,
+                                  prefixIcon: Icons.timer_outlined,
+                                  validator: _numberValidator,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _InfoBox(
+                              title: 'Básquet',
+                              message:
+                                  'No se permite empate final: si el marcador queda igualado se juega prórroga hasta definir un ganador.',
+                              secondary: true,
+                            ),
+                          ],
                           const SizedBox(height: 28),
                           const _SectionTitle(
                             title: 'Formato del campeonato',
@@ -615,6 +801,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                           const SizedBox(height: 24),
                           _DynamicFormatSection(
                             tipoCampeonato: _tipoCampeonato,
+                            esFutbol: _esFutbol,
                             vueltasController: _vueltasController,
                             cantidadGruposController: _cantidadGruposController,
                             clasificanPorGrupoController:
@@ -690,9 +877,11 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
 
 class _HeroCard extends StatelessWidget {
   final String tipoCampeonato;
+  final String deporte;
 
   const _HeroCard({
     required this.tipoCampeonato,
+    required this.deporte,
   });
 
   @override
@@ -724,7 +913,10 @@ class _HeroCard extends StatelessWidget {
                   children: [
                     const AppLogoMark(),
                     const SizedBox(height: 20),
-                    _HeroText(tipoCampeonato: tipoCampeonato),
+                    _HeroText(
+                      tipoCampeonato: tipoCampeonato,
+                      deporte: deporte,
+                    ),
                   ],
                 )
               : Row(
@@ -732,7 +924,10 @@ class _HeroCard extends StatelessWidget {
                     const AppLogoMark(),
                     const SizedBox(width: 24),
                     Expanded(
-                      child: _HeroText(tipoCampeonato: tipoCampeonato),
+                      child: _HeroText(
+                        tipoCampeonato: tipoCampeonato,
+                        deporte: deporte,
+                      ),
                     ),
                   ],
                 ),
@@ -744,9 +939,11 @@ class _HeroCard extends StatelessWidget {
 
 class _HeroText extends StatelessWidget {
   final String tipoCampeonato;
+  final String deporte;
 
   const _HeroText({
     required this.tipoCampeonato,
+    required this.deporte,
   });
 
   @override
@@ -764,6 +961,11 @@ class _HeroText extends StatelessWidget {
               text: 'Nuevo',
               type: AppBadgeType.success,
               icon: Icons.add_circle_outline,
+            ),
+            AppBadge(
+              text: _deporteTexto(deporte),
+              type: AppBadgeType.warning,
+              icon: _deporteIcono(deporte),
             ),
             AppBadge(
               text: _tipoTexto(tipoCampeonato),
@@ -785,7 +987,7 @@ class _HeroText extends StatelessWidget {
         Text(
           'Define los datos generales, la modalidad deportiva y el formato de competencia para que el sistema pueda preparar el fixture correctamente.',
           style: AppTextStyles.body.copyWith(
-            color: AppColors.white.withOpacity(0.88),
+            color: AppColors.white.withValues(alpha: 0.88),
             fontSize: isMobile ? 14 : 15,
             height: 1.55,
           ),
@@ -797,6 +999,7 @@ class _HeroText extends StatelessWidget {
 
 class _DynamicFormatSection extends StatelessWidget {
   final String tipoCampeonato;
+  final bool esFutbol;
   final TextEditingController vueltasController;
   final TextEditingController cantidadGruposController;
   final TextEditingController clasificanPorGrupoController;
@@ -814,6 +1017,7 @@ class _DynamicFormatSection extends StatelessWidget {
 
   const _DynamicFormatSection({
     required this.tipoCampeonato,
+    required this.esFutbol,
     required this.vueltasController,
     required this.cantidadGruposController,
     required this.clasificanPorGrupoController,
@@ -886,13 +1090,22 @@ class _DynamicFormatSection extends StatelessWidget {
                       tipoCampeonato != TipoCampeonato.idaVuelta,
                   validator: _numberValidator,
                 ),
-                _ConfigSwitch(
-                  title: 'Permitir empate',
-                  subtitle:
-                      'Aplica para partidos de liga o fase de clasificación.',
-                  value: permiteEmpate,
-                  onChanged: onPermiteEmpateChanged,
-                ),
+                // El empate solo es configurable en fútbol/futsal:
+                // vóley y básquet siempre definen un ganador.
+                if (esFutbol)
+                  _ConfigSwitch(
+                    title: 'Permitir empate',
+                    subtitle:
+                        'Aplica para partidos de liga o fase de clasificación.',
+                    value: permiteEmpate,
+                    onChanged: onPermiteEmpateChanged,
+                  )
+                else
+                  const _ConfigInfoTile(
+                    title: 'Sin empates',
+                    subtitle:
+                        'Este deporte siempre define un ganador por reglamento.',
+                  ),
               ],
             ),
           if (_usaGrupos) ...[
@@ -1099,7 +1312,7 @@ class _FormatoCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.small.copyWith(
                     color: selected
-                        ? AppColors.primaryDark.withOpacity(0.75)
+                        ? AppColors.primaryDark.withValues(alpha: 0.75)
                         : AppColors.textSecondary,
                   ),
                 ),
@@ -1114,6 +1327,50 @@ class _FormatoCard extends StatelessWidget {
               size: 22,
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ConfigInfoTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _ConfigInfoTile({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 78),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceSoft,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.lock_outline_rounded,
+            color: AppColors.textMuted,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: AppTextStyles.bodyMedium),
+                const SizedBox(height: 4),
+                Text(subtitle, style: AppTextStyles.small),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1160,7 +1417,7 @@ class _ConfigSwitch extends StatelessWidget {
           ),
           Switch(
             value: value,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             onChanged: onChanged,
           ),
         ],
@@ -1234,8 +1491,8 @@ class _InfoBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: secondary
-              ? AppColors.info.withOpacity(0.16)
-              : AppColors.primary.withOpacity(0.16),
+              ? AppColors.info.withValues(alpha: 0.16)
+              : AppColors.primary.withValues(alpha: 0.16),
         ),
       ),
       child: Row(
@@ -1322,6 +1579,7 @@ class _DropdownField<T> extends StatelessWidget {
   final void Function(T?) onChanged;
 
   const _DropdownField({
+    super.key,
     required this.label,
     required this.value,
     required this.items,
@@ -1336,7 +1594,7 @@ class _DropdownField<T> extends StatelessWidget {
         Text(label, style: AppTextStyles.label),
         const SizedBox(height: 7),
         DropdownButtonFormField<T>(
-          value: value,
+          initialValue: value,
           isExpanded: true,
           items: items,
           onChanged: onChanged,
@@ -1361,6 +1619,109 @@ class _FormatoOption {
     required this.subtitle,
     required this.icon,
   });
+}
+
+class _DeporteSelector extends StatelessWidget {
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  const _DeporteSelector({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  static const List<_FormatoOption> _deportes = [
+    _FormatoOption(
+      value: DeporteTipo.futbol,
+      title: 'Fútbol / Futsal',
+      subtitle: 'Resultado por goles, con goleadores y tarjetas.',
+      icon: Icons.sports_soccer,
+    ),
+    _FormatoOption(
+      value: DeporteTipo.volley,
+      title: 'Vóley',
+      subtitle: 'Resultado por sets, sin empates.',
+      icon: Icons.sports_volleyball_outlined,
+    ),
+    _FormatoOption(
+      value: DeporteTipo.basket,
+      title: 'Básquet',
+      subtitle: 'Resultado por puntos, con prórroga.',
+      icon: Icons.sports_basketball_outlined,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = Responsive.isMobile(context);
+        final columns = isMobile ? 1 : 3;
+
+        const spacing = 14.0;
+        final width =
+            (constraints.maxWidth - (spacing * (columns - 1))) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: _deportes.map((deporte) {
+            return SizedBox(
+              width: width,
+              child: _FormatoCard(
+                option: deporte,
+                selected: selected == deporte.value,
+                onTap: () => onSelected(deporte.value),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
+String _modalidadTexto(String modalidad) {
+  switch (modalidad) {
+    case ModalidadDeporte.futsal:
+      return 'Futsal';
+    case ModalidadDeporte.futbol7:
+      return 'Fútbol 7';
+    case ModalidadDeporte.futbol11:
+      return 'Fútbol 11';
+    case ModalidadDeporte.volleySala:
+      return 'Vóley sala';
+    case ModalidadDeporte.volleyMixto:
+      return 'Vóley mixto';
+    case ModalidadDeporte.basket5:
+      return 'Básquet 5';
+    case ModalidadDeporte.basket3x3:
+      return 'Básquet 3x3';
+    default:
+      return modalidad.replaceAll('_', ' ');
+  }
+}
+
+IconData _deporteIcono(String deporte) {
+  switch (deporte) {
+    case DeporteTipo.volley:
+      return Icons.sports_volleyball_outlined;
+    case DeporteTipo.basket:
+      return Icons.sports_basketball_outlined;
+    default:
+      return Icons.sports_soccer;
+  }
+}
+
+String _deporteTexto(String deporte) {
+  switch (deporte) {
+    case DeporteTipo.volley:
+      return 'Vóley';
+    case DeporteTipo.basket:
+      return 'Básquet';
+    default:
+      return 'Fútbol / Futsal';
+  }
 }
 
 String _tipoTexto(String tipo) {

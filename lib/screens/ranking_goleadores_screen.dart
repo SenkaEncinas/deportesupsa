@@ -49,6 +49,36 @@ class RankingGoleadoresScreen extends StatelessWidget {
 
               final ranking = snapshot.data ?? [];
 
+              // El ranking de goleadores solo aplica a fútbol/futsal.
+              // Para vóley/básquet se muestra un mensaje claro hasta que
+              // exista registro individual (preparado para otra fase).
+              if (campeonato != null && !campeonato.esFutbol) {
+                return SingleChildScrollView(
+                  child: AppPage(
+                    title: campeonato.esBasket
+                        ? 'Anotadores'
+                        : 'Estadísticas de jugadores',
+                    subtitle: campeonato.nombre,
+                    actions: [
+                      AppButton.secondary(
+                        text: 'Volver',
+                        icon: Icons.arrow_back,
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                    child: AppEmptyState(
+                      icon: campeonato.esBasket
+                          ? Icons.sports_basketball_outlined
+                          : Icons.sports_volleyball_outlined,
+                      title: 'Módulo en preparación',
+                      message: campeonato.esBasket
+                          ? 'El registro de puntos por jugador estará disponible próximamente. El marcador por equipo ya se registra en Resultados.'
+                          : 'Las estadísticas por jugador de vóley estarán disponibles próximamente. La tabla ya considera sets y puntos por equipo.',
+                    ),
+                  ),
+                );
+              }
+
               return SingleChildScrollView(
                 child: AppPage(
                   title: 'Ranking de goleadores',
