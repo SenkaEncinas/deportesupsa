@@ -25,7 +25,8 @@ class AppPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pagePadding = padding ??
+    final pagePadding =
+        padding ??
         EdgeInsets.symmetric(
           horizontal: Responsive.horizontalPadding(context),
           vertical: 24,
@@ -37,11 +38,7 @@ class AppPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (title != null || subtitle != null || actions.isNotEmpty) ...[
-            _Header(
-              title: title,
-              subtitle: subtitle,
-              actions: actions,
-            ),
+            _Header(title: title, subtitle: subtitle, actions: actions),
             const SizedBox(height: 22),
           ],
           child,
@@ -66,11 +63,7 @@ class _Header extends StatelessWidget {
   final String? subtitle;
   final List<Widget> actions;
 
-  const _Header({
-    this.title,
-    this.subtitle,
-    required this.actions,
-  });
+  const _Header({this.title, this.subtitle, required this.actions});
 
   @override
   Widget build(BuildContext context) {
@@ -80,11 +73,7 @@ class _Header extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (title != null)
-            Text(
-              title!,
-              style: AppTextStyles.heading2,
-            ),
+          if (title != null) Text(title!, style: AppTextStyles.heading2),
           if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
@@ -105,11 +94,7 @@ class _Header extends StatelessWidget {
           Row(children: [titleWidget]),
           if (actions.isNotEmpty) ...[
             const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: actions,
-            ),
+            Wrap(spacing: 10, runSpacing: 10, children: actions),
           ],
         ],
       );
@@ -121,10 +106,17 @@ class _Header extends StatelessWidget {
         titleWidget,
         if (actions.isNotEmpty) ...[
           const SizedBox(width: 16),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: actions,
+          // Wrap necesita un ancho acotado para poder pasar los botones a
+          // una segunda línea; sin Flexible, Row le da ancho ilimitado y
+          // termina empujando el título a un ancho casi nulo (el texto se
+          // parte letra por letra) cuando hay muchos botones de acción.
+          Flexible(
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 10,
+              runSpacing: 10,
+              children: actions,
+            ),
           ),
         ],
       ],

@@ -4,6 +4,7 @@ import '../../models/campeonato_model.dart';
 import 'app_badge.dart';
 import 'app_card.dart';
 import 'app_colors.dart';
+import 'app_match_card.dart';
 import 'app_text_styles.dart';
 
 class ChampionshipPublicCard extends StatelessWidget {
@@ -26,7 +27,7 @@ class ChampionshipPublicCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _SportIcon(modalidad: campeonato.modalidad),
+              _SportIcon(deporte: campeonato.deporteEfectivo),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -62,9 +63,7 @@ class ChampionshipPublicCard extends StatelessWidget {
                 : campeonato.descripcion,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
           const Divider(height: 1),
@@ -92,9 +91,7 @@ class ChampionshipPublicCard extends StatelessWidget {
             children: [
               Text(
                 'Ver campeonato',
-                style: AppTextStyles.button.copyWith(
-                  color: AppColors.primary,
-                ),
+                style: AppTextStyles.button.copyWith(color: AppColors.primary),
               ),
               const SizedBox(width: 6),
               const Icon(
@@ -145,19 +142,18 @@ class ChampionshipPublicCard extends StatelessWidget {
         .split(' ')
         .where((word) => word.trim().isNotEmpty)
         .map((word) {
-      if (word.length == 1) return word.toUpperCase();
+          if (word.length == 1) return word.toUpperCase();
 
-      return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
-    }).join(' ');
+          return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
+        })
+        .join(' ');
   }
 }
 
 class _SportIcon extends StatelessWidget {
-  final String modalidad;
+  final String deporte;
 
-  const _SportIcon({
-    required this.modalidad,
-  });
+  const _SportIcon({required this.deporte});
 
   @override
   Widget build(BuildContext context) {
@@ -168,13 +164,7 @@ class _SportIcon extends StatelessWidget {
         color: AppColors.primaryLight,
         borderRadius: BorderRadius.circular(15),
       ),
-      child: Icon(
-        modalidad.toLowerCase().contains('fut')
-            ? Icons.sports_soccer
-            : Icons.emoji_events_outlined,
-        color: AppColors.primary,
-        size: 25,
-      ),
+      child: Icon(deporteIcono(deporte), color: AppColors.primary, size: 25),
     );
   }
 }
@@ -183,29 +173,20 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _InfoRow({
-    required this.icon,
-    required this.text,
-  });
+  const _InfoRow({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: AppColors.textMuted,
-          size: 17,
-        ),
+        Icon(icon, color: AppColors.textMuted, size: 17),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.small.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTextStyles.small.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
       ],

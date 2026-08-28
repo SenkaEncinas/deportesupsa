@@ -28,8 +28,11 @@ class AppFilterPill extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
-        child: Container(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          constraints: const BoxConstraints(minHeight: 40),
           decoration: BoxDecoration(
             color: selected ? AppColors.primary : AppColors.surface,
             borderRadius: BorderRadius.circular(999),
@@ -48,18 +51,22 @@ class AppFilterPill extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
               ],
-              Text(
-                text,
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
                 style: AppTextStyles.small.copyWith(
                   color: selected ? AppColors.white : AppColors.textPrimary,
                   fontWeight: FontWeight.w800,
                 ),
+                child: Text(text),
               ),
               if (count != null) ...[
                 const SizedBox(width: 7),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: selected
                         ? AppColors.white.withValues(alpha: 0.22)
@@ -69,8 +76,7 @@ class AppFilterPill extends StatelessWidget {
                   child: Text(
                     '$count',
                     style: AppTextStyles.small.copyWith(
-                      color:
-                          selected ? AppColors.white : AppColors.primaryDark,
+                      color: selected ? AppColors.white : AppColors.primaryDark,
                       fontWeight: FontWeight.w800,
                     ),
                   ),

@@ -3,6 +3,9 @@ import 'model_helpers.dart';
 class TablaPosicionModel {
   final String equipoId;
   final String equipoNombre;
+  // Grupo al que pertenece el equipo en la fase de grupos. Null cuando el
+  // campeonato no usa grupos (o el equipo compite en la fase final).
+  final String? grupoId;
   final int partidosJugados;
   final int partidosGanados;
   final int partidosEmpatados;
@@ -24,6 +27,7 @@ class TablaPosicionModel {
   const TablaPosicionModel({
     required this.equipoId,
     required this.equipoNombre,
+    this.grupoId,
     required this.partidosJugados,
     required this.partidosGanados,
     required this.partidosEmpatados,
@@ -63,6 +67,7 @@ class TablaPosicionModel {
     return TablaPosicionModel(
       equipoId: stringFromJson(map['equipoId'], defaultValue: id),
       equipoNombre: stringFromJson(map['equipoNombre']),
+      grupoId: map['grupoId'] == null ? null : stringFromJson(map['grupoId']),
       partidosJugados: intFromJson(map['partidosJugados']),
       partidosGanados: intFromJson(map['partidosGanados']),
       partidosEmpatados: intFromJson(map['partidosEmpatados']),
@@ -83,6 +88,7 @@ class TablaPosicionModel {
     return {
       'equipoId': equipoId,
       'equipoNombre': equipoNombre,
+      'grupoId': grupoId,
       'partidosJugados': partidosJugados,
       'partidosGanados': partidosGanados,
       'partidosEmpatados': partidosEmpatados,

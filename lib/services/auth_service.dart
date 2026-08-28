@@ -4,11 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/admin_model.dart';
 
 class AuthService {
-  AuthService({
-    FirebaseAuth? auth,
-    FirebaseFirestore? firestore,
-  })  : _auth = auth ?? FirebaseAuth.instance,
-        _db = firestore ?? FirebaseFirestore.instance;
+  AuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
+    : _auth = auth ?? FirebaseAuth.instance,
+      _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
@@ -24,7 +22,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final credential = await  _auth.signInWithEmailAndPassword(
+    final credential = await _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
@@ -96,11 +94,8 @@ class AuthService {
   }
 
   Future<void> actualizarUltimaConexion(String uid) async {
-    await _admins.doc(uid).set(
-      {
-        'ultimaConexion': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
+    await _admins.doc(uid).set({
+      'ultimaConexion': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 }

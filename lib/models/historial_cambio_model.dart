@@ -25,12 +25,8 @@ class HistorialCambioModel {
     return HistorialCambioModel(
       id: id,
       accion: stringFromJson(map['accion']),
-      datosAnteriores: Map<String, dynamic>.from(
-        map['datosAnteriores'] ?? {},
-      ),
-      datosNuevos: Map<String, dynamic>.from(
-        map['datosNuevos'] ?? {},
-      ),
+      datosAnteriores: Map<String, dynamic>.from(map['datosAnteriores'] ?? {}),
+      datosNuevos: Map<String, dynamic>.from(map['datosNuevos'] ?? {}),
       observacion: stringFromJson(map['observacion']),
       usuarioId: stringFromJson(map['usuarioId']),
       usuarioNombre: stringFromJson(map['usuarioNombre']),

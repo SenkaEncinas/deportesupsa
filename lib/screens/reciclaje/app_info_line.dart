@@ -20,8 +20,12 @@ class AppInfoLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foreground = dark ? AppColors.white : AppColors.textPrimary;
-    final muted = dark ? AppColors.white.withValues(alpha: 0.70) : AppColors.textSecondary;
-    final iconBackground = dark ? AppColors.white.withValues(alpha: 0.14) : AppColors.primaryLight;
+    final muted = dark
+        ? AppColors.white.withValues(alpha: 0.70)
+        : AppColors.textSecondary;
+    final iconBackground = dark
+        ? AppColors.white.withValues(alpha: 0.14)
+        : AppColors.primaryLight;
     final iconColor = dark ? AppColors.white : AppColors.primary;
 
     return Row(
@@ -33,31 +37,20 @@ class AppInfoLine extends StatelessWidget {
             color: iconBackground,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            icon,
-            color: iconColor,
-            size: 19,
-          ),
+          child: Icon(icon, color: iconColor, size: 19),
         ),
         const SizedBox(width: 11),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: AppTextStyles.small.copyWith(
-                  color: muted,
-                ),
-              ),
+              Text(label, style: AppTextStyles.small.copyWith(color: muted)),
               const SizedBox(height: 2),
               Text(
                 value.trim().isEmpty ? 'No definido' : value,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: foreground,
-                ),
+                style: AppTextStyles.bodyMedium.copyWith(color: foreground),
               ),
             ],
           ),

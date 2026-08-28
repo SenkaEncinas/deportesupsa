@@ -6,7 +6,7 @@ import '../models/jugador_model.dart';
 
 class JugadorService {
   JugadorService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -31,13 +31,13 @@ class JugadorService {
   }
 
   Stream<List<JugadorModel>> streamJugadores(String campeonatoId) {
-    return _jugadores(campeonatoId).orderBy('nombreCompleto').snapshots().map(
-      (snap) {
-        return snap.docs.map((doc) {
-          return JugadorModel.fromMap(doc.id, doc.data());
-        }).toList();
-      },
-    );
+    return _jugadores(campeonatoId).orderBy('nombreCompleto').snapshots().map((
+      snap,
+    ) {
+      return snap.docs.map((doc) {
+        return JugadorModel.fromMap(doc.id, doc.data());
+      }).toList();
+    });
   }
 
   Stream<List<JugadorModel>> streamJugadoresPorEquipo({
@@ -49,20 +49,19 @@ class JugadorService {
         .orderBy('nombreCompleto')
         .snapshots()
         .map((snap) {
-      return snap.docs.map((doc) {
-        return JugadorModel.fromMap(doc.id, doc.data());
-      }).toList();
-    });
+          return snap.docs.map((doc) {
+            return JugadorModel.fromMap(doc.id, doc.data());
+          }).toList();
+        });
   }
 
   Future<List<JugadorModel>> getJugadoresPorEquipo({
     required String campeonatoId,
     required String equipoId,
   }) async {
-    final snap = await _jugadores(campeonatoId)
-        .where('equipoId', isEqualTo: equipoId)
-        .orderBy('nombreCompleto')
-        .get();
+    final snap = await _jugadores(
+      campeonatoId,
+    ).where('equipoId', isEqualTo: equipoId).orderBy('nombreCompleto').get();
 
     return snap.docs.map((doc) {
       return JugadorModel.fromMap(doc.id, doc.data());
@@ -101,10 +100,13 @@ class JugadorService {
     );
 
     if (campeonato.estaFinalizado) {
-      throw Exception('No se pueden registrar jugadores en un campeonato finalizado.');
+      throw Exception(
+        'No se pueden registrar jugadores en un campeonato finalizado.',
+      );
     }
 
-    if (campeonato.estaActivo && (observacion == null || observacion.trim().isEmpty)) {
+    if (campeonato.estaActivo &&
+        (observacion == null || observacion.trim().isEmpty)) {
       throw Exception(
         'La observación es obligatoria para modificar la planilla con el campeonato activo.',
       );
@@ -129,7 +131,8 @@ class JugadorService {
       final cantidadActual =
           (equipoDoc.data()?['cantidadJugadoresRegistrados'] ?? 0) as int;
 
-      if (cantidadActual >= campeonato.configuracion.cantidadMaximaJugadoresPorEquipo) {
+      if (cantidadActual >=
+          campeonato.configuracion.cantidadMaximaJugadoresPorEquipo) {
         throw Exception(
           'El equipo ya alcanzó la cantidad máxima de jugadores permitida.',
         );
@@ -156,7 +159,9 @@ class JugadorService {
       });
     });
 
-    if (campeonato.estaActivo && observacion != null && observacion.trim().isNotEmpty) {
+    if (campeonato.estaActivo &&
+        observacion != null &&
+        observacion.trim().isNotEmpty) {
       await jugadorRef.collection('historial_cambios').add({
         'accion': 'agregar_jugador_con_campeonato_activo',
         'datosAnteriores': {},
@@ -177,6 +182,11 @@ class JugadorService {
     return jugadorId;
   }
 
+  /// Edita un jugador. La observación solo es obligatoria si el
+  /// campeonato ya está activo (mismo criterio que [crearJugador]):
+  /// antes de arrancar, la planilla se puede corregir libremente, por
+  /// ejemplo si un ayudante cargó la lista equivocada en el equipo
+  /// equivocado.
   Future<void> editarJugador({
     required String campeonatoId,
     required String jugadorId,
@@ -185,7 +195,18 @@ class JugadorService {
     required String usuarioId,
     required String usuarioNombre,
   }) async {
-    if (observacion.trim().isEmpty) {
+    final campeonatoDoc = await _campeonato(campeonatoId).get();
+
+    if (!campeonatoDoc.exists || campeonatoDoc.data() == null) {
+      throw Exception('El campeonato no existe.');
+    }
+
+    final campeonato = CampeonatoModel.fromMap(
+      campeonatoDoc.id,
+      campeonatoDoc.data()!,
+    );
+
+    if (campeonato.estaActivo && observacion.trim().isEmpty) {
       throw Exception('La observación es obligatoria para editar un jugador.');
     }
 
@@ -201,9 +222,9 @@ class JugadorService {
     if (cambios.containsKey('codigoEstudiante')) {
       final nuevoCodigo = _normalizarCodigo(cambios['codigoEstudiante']);
 
-      final repetido = await _jugadores(campeonatoId)
-          .where('codigoNormalizado', isEqualTo: nuevoCodigo)
-          .get();
+      final repetido = await _jugadores(
+        campeonatoId,
+      ).where('codigoNormalizado', isEqualTo: nuevoCodigo).get();
 
       for (final doc in repetido.docs) {
         if (doc.id != jugadorId) {
@@ -259,5 +280,64 @@ class JugadorService {
       usuarioId: usuarioId,
       usuarioNombre: usuarioNombre,
     );
+  }
+
+  /// Borra un jugador para siempre (no es un cambio de estado): pensado
+  /// para corregir errores de carga, como registrar a alguien en el
+  /// equipo equivocado. Solo se permite mientras el campeonato está en
+  /// inscripción, porque una vez activo el jugador puede tener goles,
+  /// tarjetas o historial asociado que quedaría huérfano; para sacar a
+  /// alguien de un campeonato ya activo se usa [cambiarEstadoJugador]
+  /// con `retirado`, que sí deja rastro.
+  Future<void> eliminarJugador({
+    required String campeonatoId,
+    required String jugadorId,
+  }) async {
+    final campeonatoDoc = await _campeonato(campeonatoId).get();
+
+    if (!campeonatoDoc.exists || campeonatoDoc.data() == null) {
+      throw Exception('El campeonato no existe.');
+    }
+
+    final campeonato = CampeonatoModel.fromMap(
+      campeonatoDoc.id,
+      campeonatoDoc.data()!,
+    );
+
+    if (campeonato.estado != CampeonatoEstado.inscripcion) {
+      throw Exception(
+        'Solo se puede eliminar un jugador mientras el campeonato está en '
+        'inscripción. Si el campeonato ya empezó, cambia su estado a '
+        '"retirado" en vez de eliminarlo.',
+      );
+    }
+
+    final jugadorRef = _jugadores(campeonatoId).doc(jugadorId);
+
+    await _db.runTransaction((transaction) async {
+      final jugadorDoc = await transaction.get(jugadorRef);
+
+      if (!jugadorDoc.exists || jugadorDoc.data() == null) {
+        throw Exception('El jugador no existe.');
+      }
+
+      final equipoId = jugadorDoc.data()!['equipoId'] as String?;
+      DocumentReference<Map<String, dynamic>>? equipoRef;
+      var equipoExiste = false;
+
+      if (equipoId != null && equipoId.isNotEmpty) {
+        equipoRef = _equipos(campeonatoId).doc(equipoId);
+        equipoExiste = (await transaction.get(equipoRef)).exists;
+      }
+
+      transaction.delete(jugadorRef);
+
+      if (equipoRef != null && equipoExiste) {
+        transaction.update(equipoRef, {
+          'cantidadJugadoresRegistrados': FieldValue.increment(-1),
+          'fechaActualizacion': FieldValue.serverTimestamp(),
+        });
+      }
+    });
   }
 }

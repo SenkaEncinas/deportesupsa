@@ -28,10 +28,7 @@ class SetPartido {
   final int local;
   final int visitante;
 
-  const SetPartido({
-    required this.local,
-    required this.visitante,
-  });
+  const SetPartido({required this.local, required this.visitante});
 
   factory SetPartido.fromMap(Map<String, dynamic> map) {
     return SetPartido(
@@ -41,10 +38,7 @@ class SetPartido {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'local': local,
-      'visitante': visitante,
-    };
+    return {'local': local, 'visitante': visitante};
   }
 }
 
@@ -132,12 +126,15 @@ class PartidoModel {
         map['estado'],
         defaultValue: PartidoEstado.pendienteProgramacion,
       ),
-      golesLocal: map['golesLocal'] == null ? null : intFromJson(map['golesLocal']),
+      golesLocal: map['golesLocal'] == null
+          ? null
+          : intFromJson(map['golesLocal']),
       golesVisitante: map['golesVisitante'] == null
           ? null
           : intFromJson(map['golesVisitante']),
-      ganadorId:
-          map['ganadorId'] == null ? null : stringFromJson(map['ganadorId']),
+      ganadorId: map['ganadorId'] == null
+          ? null
+          : stringFromJson(map['ganadorId']),
       empate: boolFromJson(map['empate']),
       resultadoRegistrado: boolFromJson(map['resultadoRegistrado']),
       generadoPorSistema: boolFromJson(
@@ -154,15 +151,20 @@ class PartidoModel {
       fechaCreacion: dateFromJson(map['fechaCreacion']),
       fechaActualizacion: dateFromJson(map['fechaActualizacion']),
       // Campos nuevos con defaults: los partidos antiguos no los tienen.
-      penalesLocal:
-          map['penalesLocal'] == null ? null : intFromJson(map['penalesLocal']),
+      penalesLocal: map['penalesLocal'] == null
+          ? null
+          : intFromJson(map['penalesLocal']),
       penalesVisitante: map['penalesVisitante'] == null
           ? null
           : intFromJson(map['penalesVisitante']),
-      definidoPorPenales:
-          boolFromJson(map['definidoPorPenales'], defaultValue: false),
-      definidoPorProrroga:
-          boolFromJson(map['definidoPorProrroga'], defaultValue: false),
+      definidoPorPenales: boolFromJson(
+        map['definidoPorPenales'],
+        defaultValue: false,
+      ),
+      definidoPorProrroga: boolFromJson(
+        map['definidoPorProrroga'],
+        defaultValue: false,
+      ),
       tipoDefinicion: stringFromJson(
         map['tipoDefinicion'],
         defaultValue: TipoDefinicion.normal,
@@ -216,7 +218,9 @@ class PartidoModel {
 
     final base = '$golesLocal - $golesVisitante';
 
-    if (definidoPorPenales && penalesLocal != null && penalesVisitante != null) {
+    if (definidoPorPenales &&
+        penalesLocal != null &&
+        penalesVisitante != null) {
       return '$base ($penalesLocal - $penalesVisitante pen.)';
     }
 

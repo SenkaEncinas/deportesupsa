@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/campeonato_model.dart';
 import '../models/jugador_model.dart';
 import '../models/partido_model.dart';
+import '../models/tarjeta_model.dart';
 import '../services/auth_service.dart';
 import '../services/campeonato_service.dart';
 import '../services/jugador_service.dart';
@@ -60,6 +61,7 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
   final List<_GolInputState> _goles = [];
   final List<_TarjetaInputState> _tarjetas = [];
   final List<_SetInputState> _sets = [];
+  final List<_SancionInputState> _sanciones = [];
 
   @override
   void initState() {
@@ -111,6 +113,53 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
       ...visitante,
     ].where((jugador) => jugador.estado == JugadorEstado.activo).toList();
 
+    // Al editar un resultado ya registrado, precargamos los goles y
+    // tarjetas/sanciones por jugador (viven en colecciones aparte, no en
+    // el documento del partido) para que el admin pueda corregirlos en
+    // vez de ver solo el marcador final.
+    if (widget.partido.resultadoRegistrado) {
+      final goles = await _resultadoService.getGolesPartido(
+        campeonatoId: widget.campeonatoId,
+        partidoId: widget.partido.id,
+      );
+
+      final tarjetas = await _resultadoService.getTarjetasPartido(
+        campeonatoId: widget.campeonatoId,
+        partidoId: widget.partido.id,
+      );
+
+      for (final gol in goles) {
+        _goles.add(
+          _GolInputState()
+            ..jugadorId = gol.jugadorId
+            ..cantidad = gol.cantidad,
+        );
+      }
+
+      final esFutbol = _esFutbol(campeonato);
+
+      for (final tarjeta in tarjetas) {
+        if (esFutbol) {
+          _tarjetas.add(
+            _TarjetaInputState()
+              ..jugadorId = tarjeta.jugadorId
+              ..amarillas = tarjeta.amarillas
+              ..rojas = tarjeta.rojas
+              ..motivoController.text = tarjeta.motivo ?? '',
+          );
+        } else {
+          _sanciones.add(
+            _SancionInputState()
+              ..jugadorId = tarjeta.jugadorId
+              ..tipo = tarjeta.rojas > 0
+                  ? SancionTipo.forzada
+                  : SancionTipo.porMesa
+              ..detalleController.text = tarjeta.motivo ?? '',
+          );
+        }
+      }
+    }
+
     return _FormData(campeonato: campeonato, jugadores: jugadores);
   }
 
@@ -128,6 +177,10 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
 
     for (final set in _sets) {
       set.dispose();
+    }
+
+    for (final sancion in _sanciones) {
+      sancion.dispose();
     }
 
     super.dispose();
@@ -171,6 +224,19 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
     });
   }
 
+  void _addSancion() {
+    setState(() {
+      _sanciones.add(_SancionInputState());
+    });
+  }
+
+  void _removeSancion(int index) {
+    setState(() {
+      final item = _sanciones.removeAt(index);
+      item.dispose();
+    });
+  }
+
   int _parseInt(String value) {
     return int.tryParse(value.trim()) ?? 0;
   }
@@ -184,11 +250,26 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
   bool _esBasket(CampeonatoModel? campeonato) =>
       campeonato != null && campeonato.esBasket;
 
-  /// El formato exige ganador (sin empate) para fútbol/futsal.
+  /// El formato exige ganador (sin empate) para fútbol/futsal. En
+  /// formatos de dos fases (grupos+eliminación, liga+final,
+  /// liga+playoffs), la fase de grupos/liga puede permitir empate pero
+  /// la fase final no: esos cruces siempre se crean manualmente (todavía
+  /// no hay generador automático de llaves), así que
+  /// `generadoPorSistema == false` identifica de forma confiable un
+  /// partido de fase final.
   bool _futbolRequiereGanador(CampeonatoModel? campeonato) {
     if (campeonato == null) return false;
+
+    final formatoDosFases =
+        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion ||
+        campeonato.tipoCampeonato == TipoCampeonato.ligaFinal ||
+        campeonato.tipoCampeonato == TipoCampeonato.ligaPlayoffs;
+
+    final esFaseFinal = formatoDosFases && !widget.partido.generadoPorSistema;
+
     return !campeonato.configuracion.permiteEmpate ||
-        campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
+        campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta ||
+        esFaseFinal;
   }
 
   bool _mostrarPenales(CampeonatoModel? campeonato) {
@@ -320,6 +401,35 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
         }
       }
 
+      // Vóley/básquet no tienen tarjetas: una sanción "por mesa" o
+      // "forzada" se guarda con el mismo modelo (amarilla/roja) para que
+      // el módulo de jugadores sancionados los muestre a todos juntos.
+      if (!_esFutbol(campeonato) && _tipoResultado == TipoResultado.normal) {
+        for (final item in _sanciones) {
+          if (item.jugadorId == null || item.jugadorId!.isEmpty) {
+            throw Exception(
+              'Selecciona un jugador en todas las sanciones agregadas.',
+            );
+          }
+
+          final jugador = jugadores.firstWhere((j) => j.id == item.jugadorId);
+
+          tarjetasInputs.add(
+            TarjetaJugadorInput(
+              equipoId: jugador.equipoId,
+              equipoNombre: jugador.equipoNombre,
+              jugadorId: jugador.id,
+              jugadorNombre: jugador.nombreCompleto,
+              amarillas: item.tipo == SancionTipo.porMesa ? 1 : 0,
+              rojas: item.tipo == SancionTipo.forzada ? 1 : 0,
+              motivo: item.detalleController.text.trim().isEmpty
+                  ? null
+                  : item.detalleController.text.trim(),
+            ),
+          );
+        }
+      }
+
       await _resultadoService.registrarResultado(
         campeonatoId: widget.campeonatoId,
         partidoId: widget.partido.id,
@@ -411,6 +521,7 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
               child: AppCard(
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
                     children: [
                       if (!esVolley)
@@ -557,6 +668,17 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
                           jugadores: jugadores,
                           onAdd: _addTarjeta,
                           onRemove: _removeTarjeta,
+                          onRefresh: () => setState(() {}),
+                        ),
+                      ],
+                      if (!esFutbol &&
+                          _tipoResultado == TipoResultado.normal) ...[
+                        const SizedBox(height: 22),
+                        _SancionesSection(
+                          sanciones: _sanciones,
+                          jugadores: jugadores,
+                          onAdd: _addSancion,
+                          onRemove: _removeSancion,
                           onRefresh: () => setState(() {}),
                         ),
                       ],
@@ -1067,6 +1189,153 @@ class _TarjetasSection extends StatelessWidget {
   }
 }
 
+/// Vóley y básquet no tienen tarjetas amarillas/rojas como el fútbol,
+/// pero sí pueden tener una sanción a un jugador (por mesa o forzada,
+/// como una descalificación). Esta sección es opcional: solo se llena
+/// "si es necesario", igual que la de tarjetas en fútbol.
+class _SancionesSection extends StatelessWidget {
+  final List<_SancionInputState> sanciones;
+  final List<JugadorModel> jugadores;
+  final VoidCallback onAdd;
+  final void Function(int index) onRemove;
+  final VoidCallback onRefresh;
+
+  const _SancionesSection({
+    required this.sanciones,
+    required this.jugadores,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text('Sanciones a jugadores', style: AppTextStyles.heading3),
+            ),
+            AppButton.secondary(
+              text: 'Agregar sanción',
+              icon: Icons.add,
+              onPressed: onAdd,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (sanciones.isEmpty)
+          _InfoBox(
+            text:
+                'Solo si hubo un problema de mesa o una sanción a algún jugador. Si no pasó nada, deja esta sección vacía.',
+          )
+        else
+          Column(
+            children: List.generate(sanciones.length, (index) {
+              final item = sanciones[index];
+              final isMobile = Responsive.isMobile(context);
+
+              final jugadorDropdown = _DropdownField<String>(
+                label: 'Jugador',
+                value: item.jugadorId,
+                items: jugadores.map((jugador) {
+                  return DropdownMenuItem(
+                    value: jugador.id,
+                    child: Text(
+                      '${jugador.nombreCompleto} - ${jugador.equipoNombre}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  item.jugadorId = value;
+                  onRefresh();
+                },
+              );
+
+              final tipoDropdown = _DropdownField<String>(
+                label: 'Tipo de sanción',
+                value: item.tipo,
+                items: const [
+                  DropdownMenuItem(
+                    value: SancionTipo.porMesa,
+                    child: Text('Sanción por mesa'),
+                  ),
+                  DropdownMenuItem(
+                    value: SancionTipo.forzada,
+                    child: Text('Sanción forzada'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  item.tipo = value;
+                  onRefresh();
+                },
+              );
+
+              final deleteButton = IconButton(
+                onPressed: () => onRemove(index),
+                icon: const Icon(Icons.delete_outline),
+              );
+
+              final detalleField = TextFormField(
+                controller: item.detalleController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Detalle de lo ocurrido (opcional)',
+                  hintText: 'Ejemplo: conducta antideportiva con el árbitro.',
+                  prefixIcon: Icon(Icons.notes_outlined),
+                ),
+              );
+
+              if (isMobile) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: Column(
+                    children: [
+                      jugadorDropdown,
+                      const SizedBox(height: 10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Expanded(child: tipoDropdown),
+                          const SizedBox(width: 8),
+                          deleteButton,
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      detalleField,
+                    ],
+                  ),
+                );
+              }
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(flex: 3, child: jugadorDropdown),
+                        const SizedBox(width: 12),
+                        Expanded(flex: 2, child: tipoDropdown),
+                        const SizedBox(width: 8),
+                        deleteButton,
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    detalleField,
+                  ],
+                ),
+              );
+            }),
+          ),
+      ],
+    );
+  }
+}
+
 class _InfoBox extends StatelessWidget {
   final String text;
 
@@ -1105,6 +1374,16 @@ class _TarjetaInputState {
 
   void dispose() {
     motivoController.dispose();
+  }
+}
+
+class _SancionInputState {
+  String? jugadorId;
+  String tipo = SancionTipo.porMesa;
+  final TextEditingController detalleController = TextEditingController();
+
+  void dispose() {
+    detalleController.dispose();
   }
 }
 

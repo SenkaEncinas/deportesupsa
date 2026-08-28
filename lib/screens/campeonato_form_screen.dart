@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/campeonato_model.dart';
 import '../services/auth_service.dart';
 import '../services/campeonato_service.dart';
+import '../utils/fixture_grouping.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
@@ -39,6 +40,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
   final _vueltasController = TextEditingController(text: '2');
   final _cantidadGruposController = TextEditingController(text: '2');
   final _clasificanPorGrupoController = TextEditingController(text: '2');
+  final _mejoresTercerosController = TextEditingController(text: '0');
   final _clasificadosPlayoffsController = TextEditingController(text: '4');
 
   // Configuración específica por deporte.
@@ -116,6 +118,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
     _vueltasController.dispose();
     _cantidadGruposController.dispose();
     _clasificanPorGrupoController.dispose();
+    _mejoresTercerosController.dispose();
     _clasificadosPlayoffsController.dispose();
     _periodosController.dispose();
     _puntosSetNormalController.dispose();
@@ -152,8 +155,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
         _jugadoresCanchaController.text = '5';
         _minJugadoresController.text = '5';
         _maxJugadoresController.text = '12';
-        _permiteEmpate =
-            _tipoCampeonato != TipoCampeonato.eliminacionDirecta;
+        _permiteEmpate = _tipoCampeonato != TipoCampeonato.eliminacionDirecta;
       }
     });
   }
@@ -261,6 +263,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
           _vueltasController.text = '1';
           _cantidadGruposController.text = '2';
           _clasificanPorGrupoController.text = '2';
+          _mejoresTercerosController.text = '0';
           _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = true;
@@ -340,22 +343,14 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
 
   String _rondaEliminatoriaInicial() {
     if (_tipoCampeonato == TipoCampeonato.ligaFinal) return 'final';
+
     if (_tipoCampeonato == TipoCampeonato.ligaPlayoffs) {
       final clasificados = _intValue(_clasificadosPlayoffsController, 4);
-
-      if (clasificados <= 2) return 'final';
-      if (clasificados <= 4) return 'semifinal';
-      return 'cuartos';
+      return FixtureGrouping.claveRondaSegunEquipos(clasificados);
     }
 
     if (_tipoCampeonato == TipoCampeonato.gruposEliminacion) {
-      final grupos = _intValue(_cantidadGruposController, 2);
-      final clasificados = _intValue(_clasificanPorGrupoController, 2);
-      final total = grupos * clasificados;
-
-      if (total <= 2) return 'final';
-      if (total <= 4) return 'semifinal';
-      return 'cuartos';
+      return FixtureGrouping.claveRondaSegunEquipos(_totalClasificados);
     }
 
     if (_tipoCampeonato == TipoCampeonato.eliminacionDirecta) {
@@ -365,26 +360,41 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
     return 'no_aplica';
   }
 
+  /// Total de equipos que clasifican de la fase de grupos a la fase
+  /// final: los que clasifican directo por grupo, más los mejores
+  /// terceros entre grupos.
+  int get _totalClasificados {
+    final grupos = _intValue(_cantidadGruposController, 2);
+    final clasificados = _intValue(_clasificanPorGrupoController, 2);
+    final terceros = _intValue(_mejoresTercerosController, 0);
+    return grupos * clasificados + terceros;
+  }
+
   CampeonatoConfig _buildConfig() {
     final jugadoresEnCancha = _intValue(_jugadoresCanchaController, 5);
     final minJugadores = _intValue(_minJugadoresController, 5);
     final maxJugadores = _intValue(_maxJugadoresController, 12);
     final vueltas = _intValue(_vueltasController, 1);
-    final cantidadGrupos = _usaGrupos ? _intValue(_cantidadGruposController, 2) : 0;
-    final clasificanPorGrupo = _tipoCampeonato == TipoCampeonato.gruposEliminacion
+    final cantidadGrupos = _usaGrupos
+        ? _intValue(_cantidadGruposController, 2)
+        : 0;
+    final clasificanPorGrupo =
+        _tipoCampeonato == TipoCampeonato.gruposEliminacion
         ? _intValue(_clasificanPorGrupoController, 2)
         : 0;
-    final clasificadosPlayoffs =
-        _usaPlayoffs ? _intValue(_clasificadosPlayoffsController, 4) : 0;
+    final mejoresTerceros = _tipoCampeonato == TipoCampeonato.gruposEliminacion
+        ? _intValue(_mejoresTercerosController, 0)
+        : 0;
+    final clasificadosPlayoffs = _usaPlayoffs
+        ? _intValue(_clasificadosPlayoffsController, 4)
+        : 0;
 
     // El vóley y el básquet nunca permiten empate.
     final permiteEmpateFinal = _esFutbol && _permiteEmpate;
 
     return CampeonatoConfig(
       formato: _formatoBase(),
-      cantidadVueltas: _usaGrupos
-          ? (_idaYVueltaEnGrupos ? 2 : 1)
-          : vueltas,
+      cantidadVueltas: _usaGrupos ? (_idaYVueltaEnGrupos ? 2 : 1) : vueltas,
       idaYVuelta: _usaGrupos
           ? _idaYVueltaEnGrupos
           : vueltas >= 2 || _tipoCampeonato == TipoCampeonato.idaVuelta,
@@ -397,6 +407,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
       cantidadMaximaJugadoresPorEquipo: maxJugadores,
       cantidadGrupos: cantidadGrupos,
       clasificanPorGrupo: clasificanPorGrupo,
+      mejoresTerceros: mejoresTerceros,
       clasificadosPlayoffs: clasificadosPlayoffs,
       idaYVueltaEnGrupos: _usaGrupos && _idaYVueltaEnGrupos,
       incluyeTercerLugar: _usaEliminatoria && _incluyeTercerLugar,
@@ -407,10 +418,12 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
       modalidad: _modalidad,
       sistemaResultado: SistemaResultado.porDeporte(_deporte),
       setsParaGanar: _esVolley ? _setsParaGanar : 2,
-      puntosSetNormal:
-          _esVolley ? _intValue(_puntosSetNormalController, 25) : 25,
-      puntosSetDecisivo:
-          _esVolley ? _intValue(_puntosSetDecisivoController, 15) : 15,
+      puntosSetNormal: _esVolley
+          ? _intValue(_puntosSetNormalController, 25)
+          : 25,
+      puntosSetDecisivo: _esVolley
+          ? _intValue(_puntosSetDecisivoController, 15)
+          : 15,
       cantidadPeriodos: _esBasket ? _intValue(_periodosController, 4) : 0,
       // En fútbol, si el formato no permite empate se definen penales.
       permitePenales: _esFutbol && !permiteEmpateFinal,
@@ -458,11 +471,32 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
     }
 
     if (_tipoCampeonato == TipoCampeonato.gruposEliminacion) {
+      final grupos = _intValue(_cantidadGruposController, 0);
       final clasifican = _intValue(_clasificanPorGrupoController, 0);
+      final terceros = _intValue(_mejoresTercerosController, 0);
 
       if (clasifican <= 0) {
         throw Exception('Debe clasificar al menos 1 equipo por grupo.');
       }
+
+      if (terceros < 0) {
+        throw Exception('La cantidad de mejores terceros no puede ser negativa.');
+      }
+
+      if (terceros > grupos) {
+        throw Exception(
+          'Los mejores terceros no pueden ser más que la cantidad de grupos (solo hay un candidato a "mejor tercero" por grupo).',
+        );
+      }
+
+      // Antes esto bloqueaba guardar si el total no era potencia de 2
+      // (2/4/8/16/32). Se sacó el bloqueo a pedido explícito: hay
+      // campeonatos reales (ej. 12 equipos) donde la llave no cuadra
+      // pareja y aun así hace falta poder crear el campeonato — el
+      // ajuste de la llave se resuelve aparte, a mano. El aviso sigue
+      // ahí: `_RondaResumenBox` ya muestra la advertencia en naranja
+      // ("esa cantidad no arma una llave pareja...") sin impedir
+      // guardar.
     }
 
     if (_usaPlayoffs) {
@@ -472,9 +506,9 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
         throw Exception('Deben clasificar al menos 2 equipos a la fase final.');
       }
 
-      if (clasificados != 2 && clasificados != 4 && clasificados != 8) {
+      if (!FixtureGrouping.esPotenciaDeDos(clasificados)) {
         throw Exception(
-          'Los clasificados a playoffs deben ser 2, 4 u 8 para que el fixture pueda generar llaves ordenadas.',
+          'Los clasificados a playoffs deben ser 2, 4, 8 o 16 para que el fixture pueda generar llaves ordenadas.',
         );
       }
     }
@@ -590,14 +624,12 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
               ],
               child: Column(
                 children: [
-                  _HeroCard(
-                    tipoCampeonato: _tipoCampeonato,
-                    deporte: _deporte,
-                  ),
+                  _HeroCard(tipoCampeonato: _tipoCampeonato, deporte: _deporte),
                   const SizedBox(height: 20),
                   AppCard(
                     child: Form(
                       key: _formKey,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
                       child: Column(
                         children: [
                           const _SectionTitle(
@@ -684,11 +716,12 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                                 value: _modalidad,
                                 items: ModalidadDeporte.porDeporte(_deporte)
                                     .map((modalidad) {
-                                  return DropdownMenuItem(
-                                    value: modalidad,
-                                    child: Text(_modalidadTexto(modalidad)),
-                                  );
-                                }).toList(),
+                                      return DropdownMenuItem(
+                                        value: modalidad,
+                                        child: Text(_modalidadTexto(modalidad)),
+                                      );
+                                    })
+                                    .toList(),
                                 onChanged: (value) {
                                   if (value == null) return;
                                   _aplicarModalidad(value);
@@ -806,6 +839,8 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                             cantidadGruposController: _cantidadGruposController,
                             clasificanPorGrupoController:
                                 _clasificanPorGrupoController,
+                            mejoresTercerosController:
+                                _mejoresTercerosController,
                             clasificadosPlayoffsController:
                                 _clasificadosPlayoffsController,
                             generaCrucesAleatorios: _generaCrucesAleatorios,
@@ -879,10 +914,7 @@ class _HeroCard extends StatelessWidget {
   final String tipoCampeonato;
   final String deporte;
 
-  const _HeroCard({
-    required this.tipoCampeonato,
-    required this.deporte,
-  });
+  const _HeroCard({required this.tipoCampeonato, required this.deporte});
 
   @override
   Widget build(BuildContext context) {
@@ -898,11 +930,7 @@ class _HeroCard extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF003D2D),
-              Color(0xFF005C45),
-              AppColors.primary,
-            ],
+            colors: [Color(0xFF003D2D), Color(0xFF005C45), AppColors.primary],
           ),
         ),
         child: Padding(
@@ -913,10 +941,7 @@ class _HeroCard extends StatelessWidget {
                   children: [
                     const AppLogoMark(),
                     const SizedBox(height: 20),
-                    _HeroText(
-                      tipoCampeonato: tipoCampeonato,
-                      deporte: deporte,
-                    ),
+                    _HeroText(tipoCampeonato: tipoCampeonato, deporte: deporte),
                   ],
                 )
               : Row(
@@ -941,10 +966,7 @@ class _HeroText extends StatelessWidget {
   final String tipoCampeonato;
   final String deporte;
 
-  const _HeroText({
-    required this.tipoCampeonato,
-    required this.deporte,
-  });
+  const _HeroText({required this.tipoCampeonato, required this.deporte});
 
   @override
   Widget build(BuildContext context) {
@@ -1003,6 +1025,7 @@ class _DynamicFormatSection extends StatelessWidget {
   final TextEditingController vueltasController;
   final TextEditingController cantidadGruposController;
   final TextEditingController clasificanPorGrupoController;
+  final TextEditingController mejoresTercerosController;
   final TextEditingController clasificadosPlayoffsController;
   final bool generaCrucesAleatorios;
   final bool generaGruposAleatorios;
@@ -1021,6 +1044,7 @@ class _DynamicFormatSection extends StatelessWidget {
     required this.vueltasController,
     required this.cantidadGruposController,
     required this.clasificanPorGrupoController,
+    required this.mejoresTercerosController,
     required this.clasificadosPlayoffsController,
     required this.generaCrucesAleatorios,
     required this.generaGruposAleatorios,
@@ -1072,9 +1096,7 @@ class _DynamicFormatSection extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             _descripcionFormato(tipoCampeonato),
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 18),
           if (_usaLiga)
@@ -1086,7 +1108,8 @@ class _DynamicFormatSection extends StatelessWidget {
                   controller: vueltasController,
                   keyboardType: TextInputType.number,
                   prefixIcon: Icons.repeat_rounded,
-                  enabled: tipoCampeonato != TipoCampeonato.soloIda &&
+                  enabled:
+                      tipoCampeonato != TipoCampeonato.soloIda &&
                       tipoCampeonato != TipoCampeonato.idaVuelta,
                   validator: _numberValidator,
                 ),
@@ -1120,7 +1143,7 @@ class _DynamicFormatSection extends StatelessWidget {
                   prefixIcon: Icons.grid_view_rounded,
                   validator: _numberValidator,
                 ),
-                if (tipoCampeonato == TipoCampeonato.gruposEliminacion)
+                if (tipoCampeonato == TipoCampeonato.gruposEliminacion) ...[
                   AppTextField(
                     label: 'Clasifican por grupo',
                     hint: 'Ejemplo: 2',
@@ -1129,6 +1152,19 @@ class _DynamicFormatSection extends StatelessWidget {
                     prefixIcon: Icons.military_tech_outlined,
                     validator: _numberValidator,
                   ),
+                  AppTextField(
+                    label: 'Mejores terceros',
+                    hint: 'Ejemplo: 0',
+                    controller: mejoresTercerosController,
+                    keyboardType: TextInputType.number,
+                    prefixIcon: Icons.workspace_premium_outlined,
+                    validator: (value) {
+                      final number = int.tryParse(value ?? '');
+                      if (number == null || number < 0) return 'Valor inválido.';
+                      return null;
+                    },
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: 16),
@@ -1150,6 +1186,26 @@ class _DynamicFormatSection extends StatelessWidget {
                 ),
               ],
             ),
+            if (tipoCampeonato == TipoCampeonato.gruposEliminacion) ...[
+              const SizedBox(height: 16),
+              _RondaResumenBox(
+                listenable: Listenable.merge([
+                  cantidadGruposController,
+                  clasificanPorGrupoController,
+                  mejoresTercerosController,
+                ]),
+                calcularTotal: () {
+                  final grupos = int.tryParse(cantidadGruposController.text.trim()) ?? 0;
+                  final clasifican =
+                      int.tryParse(clasificanPorGrupoController.text.trim()) ?? 0;
+                  final terceros =
+                      int.tryParse(mejoresTercerosController.text.trim()) ?? 0;
+                  return grupos * clasifican + terceros;
+                },
+                textoBase: (total) =>
+                    '$total equipos clasifican a la fase final.',
+              ),
+            ],
           ],
           if (_usaPlayoffs) ...[
             if (_usaLiga || _usaGrupos) const SizedBox(height: 16),
@@ -1175,6 +1231,17 @@ class _DynamicFormatSection extends StatelessWidget {
                 ),
               ],
             ),
+            if (tipoCampeonato == TipoCampeonato.ligaPlayoffs) ...[
+              const SizedBox(height: 16),
+              _RondaResumenBox(
+                listenable: clasificadosPlayoffsController,
+                calcularTotal: () =>
+                    int.tryParse(clasificadosPlayoffsController.text.trim()) ??
+                    0,
+                textoBase: (total) =>
+                    '$total equipos clasifican a los playoffs.',
+              ),
+            ],
           ],
           if (tipoCampeonato == TipoCampeonato.eliminacionDirecta) ...[
             const SizedBox(height: 16),
@@ -1211,6 +1278,75 @@ class _DynamicFormatSection extends StatelessWidget {
   }
 }
 
+/// Resumen en vivo (se recalcula solo con [Listenable], sin depender de
+/// setState del formulario) de a qué ronda eliminatoria llega la
+/// configuración actual: verde y con el nombre de la ronda si el total
+/// es una potencia de 2 (llave pareja, sin equipos sueltos), o una
+/// advertencia con el ajuste sugerido si no cuadra.
+class _RondaResumenBox extends StatelessWidget {
+  final Listenable listenable;
+  final int Function() calcularTotal;
+  final String Function(int total) textoBase;
+
+  const _RondaResumenBox({
+    required this.listenable,
+    required this.calcularTotal,
+    required this.textoBase,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: listenable,
+      builder: (context, _) {
+        final total = calcularTotal();
+        final cuadra = FixtureGrouping.esPotenciaDeDos(total);
+        final color = cuadra ? AppColors.success : AppColors.warning;
+        final colorFondo = cuadra
+            ? AppColors.successLight
+            : AppColors.warningLight;
+
+        final texto = total < 2
+            ? 'Define al menos 2 equipos clasificados para armar la fase final.'
+            : cuadra
+            ? '${textoBase(total)} Arranca en ${FixtureGrouping.rondaSegunEquipos(total).toLowerCase()}.'
+            : '${textoBase(total)} Ese total no arma una llave pareja (2, 4, 8, 16 o 32): ajusta la configuración para que cuadre.';
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: colorFondo,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                cuadra ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                color: color,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  texto,
+                  style: AppTextStyles.body.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w700,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _FormatoSelector extends StatelessWidget {
   final List<_FormatoOption> formatos;
   final String selected;
@@ -1230,8 +1366,8 @@ class _FormatoSelector extends StatelessWidget {
         final columns = isMobile
             ? 1
             : constraints.maxWidth < 950
-                ? 2
-                : 3;
+            ? 2
+            : 3;
 
         const spacing = 14.0;
         final width =
@@ -1301,7 +1437,9 @@ class _FormatoCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: selected ? AppColors.primaryDark : AppColors.textPrimary,
+                    color: selected
+                        ? AppColors.primaryDark
+                        : AppColors.textPrimary,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
@@ -1337,10 +1475,7 @@ class _ConfigInfoTile extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _ConfigInfoTile({
-    required this.title,
-    required this.subtitle,
-  });
+  const _ConfigInfoTile({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -1408,10 +1543,7 @@ class _ConfigSwitch extends StatelessWidget {
               children: [
                 Text(title, style: AppTextStyles.bodyMedium),
                 const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: AppTextStyles.small,
-                ),
+                Text(subtitle, style: AppTextStyles.small),
               ],
             ),
           ),
@@ -1429,15 +1561,14 @@ class _ConfigSwitch extends StatelessWidget {
 class _ResponsiveFields extends StatelessWidget {
   final List<Widget> children;
 
-  const _ResponsiveFields({
-    required this.children,
-  });
+  const _ResponsiveFields({required this.children});
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final useColumn = Responsive.isMobile(context) || constraints.maxWidth < 860;
+        final useColumn =
+            Responsive.isMobile(context) || constraints.maxWidth < 860;
 
         if (useColumn) {
           return Column(
@@ -1534,10 +1665,7 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _SectionTitle({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionTitle({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -1625,10 +1753,7 @@ class _DeporteSelector extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onSelected;
 
-  const _DeporteSelector({
-    required this.selected,
-    required this.onSelected,
-  });
+  const _DeporteSelector({required this.selected, required this.onSelected});
 
   static const List<_FormatoOption> _deportes = [
     _FormatoOption(

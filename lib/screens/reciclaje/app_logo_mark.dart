@@ -7,23 +7,20 @@ class AppLogoMark extends StatelessWidget {
   final bool compact;
   final bool dark;
 
-  const AppLogoMark({
-    super.key,
-    this.compact = false,
-    this.dark = false,
-  });
+  const AppLogoMark({super.key, this.compact = false, this.dark = false});
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = dark ? AppColors.white.withValues(alpha: 0.12) : AppColors.white;
-    final borderColor = dark ? AppColors.white.withValues(alpha: 0.18) : AppColors.border;
+    final backgroundColor = dark
+        ? AppColors.white.withValues(alpha: 0.12)
+        : AppColors.white;
+    final borderColor = dark
+        ? AppColors.white.withValues(alpha: 0.18)
+        : AppColors.border;
 
     return Container(
       height: compact ? 46 : 56,
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 10 : 14,
-        vertical: 8,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: 8),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(16),

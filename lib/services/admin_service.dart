@@ -4,7 +4,7 @@ import '../models/admin_model.dart';
 
 class AdminService {
   AdminService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_sizes.dart';
+import 'app_text_styles.dart';
 
 class AppSnackbars {
   AppSnackbars._();
@@ -53,18 +55,20 @@ class AppSnackbars {
       SnackBar(
         backgroundColor: backgroundColor,
         behavior: SnackBarBehavior.floating,
+        elevation: 4,
         margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 4),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
         ),
         content: Row(
           children: [
-            Icon(icon, color: AppColors.white),
-            const SizedBox(width: 10),
+            Icon(icon, color: AppColors.white, size: 22),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(
+                style: AppTextStyles.body.copyWith(
                   color: AppColors.white,
                   fontWeight: FontWeight.w600,
                 ),

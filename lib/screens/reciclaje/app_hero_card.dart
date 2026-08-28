@@ -12,10 +12,7 @@ class AppHeroChipData {
   final IconData icon;
   final String text;
 
-  const AppHeroChipData({
-    required this.icon,
-    required this.text,
-  });
+  const AppHeroChipData({required this.icon, required this.text});
 }
 
 /// Dato informativo del hero (Cancha, Modalidad, Temporada, etc.).
@@ -78,11 +75,7 @@ class AppHeroCard extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF003D2D),
-              Color(0xFF005C45),
-              AppColors.primary,
-            ],
+            colors: [Color(0xFF003D2D), Color(0xFF005C45), AppColors.primary],
           ),
         ),
         child: ClipRRect(
@@ -107,7 +100,9 @@ class AppHeroCard extends StatelessWidget {
               ),
               Padding(
                 padding: EdgeInsets.all(isMobile ? 18 : 30),
-                child: isMobile ? _buildMobile(context) : _buildDesktop(context),
+                child: isMobile
+                    ? _buildMobile(context)
+                    : _buildDesktop(context),
               ),
             ],
           ),
@@ -126,10 +121,7 @@ class AppHeroCard extends StatelessWidget {
           spacing: 10,
           runSpacing: 10,
           crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            if (showLogo) const AppLogoMark(compact: true),
-            ...badges,
-          ],
+          children: [if (showLogo) const AppLogoMark(compact: true), ...badges],
         ),
         const SizedBox(height: 14),
         Text(
@@ -160,10 +152,7 @@ class AppHeroCard extends StatelessWidget {
           const SizedBox(height: 14),
           _CompactInfoGrid(items: infoItems),
         ],
-        if (side != null) ...[
-          const SizedBox(height: 14),
-          side!,
-        ],
+        if (side != null) ...[const SizedBox(height: 14), side!],
       ],
     );
   }
@@ -208,8 +197,8 @@ class AppHeroCard extends StatelessWidget {
       ],
     );
 
-    final lateral = side ??
-        (infoItems.isEmpty ? null : _DesktopInfoBox(items: infoItems));
+    final lateral =
+        side ?? (infoItems.isEmpty ? null : _DesktopInfoBox(items: infoItems));
 
     if (lateral == null) return texto;
 
@@ -228,9 +217,7 @@ class AppHeroCard extends StatelessWidget {
 class _DesktopInfoBox extends StatelessWidget {
   final List<AppHeroInfoItem> items;
 
-  const _DesktopInfoBox({
-    required this.items,
-  });
+  const _DesktopInfoBox({required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -240,9 +227,7 @@ class _DesktopInfoBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.white.withValues(alpha: 0.18),
-        ),
+        border: Border.all(color: AppColors.white.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,9 +252,7 @@ class _DesktopInfoBox extends StatelessWidget {
 class _CompactInfoGrid extends StatelessWidget {
   final List<AppHeroInfoItem> items;
 
-  const _CompactInfoGrid({
-    required this.items,
-  });
+  const _CompactInfoGrid({required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -284,10 +267,7 @@ class _CompactInfoGrid extends StatelessWidget {
           children: items.map((item) {
             return Container(
               width: itemWidth,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 9,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
               decoration: BoxDecoration(
                 color: AppColors.white.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(12),
@@ -345,23 +325,16 @@ class _CompactInfoGrid extends StatelessWidget {
 class _HeroChip extends StatelessWidget {
   final AppHeroChipData data;
 
-  const _HeroChip({
-    required this.data,
-  });
+  const _HeroChip({required this.data});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 11,
-        vertical: 7,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
       decoration: BoxDecoration(
         color: AppColors.white.withValues(alpha: 0.11),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: AppColors.white.withValues(alpha: 0.14),
-        ),
+        border: Border.all(color: AppColors.white.withValues(alpha: 0.14)),
       ),
       // Flexible + ellipsis: un Wrap acota el ancho máximo de cada hijo
       // al ancho del propio Wrap, así que un chip con texto largo (p. ej.
@@ -394,10 +367,7 @@ class _DecorativeCircle extends StatelessWidget {
   final double size;
   final double opacity;
 
-  const _DecorativeCircle({
-    required this.size,
-    required this.opacity,
-  });
+  const _DecorativeCircle({required this.size, required this.opacity});
 
   @override
   Widget build(BuildContext context) {

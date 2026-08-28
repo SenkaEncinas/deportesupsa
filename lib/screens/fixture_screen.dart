@@ -3,15 +3,20 @@ import 'package:printing/printing.dart';
 
 import '../models/campeonato_model.dart';
 import '../models/equipo_model.dart';
+import '../models/grupo_model.dart';
 import '../models/partido_model.dart';
 import '../services/campeonato_service.dart';
 import '../services/equipo_service.dart';
+import '../services/grupo_service.dart';
 import '../services/partido_service.dart';
 import '../services/pdf_service.dart';
+import '../utils/fixture_grouping.dart';
+import 'grupos_screen.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
+import 'reciclaje/app_dialogs.dart';
 import 'reciclaje/app_empty_state.dart';
 import 'reciclaje/app_filter_pill.dart';
 import 'reciclaje/app_loading.dart';
@@ -29,10 +34,7 @@ enum _FixtureFiltro { todos, sinProgramar, programados, manuales, automaticos }
 class FixtureScreen extends StatefulWidget {
   final String campeonatoId;
 
-  const FixtureScreen({
-    super.key,
-    required this.campeonatoId,
-  });
+  const FixtureScreen({super.key, required this.campeonatoId});
 
   @override
   State<FixtureScreen> createState() => _FixtureScreenState();
@@ -41,6 +43,7 @@ class FixtureScreen extends StatefulWidget {
 class _FixtureScreenState extends State<FixtureScreen> {
   final CampeonatoService _campeonatoService = CampeonatoService();
   final EquipoService _equipoService = EquipoService();
+  final GrupoService _grupoService = GrupoService();
   final PartidoService _partidoService = PartidoService();
   final PdfService _pdfService = PdfService();
 
@@ -53,9 +56,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
     });
 
     try {
-      await _partidoService.generarFixtureSegunFormato(
-        campeonato: campeonato,
-      );
+      await _partidoService.generarFixtureSegunFormato(campeonato: campeonato);
 
       if (!mounted) return;
       AppSnackbars.success(
@@ -77,15 +78,16 @@ class _FixtureScreenState extends State<FixtureScreen> {
     }
   }
 
-  Future<void> _crearCruceManual() async {
+  Future<void> _crearCruceManual(CampeonatoModel? campeonato) async {
     setState(() {
       _loading = true;
     });
 
     try {
       final equipos = await _equipoService.getEquipos(widget.campeonatoId);
-      final activos =
-          equipos.where((equipo) => equipo.estado == EquipoEstado.activo).toList();
+      final activos = equipos
+          .where((equipo) => equipo.estado == EquipoEstado.activo)
+          .toList();
 
       if (!mounted) return;
 
@@ -97,9 +99,31 @@ class _FixtureScreenState extends State<FixtureScreen> {
         return;
       }
 
+      // Mientras el campeonato deba restringir los cruces al mismo
+      // grupo (fase de grupos pura, o grupos+eliminación sin activar la
+      // fase eliminatoria), el diálogo necesita saber a qué grupo
+      // pertenece cada equipo para no dejar armar cruces entre grupos.
+      final restringirAGrupo =
+          campeonato?.debeRestringirCrucesAlGrupo ?? false;
+
+      final grupos = restringirAGrupo
+          ? await _grupoService.getGrupos(widget.campeonatoId)
+          : <GrupoModel>[];
+
+      if (!mounted) return;
+
       final result = await showDialog<_CruceManualResult>(
         context: context,
-        builder: (_) => _CruceManualDialog(equipos: activos),
+        builder: (_) => _CruceManualDialog(
+          equipos: activos,
+          grupos: grupos,
+          restringirAGrupo: restringirAGrupo,
+          // En grupos+eliminación el grupoId de los cruces de fase final
+          // debe quedar vacío para que la vista pública los muestre como
+          // llave visual en vez de una sección de grupo más: no tiene
+          // sentido dejar que el admin lo pise a mano con texto libre.
+          ocultarCampoGrupoLibre: campeonato?.tieneFasesSeparadas ?? false,
+        ),
       );
 
       if (result == null) return;
@@ -124,6 +148,45 @@ class _FixtureScreenState extends State<FixtureScreen> {
     } catch (e) {
       if (!mounted) return;
 
+      AppSnackbars.error(
+        context,
+        e.toString().replaceAll('Exception:', '').trim(),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _activarFaseEliminatoria(CampeonatoModel campeonato) async {
+    final confirm = await AppDialogs.confirm(
+      context: context,
+      title: 'Activar fase eliminatoria',
+      message:
+          'A partir de ahora "Agregar cruce manual" va a dejar de limitarse a equipos del mismo grupo, para que puedas armar las llaves (octavos, cuartos...) con los equipos que clasificaron. Esta acción no se puede deshacer.',
+      confirmText: 'Activar',
+      danger: true,
+    );
+
+    if (!confirm) return;
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      await _campeonatoService.activarFaseEliminatoria(campeonato);
+
+      if (!mounted) return;
+      AppSnackbars.success(
+        context,
+        'Fase eliminatoria activada: ya puedes cruzar equipos de distintos grupos.',
+      );
+    } catch (e) {
+      if (!mounted) return;
       AppSnackbars.error(
         context,
         e.toString().replaceAll('Exception:', '').trim(),
@@ -214,52 +277,29 @@ class _FixtureScreenState extends State<FixtureScreen> {
     }
   }
 
-  /// Agrupa los partidos para mostrarlos por secciones:
-  /// primero por grupo (si existe), luego por vuelta.
+  /// Agrupa los partidos para mostrarlos por secciones: primero por grupo
+  /// (si existe), luego por vuelta o por ronda eliminatoria. Comparte la
+  /// lógica con la vista pública a través de [FixtureGrouping].
   Map<String, List<PartidoModel>> _agruparPartidos(
     List<PartidoModel> partidos,
+    List<PartidoModel> todos,
     CampeonatoModel? campeonato,
   ) {
-    final grupos = <String, List<PartidoModel>>{};
-
-    final tieneGrupos =
-        partidos.any((p) => p.grupoId != null && p.grupoId!.isNotEmpty);
-    final tieneVarias = partidos.any((p) => p.vuelta > 1);
-    final esEliminacion =
-        campeonato?.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
-
-    for (final partido in partidos) {
-      String clave;
-
-      if (tieneGrupos) {
-        clave = (partido.grupoId == null || partido.grupoId!.isEmpty)
-            ? 'Fase final'
-            : partido.grupoId!;
-      } else if (esEliminacion) {
-        clave = 'Llaves · Ronda ${partido.jornada}';
-      } else if (tieneVarias) {
-        clave = 'Vuelta ${partido.vuelta}';
-      } else {
-        clave = 'Partidos';
-      }
-
-      grupos.putIfAbsent(clave, () => []).add(partido);
-    }
-
-    for (final lista in grupos.values) {
-      lista.sort((a, b) {
-        final vuelta = a.vuelta.compareTo(b.vuelta);
-        if (vuelta != 0) return vuelta;
-        return a.jornada.compareTo(b.jornada);
-      });
-    }
-
-    return grupos;
+    return FixtureGrouping.agrupar(
+      partidos: partidos,
+      todos: todos,
+      tipoCampeonato: campeonato?.tipoCampeonato,
+    );
   }
 
   bool _esFormatoDosFases(CampeonatoModel campeonato) {
     return campeonato.tipoCampeonato == TipoCampeonato.ligaFinal ||
         campeonato.tipoCampeonato == TipoCampeonato.ligaPlayoffs ||
+        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
+  }
+
+  bool _usaGrupos(CampeonatoModel campeonato) {
+    return campeonato.tipoCampeonato == TipoCampeonato.faseGrupos ||
         campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
   }
 
@@ -270,7 +310,9 @@ class _FixtureScreenState extends State<FixtureScreen> {
       case TipoCampeonato.ligaPlayoffs:
         return 'Liga + playoffs: al terminar la fase de liga, crea las llaves de playoffs con "Agregar cruce manual" según la tabla final (${campeonato.configuracion.clasificadosPlayoffs} clasificados).';
       case TipoCampeonato.gruposEliminacion:
-        return 'Grupos + eliminación: al terminar la fase de grupos, crea las llaves con "Agregar cruce manual" usando a los ${campeonato.configuracion.clasificanPorGrupo} mejores de cada grupo.';
+        return campeonato.estaEnFaseDeGrupos
+            ? 'Fase de grupos en curso: "Agregar cruce manual" solo deja cruzar equipos del mismo grupo. Cuando termine la fase de grupos, usa "Activar fase eliminatoria" y arma las llaves con los ${campeonato.configuracion.clasificanPorGrupo} mejores de cada grupo (y los mejores terceros, si aplica).'
+            : 'Fase eliminatoria activada: ya puedes cruzar equipos de cualquier grupo con "Agregar cruce manual" para armar octavos, cuartos, semifinal y final.';
       default:
         return '';
     }
@@ -301,24 +343,33 @@ class _FixtureScreenState extends State<FixtureScreen> {
 
               final partidos = snapshot.data ?? [];
               final filtrados = _aplicarFiltro(partidos);
-              final secciones = _agruparPartidos(filtrados, campeonato);
+              final secciones = _agruparPartidos(
+                filtrados,
+                partidos,
+                campeonato,
+              );
 
               final puedeEditarFixture =
                   campeonato != null &&
                   campeonato.estado != CampeonatoEstado.finalizado;
 
-              final programados =
-                  partidos.where((p) => p.fechaHora != null).length;
-              final pendientes =
-                  partidos.where((p) => p.fechaHora == null).length;
-              final manuales =
-                  partidos.where((p) => !p.generadoPorSistema).length;
+              final programados = partidos
+                  .where((p) => p.fechaHora != null)
+                  .length;
+              final pendientes = partidos
+                  .where((p) => p.fechaHora == null)
+                  .length;
+              final manuales = partidos
+                  .where((p) => !p.generadoPorSistema)
+                  .length;
 
               return SingleChildScrollView(
                 child: AppPage(
                   title: 'Fixture',
                   subtitle: campeonato == null
                       ? 'Cruces y programación de partidos.'
+                      : campeonato.tieneFasesSeparadas
+                      ? '${campeonato.nombre} · ${_tipoTexto(campeonato.tipoCampeonato)} · ${campeonato.estaEnFaseDeGrupos ? 'Fase de grupos' : 'Fase eliminatoria'}'
                       : '${campeonato.nombre} · ${_tipoTexto(campeonato.tipoCampeonato)}',
                   actions: [
                     AppButton.secondary(
@@ -326,6 +377,22 @@ class _FixtureScreenState extends State<FixtureScreen> {
                       icon: Icons.arrow_back,
                       onPressed: () => Navigator.pop(context),
                     ),
+                    if (campeonato != null &&
+                        _usaGrupos(campeonato) &&
+                        partidos.isEmpty)
+                      AppButton.secondary(
+                        text: 'Grupos',
+                        icon: Icons.grid_view_rounded,
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  GruposScreen(campeonatoId: widget.campeonatoId),
+                            ),
+                          );
+                        },
+                      ),
                     if (puedeEditarFixture &&
                         partidos.isEmpty &&
                         campeonato.configuracion.generaCrucesAleatorios)
@@ -335,21 +402,28 @@ class _FixtureScreenState extends State<FixtureScreen> {
                         loading: _loading,
                         onPressed: () => _generarFixture(campeonato),
                       ),
+                    if (puedeEditarFixture &&
+                        campeonato.tieneFasesSeparadas &&
+                        campeonato.estaEnFaseDeGrupos)
+                      AppButton.secondary(
+                        text: 'Activar fase eliminatoria',
+                        icon: Icons.bolt_outlined,
+                        loading: _loading,
+                        onPressed: () => _activarFaseEliminatoria(campeonato),
+                      ),
                     if (puedeEditarFixture)
                       AppButton.secondary(
                         text: 'Agregar cruce manual',
                         icon: Icons.add,
                         loading: _loading,
-                        onPressed: _crearCruceManual,
+                        onPressed: () => _crearCruceManual(campeonato),
                       ),
                     if (partidos.isNotEmpty && campeonato != null)
                       AppButton.secondary(
                         text: 'Descargar PDF',
                         icon: Icons.picture_as_pdf_outlined,
-                        onPressed: () => _descargarFixture(
-                          campeonato,
-                          partidos,
-                        ),
+                        onPressed: () =>
+                            _descargarFixture(campeonato, partidos),
                       ),
                   ],
                   child: partidos.isEmpty
@@ -360,12 +434,15 @@ class _FixtureScreenState extends State<FixtureScreen> {
                               title: 'No hay fixture generado',
                               message: campeonato == null
                                   ? 'Puedes generar el fixture completo o agregar cruces manuales uno por uno.'
+                                  : _usaGrupos(campeonato)
+                                  ? 'Antes de generar el fixture, revisa "Grupos" para inscribir a cada equipo en su grupo. Si no lo haces, se repartirán automáticamente.'
                                   : 'El botón "Generar fixture" creará los cruces según el formato "${_tipoTexto(campeonato.tipoCampeonato)}". También puedes agregar cruces manuales uno por uno.',
                               buttonText: puedeEditarFixture
                                   ? 'Agregar cruce manual'
                                   : null,
-                              onPressed:
-                                  puedeEditarFixture ? _crearCruceManual : null,
+                              onPressed: puedeEditarFixture
+                                  ? () => _crearCruceManual(campeonato)
+                                  : null,
                             ),
                           ],
                         )
@@ -397,7 +474,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
                                   value: '$pendientes',
                                   icon: Icons.pending_actions_outlined,
                                   subtitle: 'Sin programar',
-                                  color: const Color(0xFFD6A100),
+                                  color: AppColors.secondary,
                                 ),
                                 StatCard(
                                   title: 'Manuales',
@@ -477,6 +554,8 @@ class _FixtureScreenState extends State<FixtureScreen> {
                                   titulo: entry.key,
                                   partidos: entry.value,
                                   puedeEditar: puedeEditarFixture,
+                                  deporte: campeonato?.deporteEfectivo ??
+                                      DeporteTipo.futbol,
                                   onProgramar: _programarPartido,
                                 );
                               }),
@@ -496,12 +575,14 @@ class _SeccionFixture extends StatelessWidget {
   final String titulo;
   final List<PartidoModel> partidos;
   final bool puedeEditar;
+  final String deporte;
   final void Function(PartidoModel) onProgramar;
 
   const _SeccionFixture({
     required this.titulo,
     required this.partidos,
     required this.puedeEditar,
+    required this.deporte,
     required this.onProgramar,
   });
 
@@ -523,9 +604,7 @@ class _SeccionFixture extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(titulo, style: AppTextStyles.heading3),
-              ),
+              Expanded(child: Text(titulo, style: AppTextStyles.heading3)),
               AppBadge(
                 text: '${partidos.length} partidos',
                 type: AppBadgeType.neutral,
@@ -539,6 +618,7 @@ class _SeccionFixture extends StatelessWidget {
             child: _FixturePartidoCard(
               partido: partido,
               puedeEditar: puedeEditar,
+              deporte: deporte,
               onProgramar: () => onProgramar(partido),
             ),
           );
@@ -552,11 +632,13 @@ class _SeccionFixture extends StatelessWidget {
 class _FixturePartidoCard extends StatelessWidget {
   final PartidoModel partido;
   final bool puedeEditar;
+  final String deporte;
   final VoidCallback onProgramar;
 
   const _FixturePartidoCard({
     required this.partido,
     required this.puedeEditar,
+    required this.deporte,
     required this.onProgramar,
   });
 
@@ -599,7 +681,7 @@ class _FixturePartidoCard extends StatelessWidget {
           children: [
             badges,
             const SizedBox(height: 12),
-            AppMatchCard(partido: partido),
+            AppMatchCard(partido: partido, deporte: deporte),
             const SizedBox(height: 12),
             SizedBox(width: double.infinity, child: boton),
           ],
@@ -616,7 +698,9 @@ class _FixturePartidoCard extends StatelessWidget {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: AppMatchCard(partido: partido)),
+              Expanded(
+                child: AppMatchCard(partido: partido, deporte: deporte),
+              ),
               const SizedBox(width: 14),
               boton,
             ],
@@ -630,9 +714,7 @@ class _FixturePartidoCard extends StatelessWidget {
 class _InfoBox extends StatelessWidget {
   final String text;
 
-  const _InfoBox({
-    required this.text,
-  });
+  const _InfoBox({required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -642,9 +724,7 @@ class _InfoBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.infoLight,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.info.withValues(alpha: 0.16),
-        ),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.16)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -669,9 +749,15 @@ class _InfoBox extends StatelessWidget {
 
 class _CruceManualDialog extends StatefulWidget {
   final List<EquipoModel> equipos;
+  final List<GrupoModel> grupos;
+  final bool restringirAGrupo;
+  final bool ocultarCampoGrupoLibre;
 
   const _CruceManualDialog({
     required this.equipos,
+    this.grupos = const [],
+    this.restringirAGrupo = false,
+    this.ocultarCampoGrupoLibre = false,
   });
 
   @override
@@ -683,8 +769,9 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
   EquipoModel? _visitante;
   bool _idaYVuelta = false;
 
-  final TextEditingController _jornadaController =
-      TextEditingController(text: '1');
+  final TextEditingController _jornadaController = TextEditingController(
+    text: '1',
+  );
   final TextEditingController _grupoController = TextEditingController();
 
   @override
@@ -692,6 +779,16 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
     _jornadaController.dispose();
     _grupoController.dispose();
     super.dispose();
+  }
+
+  String? _grupoDe(EquipoModel? equipo) {
+    if (equipo == null) return null;
+
+    for (final grupo in widget.grupos) {
+      if (grupo.equipoIds.contains(equipo.id)) return grupo.nombre;
+    }
+
+    return null;
   }
 
   void _guardar() {
@@ -708,6 +805,9 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
         visitante: _visitante!,
         jornada: jornada,
         idaYVuelta: _idaYVuelta,
+        // En fase de grupos el servicio ignora este valor y lo calcula
+        // solo a partir de la inscripción real, así que acá solo importa
+        // para la fase eliminatoria (texto libre, ej. "Semifinal").
         grupoId: _grupoController.text.trim().isEmpty
             ? null
             : _grupoController.text.trim(),
@@ -717,23 +817,33 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final grupoLocal = widget.restringirAGrupo ? _grupoDe(_local) : null;
+
     final visitantes = widget.equipos.where((equipo) {
-      return equipo.id != _local?.id;
+      if (equipo.id == _local?.id) return false;
+      if (widget.restringirAGrupo && grupoLocal != null) {
+        return _grupoDe(equipo) == grupoLocal;
+      }
+      return true;
     }).toList();
 
     return AlertDialog(
       backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
-      title: Text(
-        'Agregar cruce manual',
-        style: AppTextStyles.heading3,
-      ),
-      content: SizedBox(
-        width: 470,
+      title: Text('Agregar cruce manual', style: AppTextStyles.heading3),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 470),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.restringirAGrupo) ...[
+                _InfoBox(
+                  text:
+                      'Todavía es fase de grupos: solo puedes cruzar equipos del mismo grupo. Activa la fase eliminatoria para armar cruces entre grupos distintos.',
+                ),
+                const SizedBox(height: 14),
+              ],
               _EquipoDropdown(
                 label: 'Equipo local',
                 value: _local,
@@ -745,9 +855,28 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
                     if (_visitante?.id == value?.id) {
                       _visitante = null;
                     }
+
+                    if (widget.restringirAGrupo &&
+                        _grupoDe(_visitante) != _grupoDe(value)) {
+                      _visitante = null;
+                    }
                   });
                 },
               ),
+              if (widget.restringirAGrupo && _local != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  grupoLocal == null
+                      ? '${_local!.nombre} todavía no está inscrito en ningún grupo. Complétalo en "Grupos" primero.'
+                      : 'Grupo de ${_local!.nombre}: $grupoLocal',
+                  style: AppTextStyles.small.copyWith(
+                    color: grupoLocal == null
+                        ? AppColors.danger
+                        : AppColors.textSecondary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
               _EquipoDropdown(
                 label: 'Equipo visitante',
@@ -770,15 +899,18 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
                 ),
               ),
               const SizedBox(height: 14),
-              TextField(
-                controller: _grupoController,
-                decoration: const InputDecoration(
-                  labelText: 'Grupo o fase (opcional)',
-                  hintText: 'Ejemplo: Grupo A, Semifinal, Final...',
-                  prefixIcon: Icon(Icons.grid_view_rounded),
+              if (!widget.restringirAGrupo &&
+                  !widget.ocultarCampoGrupoLibre) ...[
+                TextField(
+                  controller: _grupoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Grupo o fase (opcional)',
+                    hintText: 'Ejemplo: Octavos, Semifinal, Final...',
+                    prefixIcon: Icon(Icons.grid_view_rounded),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 14),
+              ],
               SwitchListTile(
                 value: _idaYVuelta,
                 onChanged: (value) {
@@ -824,9 +956,11 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
           text: 'Crear cruce',
           icon: Icons.add,
           onPressed:
-              _local == null || _visitante == null || _local?.id == _visitante?.id
-                  ? null
-                  : _guardar,
+              _local == null ||
+                  _visitante == null ||
+                  _local?.id == _visitante?.id
+              ? null
+              : _guardar,
         ),
       ],
     );
@@ -852,10 +986,7 @@ class _EquipoDropdown extends StatelessWidget {
       initialValue: value,
       isExpanded: true,
       items: equipos.map((equipo) {
-        return DropdownMenuItem(
-          value: equipo,
-          child: Text(equipo.nombre),
-        );
+        return DropdownMenuItem(value: equipo, child: Text(equipo.nombre));
       }).toList(),
       onChanged: onChanged,
       decoration: InputDecoration(

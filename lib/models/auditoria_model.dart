@@ -33,8 +33,9 @@ class AuditoriaModel {
       documentoAfectado: stringFromJson(map['documentoAfectado']),
       fecha: dateFromJson(map['fecha']),
       detalle: stringFromJson(map['detalle']),
-      observacion:
-          map['observacion'] == null ? null : stringFromJson(map['observacion']),
+      observacion: map['observacion'] == null
+          ? null
+          : stringFromJson(map['observacion']),
     );
   }
 

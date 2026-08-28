@@ -27,11 +27,7 @@ class AppInlineEmptyState extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: AppColors.textMuted,
-            size: 24,
-          ),
+          Icon(icon, color: AppColors.textMuted, size: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -45,10 +41,7 @@ class AppInlineEmptyState extends StatelessWidget {
                 ),
                 if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
                   const SizedBox(height: 3),
-                  Text(
-                    subtitle!,
-                    style: AppTextStyles.small,
-                  ),
+                  Text(subtitle!, style: AppTextStyles.small),
                 ],
               ],
             ),

@@ -5,6 +5,8 @@ import '../services/campeonato_service.dart';
 import 'auditoria_screen.dart';
 import 'equipos_screen.dart';
 import 'fixture_screen.dart';
+import 'grupos_screen.dart';
+import 'jugadores_sancionados_screen.dart';
 import 'jugadores_screen.dart';
 import 'pdfs_screen.dart';
 import 'ranking_goleadores_screen.dart';
@@ -29,10 +31,7 @@ import 'reciclaje/stat_card.dart';
 class DetalleCampeonatoScreen extends StatefulWidget {
   final String campeonatoId;
 
-  const DetalleCampeonatoScreen({
-    super.key,
-    required this.campeonatoId,
-  });
+  const DetalleCampeonatoScreen({super.key, required this.campeonatoId});
 
   @override
   State<DetalleCampeonatoScreen> createState() =>
@@ -120,10 +119,7 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
   }
 
   void _goTo(Widget screen) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => screen),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
   @override
@@ -252,15 +248,14 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
                       const SizedBox(height: 22),
                       _ModulesGrid(
                         campeonato: campeonato,
-                        onEquipos: () => _goTo(
-                          EquiposScreen(campeonatoId: campeonato.id),
-                        ),
-                        onJugadores: () => _goTo(
-                          JugadoresScreen(campeonatoId: campeonato.id),
-                        ),
-                        onFixture: () => _goTo(
-                          FixtureScreen(campeonatoId: campeonato.id),
-                        ),
+                        onEquipos: () =>
+                            _goTo(EquiposScreen(campeonatoId: campeonato.id)),
+                        onJugadores: () =>
+                            _goTo(JugadoresScreen(campeonatoId: campeonato.id)),
+                        onGrupos: () =>
+                            _goTo(GruposScreen(campeonatoId: campeonato.id)),
+                        onFixture: () =>
+                            _goTo(FixtureScreen(campeonatoId: campeonato.id)),
                         onResultados: () => _goTo(
                           ResultadosScreen(campeonatoId: campeonato.id),
                         ),
@@ -270,12 +265,15 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
                         onRanking: () => _goTo(
                           RankingGoleadoresScreen(campeonatoId: campeonato.id),
                         ),
-                        onPdfs: () => _goTo(
-                          PdfsScreen(campeonatoId: campeonato.id),
+                        onSancionados: () => _goTo(
+                          JugadoresSancionadosScreen(
+                            campeonatoId: campeonato.id,
+                          ),
                         ),
-                        onAuditoria: () => _goTo(
-                          AuditoriaScreen(campeonatoId: campeonato.id),
-                        ),
+                        onPdfs: () =>
+                            _goTo(PdfsScreen(campeonatoId: campeonato.id)),
+                        onAuditoria: () =>
+                            _goTo(AuditoriaScreen(campeonatoId: campeonato.id)),
                       ),
                       const SizedBox(height: 22),
                       _FormatSummaryCard(campeonato: campeonato),
@@ -295,9 +293,7 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
 class _InfoStats extends StatelessWidget {
   final CampeonatoModel campeonato;
 
-  const _InfoStats({
-    required this.campeonato,
-  });
+  const _InfoStats({required this.campeonato});
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +317,7 @@ class _InfoStats extends StatelessWidget {
           value: '${config.cantidadVueltas}',
           icon: Icons.repeat_rounded,
           subtitle: _vueltasSubtitle(campeonato),
-          color: const Color(0xFFD6A100),
+          color: AppColors.secondary,
         ),
         StatCard(
           title: 'En cancha',
@@ -347,10 +343,12 @@ class _ModulesGrid extends StatelessWidget {
   final CampeonatoModel campeonato;
   final VoidCallback onEquipos;
   final VoidCallback onJugadores;
+  final VoidCallback onGrupos;
   final VoidCallback onFixture;
   final VoidCallback onResultados;
   final VoidCallback onTabla;
   final VoidCallback onRanking;
+  final VoidCallback onSancionados;
   final VoidCallback onPdfs;
   final VoidCallback onAuditoria;
 
@@ -358,13 +356,20 @@ class _ModulesGrid extends StatelessWidget {
     required this.campeonato,
     required this.onEquipos,
     required this.onJugadores,
+    required this.onGrupos,
     required this.onFixture,
     required this.onResultados,
     required this.onTabla,
     required this.onRanking,
+    required this.onSancionados,
     required this.onPdfs,
     required this.onAuditoria,
   });
+
+  bool get _usaGrupos {
+    return campeonato.tipoCampeonato == TipoCampeonato.faseGrupos ||
+        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -385,6 +390,15 @@ class _ModulesGrid extends StatelessWidget {
         tag: 'Planillas',
         onTap: onJugadores,
       ),
+      if (_usaGrupos)
+        _ModuleItem(
+          title: 'Grupos',
+          description: 'Inscribir equipos en cada grupo antes del fixture.',
+          icon: Icons.grid_view_rounded,
+          enabled: true,
+          tag: 'Inscripción',
+          onTap: onGrupos,
+        ),
       _ModuleItem(
         title: 'Fixture',
         description: 'Generar cruces, asignar fechas y programar partidos.',
@@ -411,31 +425,10 @@ class _ModulesGrid extends StatelessWidget {
         tag: 'Público',
         onTap: onTabla,
       ),
-      // El ranking individual depende del deporte:
-      // - Fútbol/futsal: goleadores (implementado).
-      // - Básquet: anotadores (queda preparado, aún sin registro individual).
-      // - Vóley: estadísticas de jugadores (pendiente para otra fase).
-      if (campeonato.esVolley)
-        _ModuleItem(
-          title: 'Estadísticas',
-          description:
-              'Las estadísticas por jugador de vóley estarán disponibles próximamente.',
-          icon: Icons.sports_volleyball_outlined,
-          enabled: false,
-          tag: 'Próximamente',
-          onTap: onRanking,
-        )
-      else if (campeonato.esBasket)
-        _ModuleItem(
-          title: 'Anotadores',
-          description:
-              'El registro de puntos por jugador estará disponible próximamente.',
-          icon: Icons.sports_basketball_outlined,
-          enabled: false,
-          tag: 'Próximamente',
-          onTap: onRanking,
-        )
-      else
+      // El ranking individual (goleadores) solo aplica a fútbol/futsal:
+      // vóley y básquet no registran goles/puntos por jugador, así que
+      // el módulo ni se muestra para esos deportes.
+      if (campeonato.esFutbol)
         _ModuleItem(
           title: 'Goleadores',
           description: 'Ver ranking de mejores anotadores.',
@@ -444,6 +437,16 @@ class _ModulesGrid extends StatelessWidget {
           tag: 'Público',
           onTap: onRanking,
         ),
+      _ModuleItem(
+        title: 'Sancionados',
+        description: campeonato.esFutbol
+            ? 'Amarillas, rojas y expulsiones por jugador y partido.'
+            : 'Sanciones por mesa o forzadas por jugador y partido.',
+        icon: Icons.shield_outlined,
+        enabled: true,
+        tag: 'Control',
+        onTap: onSancionados,
+      ),
       _ModuleItem(
         title: 'PDFs',
         description: 'Descargar fixture, listas y planillas de partido.',
@@ -487,9 +490,7 @@ class _ModulesGrid extends StatelessWidget {
 class _ModuleCard extends StatelessWidget {
   final _ModuleItem module;
 
-  const _ModuleCard({
-    required this.module,
-  });
+  const _ModuleCard({required this.module});
 
   @override
   Widget build(BuildContext context) {
@@ -535,10 +536,7 @@ class _ModuleCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Text(
-              module.title,
-              style: AppTextStyles.heading3,
-            ),
+            Text(module.title, style: AppTextStyles.heading3),
             const SizedBox(height: 7),
             Text(
               module.description,
@@ -580,9 +578,7 @@ class _ModuleCard extends StatelessWidget {
 class _FormatSummaryCard extends StatelessWidget {
   final CampeonatoModel campeonato;
 
-  const _FormatSummaryCard({
-    required this.campeonato,
-  });
+  const _FormatSummaryCard({required this.campeonato});
 
   @override
   Widget build(BuildContext context) {
@@ -620,6 +616,12 @@ class _FormatSummaryCard extends StatelessWidget {
           icon: Icons.military_tech_outlined,
           label: 'Clasifican por grupo',
           value: '${config.clasificanPorGrupo}',
+        ),
+      if (config.mejoresTerceros > 0)
+        _ConfigItem(
+          icon: Icons.workspace_premium_outlined,
+          label: 'Mejores terceros',
+          value: '${config.mejoresTerceros}',
         ),
       if (config.clasificadosPlayoffs > 0)
         _ConfigItem(
@@ -674,9 +676,7 @@ class _FormatSummaryCard extends StatelessWidget {
 class _ConfigTile extends StatelessWidget {
   final _ConfigItem item;
 
-  const _ConfigTile({
-    required this.item,
-  });
+  const _ConfigTile({required this.item});
 
   @override
   Widget build(BuildContext context) {
@@ -697,11 +697,7 @@ class _ConfigTile extends StatelessWidget {
               color: AppColors.primaryLight,
               borderRadius: BorderRadius.circular(13),
             ),
-            child: Icon(
-              item.icon,
-              color: AppColors.primary,
-              size: 20,
-            ),
+            child: Icon(item.icon, color: AppColors.primary, size: 20),
           ),
           const SizedBox(width: 11),
           Expanded(
@@ -736,10 +732,7 @@ class _InfoBox extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _InfoBox({
-    required this.icon,
-    required this.text,
-  });
+  const _InfoBox({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -749,9 +742,7 @@ class _InfoBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.infoLight,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.info.withValues(alpha: 0.16),
-        ),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.16)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -773,7 +764,6 @@ class _InfoBox extends StatelessWidget {
     );
   }
 }
-
 
 class _ModuleItem {
   final String title;
@@ -932,6 +922,10 @@ String _rondaTexto(String ronda) {
       return 'Semifinales';
     case 'cuartos':
       return 'Cuartos de final';
+    case 'octavos':
+      return 'Octavos de final';
+    case 'dieciseisavos':
+      return 'Dieciseisavos de final';
     case 'llaves':
       return 'Llaves eliminatorias';
     case 'no_aplica':
@@ -972,8 +966,9 @@ String _formatLabel(String value) {
       .split(' ')
       .where((word) => word.trim().isNotEmpty)
       .map((word) {
-    if (word.length == 1) return word.toUpperCase();
+        if (word.length == 1) return word.toUpperCase();
 
-    return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
-  }).join(' ');
+        return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
+      })
+      .join(' ');
 }

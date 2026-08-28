@@ -36,11 +36,7 @@ class AppEmptyState extends StatelessWidget {
                 color: AppColors.primaryLight,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                icon,
-                color: AppColors.primary,
-                size: 32,
-              ),
+              child: Icon(icon, color: AppColors.primary, size: 32),
             ),
             const SizedBox(height: 16),
             Text(
@@ -58,10 +54,7 @@ class AppEmptyState extends StatelessWidget {
             ),
             if (buttonText != null && onPressed != null) ...[
               const SizedBox(height: 20),
-              AppButton.primary(
-                text: buttonText!,
-                onPressed: onPressed,
-              ),
+              AppButton.primary(text: buttonText!, onPressed: onPressed),
             ],
           ],
         ),

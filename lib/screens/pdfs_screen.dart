@@ -23,10 +23,7 @@ import 'reciclaje/app_text_styles.dart';
 class PdfsScreen extends StatefulWidget {
   final String campeonatoId;
 
-  const PdfsScreen({
-    super.key,
-    required this.campeonatoId,
-  });
+  const PdfsScreen({super.key, required this.campeonatoId});
 
   @override
   State<PdfsScreen> createState() => _PdfsScreenState();
@@ -67,8 +64,9 @@ class _PdfsScreenState extends State<PdfsScreen> {
   }
 
   Future<_PdfData> _loadData() async {
-    final campeonato =
-        await _campeonatoService.getCampeonato(widget.campeonatoId);
+    final campeonato = await _campeonatoService.getCampeonato(
+      widget.campeonatoId,
+    );
     final equipos = await _equipoService.getEquipos(widget.campeonatoId);
     final partidos = await _partidoService.getPartidos(widget.campeonatoId);
 
@@ -139,11 +137,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
 
         if (fecha == null) return false;
 
-        return _estaEnRango(
-          fecha,
-          _planillasInicio!,
-          _planillasFin!,
-        );
+        return _estaEnRango(fecha, _planillasInicio!, _planillasFin!);
       }).toList(),
     );
   }
@@ -240,7 +234,8 @@ class _PdfsScreenState extends State<PdfsScreen> {
 
       if (fecha == null) return false;
 
-      final tieneResultado = partido.resultadoRegistrado &&
+      final tieneResultado =
+          partido.resultadoRegistrado &&
           partido.golesLocal != null &&
           partido.golesVisitante != null;
 
@@ -276,12 +271,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
         );
       }).toList();
 
-      resultados.add(
-        PdfResultadoPartidoItem(
-          partido: partido,
-          goles: goles,
-        ),
-      );
+      resultados.add(PdfResultadoPartidoItem(partido: partido, goles: goles));
     }
 
     final bytes = await _pdfService.generarResultadosPorRangoPdf(
@@ -297,10 +287,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
     );
   }
 
-  Future<void> _imprimirListaEquipo(
-    _PdfData data,
-    EquipoModel equipo,
-  ) async {
+  Future<void> _imprimirListaEquipo(_PdfData data, EquipoModel equipo) async {
     if (data.campeonato == null) return;
 
     final jugadores = await _jugadorService.getJugadoresPorEquipo(
@@ -337,10 +324,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
       );
 
       equiposConJugadores.add(
-        PdfEquipoJugadoresItem(
-          equipo: equipo,
-          jugadores: jugadores,
-        ),
+        PdfEquipoJugadoresItem(equipo: equipo, jugadores: jugadores),
       );
     }
 
@@ -564,9 +548,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
                         : () => _imprimirResultadosRango(data),
                   ),
                   const SizedBox(height: 18),
-                  _RankingCard(
-                    onPrint: () => _imprimirRankingGoleadores(data),
-                  ),
+                  _RankingCard(onPrint: () => _imprimirRankingGoleadores(data)),
                   const SizedBox(height: 22),
                   _PartidosPrintSection(
                     partidos: partidosPlanillas,
@@ -696,9 +678,7 @@ class _FixtureRangeCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Imprime partidos programados dentro de un rango de fechas. Los partidos sin fecha no se incluyen en este reporte.',
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
           _DateRangeRow(
@@ -758,9 +738,7 @@ class _ResultadosRangeCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Imprime los partidos finalizados dentro de un rango de fechas, con marcador y goleadores.',
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
           _DateRangeRow(
@@ -785,9 +763,7 @@ class _ResultadosRangeCard extends StatelessWidget {
 class _RankingCard extends StatelessWidget {
   final VoidCallback onPrint;
 
-  const _RankingCard({
-    required this.onPrint,
-  });
+  const _RankingCard({required this.onPrint});
 
   @override
   Widget build(BuildContext context) {
@@ -801,10 +777,7 @@ class _RankingCard extends StatelessWidget {
               color: AppColors.primaryLight,
               borderRadius: BorderRadius.circular(15),
             ),
-            child: const Icon(
-              Icons.sports_soccer,
-              color: AppColors.primary,
-            ),
+            child: const Icon(Icons.sports_soccer, color: AppColors.primary),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -991,7 +964,8 @@ class _EquiposPrintSection extends StatelessWidget {
       children: [
         const AppSectionHeader(
           title: 'Planillas de equipos',
-          subtitle: 'Imprime listas de jugadores por equipo para control manual.',
+          subtitle:
+              'Imprime listas de jugadores por equipo para control manual.',
         ),
         const SizedBox(height: 14),
         AppCard(

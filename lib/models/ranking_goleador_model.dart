@@ -25,7 +25,10 @@ class RankingGoleadorModel {
     return RankingGoleadorModel(
       jugadorId: stringFromJson(map['jugadorId'], defaultValue: id),
       jugadorNombre: stringFromJson(map['jugadorNombre']),
-      jugadorEstado: stringFromJson(map['jugadorEstado'], defaultValue: 'activo'),
+      jugadorEstado: stringFromJson(
+        map['jugadorEstado'],
+        defaultValue: 'activo',
+      ),
       equipoId: stringFromJson(map['equipoId']),
       equipoNombre: stringFromJson(map['equipoNombre']),
       totalGoles: intFromJson(map['totalGoles']),

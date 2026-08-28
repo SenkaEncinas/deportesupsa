@@ -1,25 +1,46 @@
 import 'package:flutter/material.dart';
 
+import '../../models/campeonato_model.dart';
 import '../../models/partido_model.dart';
 import 'app_badge.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 import 'responsive.dart';
 
+/// Ícono representativo de cada deporte, reutilizado en toda la app para
+/// que el mismo deporte siempre se vea con el mismo ícono.
+IconData deporteIcono(String deporte) {
+  switch (deporte) {
+    case DeporteTipo.volley:
+      return Icons.sports_volleyball_outlined;
+    case DeporteTipo.basket:
+      return Icons.sports_basketball_outlined;
+    default:
+      return Icons.sports_soccer;
+  }
+}
+
 class AppMatchCard extends StatelessWidget {
   final PartidoModel partido;
   final bool showResult;
+
+  /// Deporte del campeonato (fútbol/vóley/básquet, ver [DeporteTipo]):
+  /// define el ícono y si se muestra el detalle de sets. Por defecto
+  /// fútbol, para no romper a los llamadores que todavía no lo pasan.
+  final String deporte;
 
   const AppMatchCard({
     super.key,
     required this.partido,
     this.showResult = false,
+    this.deporte = DeporteTipo.futbol,
   });
 
   @override
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
     final isAdministrative = partido.tipoResultado != TipoResultado.normal;
+    final esVolley = deporte == DeporteTipo.volley;
 
     return Container(
       width: double.infinity,
@@ -34,36 +55,59 @@ class AppMatchCard extends StatelessWidget {
               partido: partido,
               showResult: showResult,
               isAdministrative: isAdministrative,
+              esVolley: esVolley,
             )
-          : Row(
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(
-                    Icons.sports_soccer,
-                    color: AppColors.primary,
-                    size: 23,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        deporteIcono(deporte),
+                        color: AppColors.primary,
+                        size: 23,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _TeamsBlock(
+                        local: partido.equipoLocalNombre,
+                        visitante: partido.equipoVisitanteNombre,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    _TopMatchInfo(
+                      partido: partido,
+                      showResult: showResult,
+                      esVolley: esVolley,
+                    ),
+                    if (showResult && isAdministrative) ...[
+                      const SizedBox(width: 10),
+                      AppBadge(
+                        text: _formatLabel(partido.tipoResultado),
+                        type: AppBadgeType.warning,
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _TeamsBlock(
-                    local: partido.equipoLocalNombre,
-                    visitante: partido.equipoVisitanteNombre,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                _TopMatchInfo(partido: partido, showResult: showResult),
-                if (showResult && isAdministrative) ...[
-                  const SizedBox(width: 10),
-                  AppBadge(
-                    text: _formatLabel(partido.tipoResultado),
-                    type: AppBadgeType.warning,
+                if (showResult && esVolley && partido.sets.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 54),
+                    child: Text(
+                      'Sets: ${partido.setsTexto}',
+                      style: AppTextStyles.small.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ],
               ],
@@ -79,11 +123,13 @@ class _MobileMatchCard extends StatelessWidget {
   final PartidoModel partido;
   final bool showResult;
   final bool isAdministrative;
+  final bool esVolley;
 
   const _MobileMatchCard({
     required this.partido,
     required this.showResult,
     required this.isAdministrative,
+    required this.esVolley,
   });
 
   @override
@@ -138,6 +184,16 @@ class _MobileMatchCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+        if (showResult && esVolley && partido.sets.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Text(
+            'Sets: ${partido.setsTexto}',
+            style: AppTextStyles.small.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
         if (showResult && isAdministrative) ...[
@@ -274,8 +330,13 @@ class _FechaInline extends StatelessWidget {
 class _TopMatchInfo extends StatelessWidget {
   final PartidoModel partido;
   final bool showResult;
+  final bool esVolley;
 
-  const _TopMatchInfo({required this.partido, required this.showResult});
+  const _TopMatchInfo({
+    required this.partido,
+    required this.showResult,
+    required this.esVolley,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -283,6 +344,7 @@ class _TopMatchInfo extends StatelessWidget {
       return _ScoreBox(
         local: partido.golesLocal ?? 0,
         visitante: partido.golesVisitante ?? 0,
+        etiqueta: esVolley ? 'sets' : null,
       );
     }
 
@@ -349,8 +411,13 @@ class _DateChip extends StatelessWidget {
 class _ScoreBox extends StatelessWidget {
   final int local;
   final int visitante;
+  final String? etiqueta;
 
-  const _ScoreBox({required this.local, required this.visitante});
+  const _ScoreBox({
+    required this.local,
+    required this.visitante,
+    this.etiqueta,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -360,17 +427,28 @@ class _ScoreBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: const Color(0xFFD6A100).withValues(alpha: 0.45),
-        ),
+        border: Border.all(color: AppColors.secondary.withValues(alpha: 0.45)),
       ),
-      child: Text(
-        '$local - $visitante',
-        textAlign: TextAlign.center,
-        style: AppTextStyles.heading3.copyWith(
-          color: AppColors.primaryDark,
-          fontWeight: FontWeight.w900,
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$local - $visitante',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.heading3.copyWith(
+              color: AppColors.primaryDark,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          if (etiqueta != null)
+            Text(
+              etiqueta!,
+              style: AppTextStyles.small.copyWith(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+        ],
       ),
     );
   }

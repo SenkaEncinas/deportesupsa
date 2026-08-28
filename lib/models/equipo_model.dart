@@ -40,10 +40,13 @@ class EquipoModel {
       nombre: stringFromJson(map['nombre']),
       representante: stringFromJson(map['representante']),
       carrera: map['carrera'] == null ? null : stringFromJson(map['carrera']),
-      facultad: map['facultad'] == null ? null : stringFromJson(map['facultad']),
+      facultad: map['facultad'] == null
+          ? null
+          : stringFromJson(map['facultad']),
       estado: stringFromJson(map['estado'], defaultValue: EquipoEstado.activo),
-      cantidadJugadoresRegistrados:
-          intFromJson(map['cantidadJugadoresRegistrados']),
+      cantidadJugadoresRegistrados: intFromJson(
+        map['cantidadJugadoresRegistrados'],
+      ),
       fechaCreacion: dateFromJson(map['fechaCreacion']),
       fechaActualizacion: dateFromJson(map['fechaActualizacion']),
       creadoPor: stringFromJson(map['creadoPor']),

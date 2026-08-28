@@ -6,7 +6,7 @@ import '../models/tabla_posicion_model.dart';
 
 class EquipoService {
   EquipoService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -88,10 +88,7 @@ class EquipoService {
       equipoNombre: nombre.trim(),
     );
 
-    batch.set(
-      _tabla(campeonatoId).doc(equipoDoc.id),
-      tablaInicial.toMap(),
-    );
+    batch.set(_tabla(campeonatoId).doc(equipoDoc.id), tablaInicial.toMap());
 
     await batch.commit();
 

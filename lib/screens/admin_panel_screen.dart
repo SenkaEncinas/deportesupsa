@@ -58,9 +58,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(
-        builder: (_) => const HomeScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
       (_) => false,
     );
   }
@@ -68,18 +66,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   void _openPublicHome() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const HomeScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const HomeScreen()),
     );
   }
 
   void _openCampeonatos() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const CampeonatosScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const CampeonatosScreen()),
     );
   }
 
@@ -87,9 +81,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ChampionshipDetailScreen(
-          campeonato: campeonato,
-        ),
+        builder: (_) => ChampionshipDetailScreen(campeonato: campeonato),
       ),
     );
   }
@@ -149,8 +141,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       subtitle: loadingAdmin
                           ? 'Cargando información del administrador...'
                           : admin == null
-                              ? 'Gestión de campeonatos universitarios.'
-                              : 'Bienvenido, ${admin.nombre}.',
+                          ? 'Gestión de campeonatos universitarios.'
+                          : 'Bienvenido, ${admin.nombre}.',
                       actions: [
                         AppButton.secondary(
                           text: isMobile ? 'Pública' : 'Ver pantalla pública',
@@ -158,7 +150,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                           onPressed: _openPublicHome,
                         ),
                         AppButton.primary(
-                          text: isMobile ? 'Campeonatos' : 'Gestionar campeonatos',
+                          text: isMobile
+                              ? 'Campeonatos'
+                              : 'Gestionar campeonatos',
                           icon: Icons.emoji_events_outlined,
                           onPressed: _openCampeonatos,
                         ),
@@ -175,8 +169,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             title: loadingAdmin
                                 ? 'Cargando...'
                                 : admin != null
-                                    ? 'Bienvenido, ${admin.nombre}'
-                                    : 'Panel Administrativo',
+                                ? 'Bienvenido, ${admin.nombre}'
+                                : 'Panel Administrativo',
                             description:
                                 'Gestiona campeonatos, equipos y resultados desde aquí.',
                             side: _AdminResumeBox(
@@ -259,8 +253,12 @@ class _AdminStats extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activos = campeonatos.where((c) => c.estado == 'activo').length;
-    final finalizados = campeonatos.where((c) => c.estado == 'finalizado').length;
-    final proximamente = campeonatos.where((c) => c.estado == 'proximamente').length;
+    final finalizados = campeonatos
+        .where((c) => c.estado == 'finalizado')
+        .length;
+    final proximamente = campeonatos
+        .where((c) => c.estado == 'proximamente')
+        .length;
 
     return AppResponsiveGrid(
       mobileColumns: 2,
@@ -316,9 +314,7 @@ class _MainActionCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             'Accede directamente a las secciones principales del panel.',
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 18),
           Wrap(
@@ -451,9 +447,7 @@ class _AdminChampionshipCard extends StatelessWidget {
                 : campeonato.descripcion,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
           const Divider(height: 1),
@@ -467,9 +461,7 @@ class _AdminChampionshipCard extends StatelessWidget {
           const SizedBox(height: 8),
           _InfoRow(
             icon: Icons.account_tree_outlined,
-            text: ChampionshipPublicCard.formatLabel(
-              campeonato.tipoCampeonato,
-            ),
+            text: ChampionshipPublicCard.formatLabel(campeonato.tipoCampeonato),
           ),
           const SizedBox(height: 8),
           _InfoRow(
@@ -528,9 +520,7 @@ class _AdminChampionshipCard extends StatelessWidget {
 class _SportIcon extends StatelessWidget {
   final String modalidad;
 
-  const _SportIcon({
-    required this.modalidad,
-  });
+  const _SportIcon({required this.modalidad});
 
   @override
   Widget build(BuildContext context) {
@@ -556,29 +546,20 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _InfoRow({
-    required this.icon,
-    required this.text,
-  });
+  const _InfoRow({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: AppColors.textMuted,
-          size: 17,
-        ),
+        Icon(icon, color: AppColors.textMuted, size: 17),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.small.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTextStyles.small.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
       ],

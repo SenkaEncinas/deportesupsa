@@ -24,9 +24,7 @@ class AppDialogs {
           title: Text(title, style: AppTextStyles.heading3),
           content: Text(
             message,
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           actions: [
             AppButton.ghost(
@@ -35,7 +33,9 @@ class AppDialogs {
             ),
             AppButton(
               text: confirmText,
-              variant: danger ? AppButtonVariant.danger : AppButtonVariant.primary,
+              variant: danger
+                  ? AppButtonVariant.danger
+                  : AppButtonVariant.primary,
               onPressed: () => Navigator.pop(context, true),
             ),
           ],

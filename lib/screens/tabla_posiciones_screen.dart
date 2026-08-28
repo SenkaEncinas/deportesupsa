@@ -10,8 +10,10 @@ import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
+import 'reciclaje/app_inline_empty_state.dart';
 import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_page.dart';
+import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 
@@ -27,8 +29,30 @@ class TablaPosicionesScreen extends StatefulWidget {
 class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
   final CampeonatoService _campeonatoService = CampeonatoService();
   final PartidoService _partidoService = PartidoService();
+  final _searchController = TextEditingController();
+  String _search = '';
 
   late Future<_HistorialPartidosData> _dataFuture;
+
+  List<_PartidoHistorialItem> _filtrar(List<_PartidoHistorialItem> items) {
+    final search = _search.trim().toLowerCase();
+    if (search.isEmpty) return items;
+
+    return items.where((item) {
+      final searchable = [
+        item.partido.equipoLocalNombre,
+        item.partido.equipoVisitanteNombre,
+      ].join(' ').toLowerCase();
+
+      return searchable.contains(search);
+    }).toList();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -228,18 +252,47 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
                           'Cuando se registren resultados, goles o tarjetas, aparecerán aquí para que los administradores puedan revisar lo ocurrido.',
                     )
                   : Column(
-                      children: data.partidos.map((item) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: _PartidoHistorialCard(
-                            item: item,
-                            fechaTexto: _fechaTexto,
-                            resultadoTexto: _resultadoTexto,
-                            tipoResultadoTexto: _tipoResultadoTexto,
-                            tipoBadgeResultado: _tipoBadgeResultado,
-                          ),
-                        );
-                      }).toList(),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppTextField(
+                          label: 'Buscar partido',
+                          hint: 'Nombre de alguno de los equipos...',
+                          controller: _searchController,
+                          prefixIcon: Icons.search_rounded,
+                          onChanged: (value) {
+                            setState(() => _search = value);
+                          },
+                        ),
+                        const SizedBox(height: 18),
+                        Builder(
+                          builder: (context) {
+                            final filtrados = _filtrar(data.partidos);
+
+                            if (filtrados.isEmpty) {
+                              return const AppInlineEmptyState(
+                                icon: Icons.search_off_rounded,
+                                text:
+                                    'No hay partidos que coincidan con la búsqueda.',
+                              );
+                            }
+
+                            return Column(
+                              children: filtrados.map((item) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: _PartidoHistorialCard(
+                                    item: item,
+                                    fechaTexto: _fechaTexto,
+                                    resultadoTexto: _resultadoTexto,
+                                    tipoResultadoTexto: _tipoResultadoTexto,
+                                    tipoBadgeResultado: _tipoBadgeResultado,
+                                  ),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
+                      ],
                     ),
             ),
           );

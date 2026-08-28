@@ -9,6 +9,7 @@ import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
+import 'reciclaje/app_filter_pill.dart';
 import 'reciclaje/app_hero_card.dart';
 import 'reciclaje/app_inline_empty_state.dart';
 import 'reciclaje/app_loading.dart';
@@ -27,12 +28,7 @@ class CampeonatosScreen extends StatefulWidget {
   State<CampeonatosScreen> createState() => _CampeonatosScreenState();
 }
 
-enum _CampeonatoFilter {
-  todos,
-  inscripcion,
-  activo,
-  finalizado,
-}
+enum _CampeonatoFilter { todos, inscripcion, activo, finalizado }
 
 class _CampeonatosScreenState extends State<CampeonatosScreen> {
   final CampeonatoService _service = CampeonatoService();
@@ -50,9 +46,7 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
   void _openForm() {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const CampeonatoFormScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const CampeonatoFormScreen()),
     );
   }
 
@@ -60,9 +54,7 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => DetalleCampeonatoScreen(
-          campeonatoId: campeonato.id,
-        ),
+        builder: (_) => DetalleCampeonatoScreen(campeonatoId: campeonato.id),
       ),
     );
   }
@@ -125,9 +117,7 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
             stream: _service.streamCampeonatos(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const AppLoading(
-                  message: 'Cargando campeonatos...',
-                );
+                return const AppLoading(message: 'Cargando campeonatos...');
               }
 
               if (snapshot.hasError) {
@@ -257,10 +247,7 @@ class _HeroActionBox extends StatelessWidget {
   final int total;
   final VoidCallback onCreate;
 
-  const _HeroActionBox({
-    required this.total,
-    required this.onCreate,
-  });
+  const _HeroActionBox({required this.total, required this.onCreate});
 
   @override
   Widget build(BuildContext context) {
@@ -270,9 +257,7 @@ class _HeroActionBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.white.withValues(alpha: 0.18),
-        ),
+        border: Border.all(color: AppColors.white.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,11 +303,7 @@ class _HeroStatLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: AppColors.white,
-          size: 22,
-        ),
+        Icon(icon, color: AppColors.white, size: 22),
         const SizedBox(width: 10),
         Expanded(
           child: Text(
@@ -347,9 +328,7 @@ class _HeroStatLine extends StatelessWidget {
 class _CampeonatosStats extends StatelessWidget {
   final List<CampeonatoModel> campeonatos;
 
-  const _CampeonatosStats({
-    required this.campeonatos,
-  });
+  const _CampeonatosStats({required this.campeonatos});
 
   @override
   Widget build(BuildContext context) {
@@ -396,7 +375,7 @@ class _CampeonatosStats extends StatelessWidget {
           value: '$finalizados',
           icon: Icons.flag_outlined,
           subtitle: 'Cerrados',
-          color: const Color(0xFFD6A100),
+          color: AppColors.secondary,
         ),
       ],
     );
@@ -422,10 +401,7 @@ class _FiltersCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Buscar y filtrar',
-            style: AppTextStyles.heading3,
-          ),
+          Text('Buscar y filtrar', style: AppTextStyles.heading3),
           const SizedBox(height: 12),
           TextField(
             controller: controller,
@@ -453,22 +429,22 @@ class _FiltersCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              _FilterPill(
+              AppFilterPill(
                 text: 'Todos',
                 selected: filter == _CampeonatoFilter.todos,
                 onTap: () => onFilterChanged(_CampeonatoFilter.todos),
               ),
-              _FilterPill(
+              AppFilterPill(
                 text: 'Inscripción',
                 selected: filter == _CampeonatoFilter.inscripcion,
                 onTap: () => onFilterChanged(_CampeonatoFilter.inscripcion),
               ),
-              _FilterPill(
+              AppFilterPill(
                 text: 'Activo',
                 selected: filter == _CampeonatoFilter.activo,
                 onTap: () => onFilterChanged(_CampeonatoFilter.activo),
               ),
-              _FilterPill(
+              AppFilterPill(
                 text: 'Finalizado',
                 selected: filter == _CampeonatoFilter.finalizado,
                 onTap: () => onFilterChanged(_CampeonatoFilter.finalizado),
@@ -481,51 +457,11 @@ class _FiltersCard extends StatelessWidget {
   }
 }
 
-class _FilterPill extends StatelessWidget {
-  final String text;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _FilterPill({
-    required this.text,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
-          ),
-        ),
-        child: Text(
-          text,
-          style: AppTextStyles.small.copyWith(
-            color: selected ? AppColors.white : AppColors.textSecondary,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _CampeonatoAdminCard extends StatelessWidget {
   final CampeonatoModel campeonato;
   final VoidCallback onTap;
 
-  const _CampeonatoAdminCard({
-    required this.campeonato,
-    required this.onTap,
-  });
+  const _CampeonatoAdminCard({required this.campeonato, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -573,9 +509,7 @@ class _CampeonatoAdminCard extends StatelessWidget {
                 : campeonato.descripcion,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 16),
           const Divider(height: 1),
@@ -589,9 +523,7 @@ class _CampeonatoAdminCard extends StatelessWidget {
           const SizedBox(height: 8),
           _InfoRow(
             icon: Icons.account_tree_outlined,
-            text: ChampionshipPublicCard.formatLabel(
-              campeonato.tipoCampeonato,
-            ),
+            text: ChampionshipPublicCard.formatLabel(campeonato.tipoCampeonato),
           ),
           const SizedBox(height: 8),
           _InfoRow(
@@ -616,9 +548,7 @@ class _CampeonatoAdminCard extends StatelessWidget {
 class _SportIcon extends StatelessWidget {
   final String modalidad;
 
-  const _SportIcon({
-    required this.modalidad,
-  });
+  const _SportIcon({required this.modalidad});
 
   @override
   Widget build(BuildContext context) {
@@ -644,29 +574,20 @@ class _InfoRow extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _InfoRow({
-    required this.icon,
-    required this.text,
-  });
+  const _InfoRow({required this.icon, required this.text});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          color: AppColors.textMuted,
-          size: 17,
-        ),
+        Icon(icon, color: AppColors.textMuted, size: 17),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.small.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTextStyles.small.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
       ],

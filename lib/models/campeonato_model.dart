@@ -59,6 +59,15 @@ class SistemaResultado {
   }
 }
 
+/// Etapa actual de un campeonato de "Grupos + eliminación": mientras
+/// está en `grupos`, los cruces manuales solo pueden armarse entre
+/// equipos del mismo grupo; el admin activa `eliminatoria` a mano
+/// cuando decide, según la tabla, quién pasa a las llaves.
+class FaseCampeonato {
+  static const String grupos = 'grupos';
+  static const String eliminatoria = 'eliminatoria';
+}
+
 class TipoCampeonato {
   static const String soloIda = 'solo_ida';
   static const String idaVuelta = 'ida_vuelta';
@@ -94,6 +103,11 @@ class CampeonatoConfig {
 
   final int cantidadGrupos;
   final int clasificanPorGrupo;
+  // Mejores equipos ubicados justo después del corte directo (los
+  // clásicos "mejores terceros") que también clasifican a la fase
+  // final, comparados entre todos los grupos con el mismo criterio de
+  // desempate que la tabla de posiciones.
+  final int mejoresTerceros;
   final int clasificadosPlayoffs;
   final bool idaYVueltaEnGrupos;
   final bool incluyeTercerLugar;
@@ -126,6 +140,7 @@ class CampeonatoConfig {
     required this.cantidadMaximaJugadoresPorEquipo,
     this.cantidadGrupos = 0,
     this.clasificanPorGrupo = 0,
+    this.mejoresTerceros = 0,
     this.clasificadosPlayoffs = 0,
     this.idaYVueltaEnGrupos = false,
     this.incluyeTercerLugar = false,
@@ -175,42 +190,64 @@ class CampeonatoConfig {
       formato: stringFromJson(map['formato'], defaultValue: 'liga'),
       cantidadVueltas: intFromJson(map['cantidadVueltas'], defaultValue: 2),
       idaYVuelta: boolFromJson(map['idaYVuelta'], defaultValue: true),
-      generaCrucesAleatorios:
-          boolFromJson(map['generaCrucesAleatorios'], defaultValue: true),
-      generaGruposAleatorios:
-          boolFromJson(map['generaGruposAleatorios'], defaultValue: false),
+      generaCrucesAleatorios: boolFromJson(
+        map['generaCrucesAleatorios'],
+        defaultValue: true,
+      ),
+      generaGruposAleatorios: boolFromJson(
+        map['generaGruposAleatorios'],
+        defaultValue: false,
+      ),
       permiteEmpate: boolFromJson(map['permiteEmpate'], defaultValue: true),
-      generaTablaPosiciones:
-          boolFromJson(map['generaTablaPosiciones'], defaultValue: true),
-      cantidadJugadoresEnCancha:
-          intFromJson(map['cantidadJugadoresEnCancha'], defaultValue: 5),
-      cantidadMinimaJugadoresPorEquipo:
-          intFromJson(map['cantidadMinimaJugadoresPorEquipo'], defaultValue: 5),
-      cantidadMaximaJugadoresPorEquipo:
-          intFromJson(map['cantidadMaximaJugadoresPorEquipo'], defaultValue: 12),
+      generaTablaPosiciones: boolFromJson(
+        map['generaTablaPosiciones'],
+        defaultValue: true,
+      ),
+      cantidadJugadoresEnCancha: intFromJson(
+        map['cantidadJugadoresEnCancha'],
+        defaultValue: 5,
+      ),
+      cantidadMinimaJugadoresPorEquipo: intFromJson(
+        map['cantidadMinimaJugadoresPorEquipo'],
+        defaultValue: 5,
+      ),
+      cantidadMaximaJugadoresPorEquipo: intFromJson(
+        map['cantidadMaximaJugadoresPorEquipo'],
+        defaultValue: 12,
+      ),
       cantidadGrupos: intFromJson(map['cantidadGrupos'], defaultValue: 0),
-      clasificanPorGrupo:
-          intFromJson(map['clasificanPorGrupo'], defaultValue: 0),
-      clasificadosPlayoffs:
-          intFromJson(map['clasificadosPlayoffs'], defaultValue: 0),
-      idaYVueltaEnGrupos:
-          boolFromJson(map['idaYVueltaEnGrupos'], defaultValue: false),
-      incluyeTercerLugar:
-          boolFromJson(map['incluyeTercerLugar'], defaultValue: false),
-      generaFaseEliminatoria:
-          boolFromJson(map['generaFaseEliminatoria'], defaultValue: false),
-      fixtureManualPermitido:
-          boolFromJson(map['fixtureManualPermitido'], defaultValue: true),
+      clasificanPorGrupo: intFromJson(
+        map['clasificanPorGrupo'],
+        defaultValue: 0,
+      ),
+      mejoresTerceros: intFromJson(map['mejoresTerceros'], defaultValue: 0),
+      clasificadosPlayoffs: intFromJson(
+        map['clasificadosPlayoffs'],
+        defaultValue: 0,
+      ),
+      idaYVueltaEnGrupos: boolFromJson(
+        map['idaYVueltaEnGrupos'],
+        defaultValue: false,
+      ),
+      incluyeTercerLugar: boolFromJson(
+        map['incluyeTercerLugar'],
+        defaultValue: false,
+      ),
+      generaFaseEliminatoria: boolFromJson(
+        map['generaFaseEliminatoria'],
+        defaultValue: false,
+      ),
+      fixtureManualPermitido: boolFromJson(
+        map['fixtureManualPermitido'],
+        defaultValue: true,
+      ),
       rondaEliminatoriaInicial: stringFromJson(
         map['rondaEliminatoriaInicial'],
         defaultValue: 'no_aplica',
       ),
       // Campos nuevos: si el documento antiguo no los tiene,
       // se asume fútbol/futsal con resultado por goles.
-      deporte: stringFromJson(
-        map['deporte'],
-        defaultValue: DeporteTipo.futbol,
-      ),
+      deporte: stringFromJson(map['deporte'], defaultValue: DeporteTipo.futbol),
       modalidad: stringFromJson(
         map['modalidad'],
         defaultValue: ModalidadDeporte.futsal,
@@ -221,12 +258,16 @@ class CampeonatoConfig {
       ),
       setsParaGanar: intFromJson(map['setsParaGanar'], defaultValue: 2),
       puntosSetNormal: intFromJson(map['puntosSetNormal'], defaultValue: 25),
-      puntosSetDecisivo:
-          intFromJson(map['puntosSetDecisivo'], defaultValue: 15),
+      puntosSetDecisivo: intFromJson(
+        map['puntosSetDecisivo'],
+        defaultValue: 15,
+      ),
       cantidadPeriodos: intFromJson(map['cantidadPeriodos'], defaultValue: 0),
       permitePenales: boolFromJson(map['permitePenales'], defaultValue: false),
-      permiteProrroga:
-          boolFromJson(map['permiteProrroga'], defaultValue: false),
+      permiteProrroga: boolFromJson(
+        map['permiteProrroga'],
+        defaultValue: false,
+      ),
     );
   }
 
@@ -244,6 +285,7 @@ class CampeonatoConfig {
       'cantidadMaximaJugadoresPorEquipo': cantidadMaximaJugadoresPorEquipo,
       'cantidadGrupos': cantidadGrupos,
       'clasificanPorGrupo': clasificanPorGrupo,
+      'mejoresTerceros': mejoresTerceros,
       'clasificadosPlayoffs': clasificadosPlayoffs,
       'idaYVueltaEnGrupos': idaYVueltaEnGrupos,
       'incluyeTercerLugar': incluyeTercerLugar,
@@ -275,11 +317,7 @@ class ReglasPuntuacion {
   });
 
   factory ReglasPuntuacion.defaultRules() {
-    return const ReglasPuntuacion(
-      victoria: 3,
-      empate: 1,
-      derrota: 0,
-    );
+    return const ReglasPuntuacion(victoria: 3, empate: 1, derrota: 0);
   }
 
   factory ReglasPuntuacion.fromMap(Map<String, dynamic>? map) {
@@ -293,11 +331,7 @@ class ReglasPuntuacion {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'victoria': victoria,
-      'empate': empate,
-      'derrota': derrota,
-    };
+    return {'victoria': victoria, 'empate': empate, 'derrota': derrota};
   }
 }
 
@@ -314,6 +348,7 @@ class CampeonatoModel {
   final CampeonatoConfig configuracion;
   final ReglasPuntuacion reglasPuntuacion;
   final List<String> reglasDesempate;
+  final String faseActual;
   final DateTime? fechaCreacion;
   final DateTime? fechaActualizacion;
   final String creadoPor;
@@ -331,6 +366,7 @@ class CampeonatoModel {
     required this.configuracion,
     required this.reglasPuntuacion,
     required this.reglasDesempate,
+    this.faseActual = FaseCampeonato.grupos,
     this.fechaCreacion,
     this.fechaActualizacion,
     required this.creadoPor,
@@ -360,6 +396,10 @@ class CampeonatoModel {
         map['reglasPuntuacion'] as Map<String, dynamic>?,
       ),
       reglasDesempate: stringListFromJson(map['reglasDesempate']),
+      faseActual: stringFromJson(
+        map['faseActual'],
+        defaultValue: FaseCampeonato.grupos,
+      ),
       fechaCreacion: dateFromJson(map['fechaCreacion']),
       fechaActualizacion: dateFromJson(map['fechaActualizacion']),
       creadoPor: stringFromJson(map['creadoPor']),
@@ -379,6 +419,7 @@ class CampeonatoModel {
       'configuracion': configuracion.toMap(),
       'reglasPuntuacion': reglasPuntuacion.toMap(),
       'reglasDesempate': reglasDesempate,
+      'faseActual': faseActual,
       'fechaCreacion': dateToJson(fechaCreacion),
       'fechaActualizacion': dateToJson(fechaActualizacion),
       'creadoPor': creadoPor,
@@ -416,4 +457,23 @@ class CampeonatoModel {
   /// En fases eliminatorias, finales y playoffs no puede quedar empate.
   bool get formatoEliminaEmpates =>
       tipoCampeonato == TipoCampeonato.eliminacionDirecta;
+
+  /// Solo "Grupos + eliminación" tiene dos etapas separadas: mientras no
+  /// se active la fase eliminatoria a mano, los cruces manuales quedan
+  /// limitados a equipos del mismo grupo (ver [PartidoService]).
+  bool get tieneFasesSeparadas =>
+      tipoCampeonato == TipoCampeonato.gruposEliminacion;
+
+  /// Si los cruces manuales deberían limitarse a equipos del mismo
+  /// grupo: siempre en "fase de grupos" puro (no hay otra etapa), y en
+  /// "grupos + eliminación" mientras no se active la fase eliminatoria.
+  bool get debeRestringirCrucesAlGrupo =>
+      tipoCampeonato == TipoCampeonato.faseGrupos ||
+      (tieneFasesSeparadas && faseActual != FaseCampeonato.eliminatoria);
+
+  bool get estaEnFaseDeGrupos =>
+      tieneFasesSeparadas && faseActual != FaseCampeonato.eliminatoria;
+
+  bool get estaEnFaseEliminatoria =>
+      tieneFasesSeparadas && faseActual == FaseCampeonato.eliminatoria;
 }

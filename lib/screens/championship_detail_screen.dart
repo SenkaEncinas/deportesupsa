@@ -5,25 +5,29 @@ import '../models/partido_model.dart';
 import '../models/ranking_goleador_model.dart';
 import '../models/tabla_posicion_model.dart';
 import '../services/public_home_service.dart';
+import '../utils/clasificacion.dart';
+import '../utils/fixture_grouping.dart';
 import 'reciclaje/app_badge.dart';
+import 'reciclaje/app_bracket_view.dart';
+import 'reciclaje/app_clasificados_card.dart';
 import 'reciclaje/app_card.dart';
+import 'reciclaje/app_filter_pill.dart';
 import 'reciclaje/app_colors.dart';
-import 'reciclaje/app_hero_card.dart';
 import 'reciclaje/app_inline_empty_state.dart';
+import 'reciclaje/app_logo_mark.dart';
 import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_match_card.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_responsive_pair.dart';
 import 'reciclaje/app_section_header.dart';
+import 'reciclaje/app_skeleton.dart';
 import 'reciclaje/app_standing_card.dart';
 import 'reciclaje/app_table_container.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/championship_public_card.dart';
 import 'reciclaje/responsive.dart';
 import 'reciclaje/stat_card.dart';
-
-const Color _upsaGold = Color(0xFFD6A100);
 
 class ChampionshipDetailScreen extends StatelessWidget {
   final CampeonatoModel campeonato;
@@ -33,7 +37,7 @@ class ChampionshipDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final service = PublicHomeService();
-    final estadoTexto = ChampionshipPublicCard.estadoTexto(campeonato.estado);
+    final isMobile = Responsive.isMobile(context);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -52,106 +56,270 @@ class ChampionshipDetailScreen extends StatelessWidget {
           ),
         ),
         child: SafeArea(
-          child: SingleChildScrollView(
-            child: AppPage(
-              title: campeonato.nombre,
-              subtitle: 'Información pública del campeonato.',
-              actions: [
-                TextButton.icon(
+          child: isMobile
+              ? _MobileChampionshipView(
+                  service: service,
+                  campeonato: campeonato,
+                )
+              : SingleChildScrollView(
+                  child: AppPage(
+                    title: campeonato.nombre,
+                    subtitle: 'Información pública del campeonato.',
+                    actions: [
+                      TextButton.icon(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        label: const Text('Volver'),
+                      ),
+                    ],
+                    child: _ChampionshipContent(
+                      service: service,
+                      campeonato: campeonato,
+                    ),
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// El contenido completo del campeonato, sin encabezado ni scroll
+/// propios (eso lo pone quien lo use): pensado para desktop/tablet, que
+/// ya tenían lugar de sobra para ver todo en una sola columna larga. En
+/// vez del cartel verde grande de antes (con descripción, universidad,
+/// cancha, modalidad...) solo se muestra el logo de la UPSA: esa info ya
+/// la vio el usuario al entrar al campeonato, no hace falta repetirla.
+class _ChampionshipContent extends StatelessWidget {
+  final PublicHomeService service;
+  final CampeonatoModel campeonato;
+
+  const _ChampionshipContent({required this.service, required this.campeonato});
+
+  @override
+  Widget build(BuildContext context) {
+    final estadoTexto = ChampionshipPublicCard.estadoTexto(campeonato.estado);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const AppLogoMark(compact: true),
+            const SizedBox(width: 12),
+            AppBadge(
+              text: estadoTexto,
+              type: ChampionshipPublicCard.badgeType(campeonato.estado),
+              icon: Icons.sports_soccer,
+            ),
+            if (campeonato.tieneFasesSeparadas) ...[
+              const SizedBox(width: 8),
+              AppBadge(
+                text: campeonato.estaEnFaseDeGrupos
+                    ? 'Fase de grupos'
+                    : 'Fase eliminatoria',
+                type: campeonato.estaEnFaseDeGrupos
+                    ? AppBadgeType.info
+                    : AppBadgeType.warning,
+                icon: campeonato.estaEnFaseDeGrupos
+                    ? Icons.grid_view_rounded
+                    : Icons.bolt_outlined,
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 20),
+        _StatsSection(
+          service: service,
+          campeonato: campeonato,
+          estadoTexto: estadoTexto,
+        ),
+        const SizedBox(height: 24),
+        AppResponsivePair(
+          first: _NextMatchesSection(
+            service: service,
+            campeonatoId: campeonato.id,
+            deporte: campeonato.deporteEfectivo,
+          ),
+          second: _LastResultsSection(
+            service: service,
+            campeonatoId: campeonato.id,
+            deporte: campeonato.deporteEfectivo,
+          ),
+        ),
+        const SizedBox(height: 24),
+        _FixtureSection(service: service, campeonato: campeonato),
+        if (campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion) ...[
+          const SizedBox(height: 24),
+          _ClasificadosSection(service: service, campeonato: campeonato),
+        ],
+        const SizedBox(height: 24),
+        // Vóley y básquet no registran goles/puntos por jugador: sin esa
+        // sección, la tabla usa todo el ancho en vez de dejar un hueco
+        // al lado.
+        if (campeonato.esFutbol)
+          AppResponsivePair(
+            firstFlex: 3,
+            secondFlex: 2,
+            first: _TableSection(service: service, campeonato: campeonato),
+            second: _ScorersSection(service: service, campeonato: campeonato),
+          )
+        else
+          _TableSection(service: service, campeonato: campeonato),
+        const SizedBox(height: 28),
+      ],
+    );
+  }
+}
+
+enum _MobileTab { resumen, fixture, tabla }
+
+/// Versión móvil, separada en pestañas en vez de una sola columna larga:
+/// antes había que scrollear muchísimo para llegar a la tabla o los
+/// goleadores. Se arma con `AppFilterPill` (el mismo patrón de "General /
+/// Por grupos" que ya usa la tabla de posiciones) en vez de un `TabBar`
+/// de Material, para no meter un estilo de pestañas distinto al resto
+/// de la app.
+class _MobileChampionshipView extends StatefulWidget {
+  final PublicHomeService service;
+  final CampeonatoModel campeonato;
+
+  const _MobileChampionshipView({
+    required this.service,
+    required this.campeonato,
+  });
+
+  @override
+  State<_MobileChampionshipView> createState() =>
+      _MobileChampionshipViewState();
+}
+
+class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
+  _MobileTab _tab = _MobileTab.resumen;
+
+  CampeonatoModel get campeonato => widget.campeonato;
+  PublicHomeService get service => widget.service;
+
+  @override
+  Widget build(BuildContext context) {
+    final estadoTexto = ChampionshipPublicCard.estadoTexto(campeonato.estado);
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                IconButton(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.arrow_back_rounded),
-                  label: const Text('Volver'),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 6),
+                const AppLogoMark(compact: true),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(campeonato.nombre, style: AppTextStyles.heading2),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                AppBadge(
+                  text: estadoTexto,
+                  type: ChampionshipPublicCard.badgeType(campeonato.estado),
+                  icon: Icons.sports_soccer,
+                ),
+                if (campeonato.tieneFasesSeparadas)
+                  AppBadge(
+                    text: campeonato.estaEnFaseDeGrupos
+                        ? 'Fase de grupos'
+                        : 'Fase eliminatoria',
+                    type: campeonato.estaEnFaseDeGrupos
+                        ? AppBadgeType.info
+                        : AppBadgeType.warning,
+                    icon: campeonato.estaEnFaseDeGrupos
+                        ? Icons.grid_view_rounded
+                        : Icons.bolt_outlined,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                AppFilterPill(
+                  text: 'Resumen',
+                  selected: _tab == _MobileTab.resumen,
+                  onTap: () => setState(() => _tab = _MobileTab.resumen),
+                ),
+                AppFilterPill(
+                  text: 'Fixture',
+                  selected: _tab == _MobileTab.fixture,
+                  onTap: () => setState(() => _tab = _MobileTab.fixture),
+                ),
+                AppFilterPill(
+                  text: 'Tabla',
+                  selected: _tab == _MobileTab.tabla,
+                  onTap: () => setState(() => _tab = _MobileTab.tabla),
                 ),
               ],
-              child: Column(
+            ),
+            const SizedBox(height: 18),
+            switch (_tab) {
+              _MobileTab.resumen => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppHeroCard(
-                    title: campeonato.nombre,
-                    description: campeonato.descripcion.trim().isEmpty
-                        ? 'Consulta la información pública del campeonato: partidos programados, resultados, tabla de posiciones y ranking de goleadores.'
-                        : campeonato.descripcion,
-                    badges: [
-                      AppBadge(
-                        text: estadoTexto,
-                        type: ChampionshipPublicCard.badgeType(
-                          campeonato.estado,
-                        ),
-                        icon: Icons.sports_soccer,
-                      ),
-                    ],
-                    chips: const [
-                      AppHeroChipData(
-                        icon: Icons.school_outlined,
-                        text: 'Universidad Privada de Santa Cruz',
-                      ),
-                      AppHeroChipData(
-                        icon: Icons.public_outlined,
-                        text: 'Vista pública',
-                      ),
-                    ],
-                    infoItems: [
-                      AppHeroInfoItem(
-                        icon: Icons.place_outlined,
-                        label: 'Cancha',
-                        value: campeonato.cancha,
-                      ),
-                      AppHeroInfoItem(
-                        icon: Icons.category_outlined,
-                        label: 'Modalidad',
-                        value: ChampionshipPublicCard.formatLabel(
-                          campeonato.modalidad,
-                        ),
-                      ),
-                      AppHeroInfoItem(
-                        icon: Icons.account_tree_outlined,
-                        label: 'Formato',
-                        value: ChampionshipPublicCard.formatLabel(
-                          campeonato.tipoCampeonato,
-                        ),
-                      ),
-                      AppHeroInfoItem(
-                        icon: Icons.calendar_today_outlined,
-                        label: 'Temporada',
-                        value: campeonato.temporada,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
                   _StatsSection(
                     service: service,
                     campeonato: campeonato,
                     estadoTexto: estadoTexto,
                   ),
-                  const SizedBox(height: 24),
-                  AppResponsivePair(
-                    first: _NextMatchesSection(
-                      service: service,
-                      campeonatoId: campeonato.id,
-                    ),
-                    second: _LastResultsSection(
-                      service: service,
-                      campeonatoId: campeonato.id,
-                    ),
+                  const SizedBox(height: 20),
+                  _NextMatchesSection(
+                    service: service,
+                    campeonatoId: campeonato.id,
+                    deporte: campeonato.deporteEfectivo,
                   ),
-                  const SizedBox(height: 24),
-                  AppResponsivePair(
-                    firstFlex: 3,
-                    secondFlex: 2,
-                    first: _TableSection(
-                      service: service,
-                      campeonato: campeonato,
-                    ),
-                    second: _ScorersSection(
-                      service: service,
-                      campeonato: campeonato,
-                    ),
+                  const SizedBox(height: 16),
+                  _LastResultsSection(
+                    service: service,
+                    campeonatoId: campeonato.id,
+                    deporte: campeonato.deporteEfectivo,
                   ),
-                  const SizedBox(height: 28),
                 ],
               ),
-            ),
-          ),
+              _MobileTab.fixture => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _FixtureSection(service: service, campeonato: campeonato),
+                  if (campeonato.tipoCampeonato ==
+                      TipoCampeonato.gruposEliminacion) ...[
+                    const SizedBox(height: 20),
+                    _ClasificadosSection(
+                      service: service,
+                      campeonato: campeonato,
+                    ),
+                  ],
+                ],
+              ),
+              _MobileTab.tabla => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TableSection(service: service, campeonato: campeonato),
+                  if (campeonato.esFutbol) ...[
+                    const SizedBox(height: 20),
+                    _ScorersSection(service: service, campeonato: campeonato),
+                  ],
+                ],
+              ),
+            },
+          ],
         ),
       ),
     );
@@ -196,7 +364,7 @@ class _StatsSection extends StatelessWidget {
             subtitle: ChampionshipPublicCard.formatLabel(
               campeonato.tipoCampeonato,
             ),
-            color: _upsaGold,
+            color: AppColors.secondary,
           );
         },
       ),
@@ -259,10 +427,12 @@ class _StatsSection extends StatelessWidget {
 class _NextMatchesSection extends StatelessWidget {
   final PublicHomeService service;
   final String campeonatoId;
+  final String deporte;
 
   const _NextMatchesSection({
     required this.service,
     required this.campeonatoId,
+    required this.deporte,
   });
 
   @override
@@ -282,7 +452,7 @@ class _NextMatchesSection extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               if (snapshot.connectionState == ConnectionState.waiting)
-                const AppLoading(message: 'Cargando partidos...')
+                const _MatchSkeletonColumn()
               else if (partidos.isEmpty)
                 const AppInlineEmptyState(
                   icon: Icons.event_busy_outlined,
@@ -296,7 +466,7 @@ class _NextMatchesSection extends StatelessWidget {
                     padding: EdgeInsets.only(
                       bottom: index < partidos.length - 1 ? 10 : 0,
                     ),
-                    child: AppMatchCard(partido: partido),
+                    child: AppMatchCard(partido: partido, deporte: deporte),
                   );
                 }),
             ],
@@ -310,10 +480,12 @@ class _NextMatchesSection extends StatelessWidget {
 class _LastResultsSection extends StatelessWidget {
   final PublicHomeService service;
   final String campeonatoId;
+  final String deporte;
 
   const _LastResultsSection({
     required this.service,
     required this.campeonatoId,
+    required this.deporte,
   });
 
   @override
@@ -333,7 +505,7 @@ class _LastResultsSection extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               if (snapshot.connectionState == ConnectionState.waiting)
-                const AppLoading(message: 'Cargando resultados...')
+                const _MatchSkeletonColumn()
               else if (partidos.isEmpty)
                 const AppInlineEmptyState(
                   icon: Icons.scoreboard_outlined,
@@ -347,7 +519,11 @@ class _LastResultsSection extends StatelessWidget {
                     padding: EdgeInsets.only(
                       bottom: index < partidos.length - 1 ? 10 : 0,
                     ),
-                    child: AppMatchCard(partido: partido, showResult: true),
+                    child: AppMatchCard(
+                      partido: partido,
+                      showResult: true,
+                      deporte: deporte,
+                    ),
                   );
                 }),
             ],
@@ -358,106 +534,267 @@ class _LastResultsSection extends StatelessWidget {
   }
 }
 
-class _TableSection extends StatelessWidget {
+/// Fixture completo, público y de solo lectura. Según el formato del
+/// campeonato separa dos cosas distintas:
+/// - Los cruces de todos contra todos (liga o fase de grupos): lista
+///   agrupada, igual que en la pantalla de administración.
+/// - Los cruces de eliminación directa (octavos, cuartos, semifinal,
+///   final...): una llave visual con `AppBracketView`, mucho más clara
+///   que una lista de texto una vez que el torneo llega a esa etapa.
+class _FixtureSection extends StatelessWidget {
+  final PublicHomeService service;
+  final CampeonatoModel campeonato;
+
+  const _FixtureSection({required this.service, required this.campeonato});
+
+  bool get _esEliminacionPura =>
+      campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
+
+  bool get _esGruposEliminacion =>
+      campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<PartidoModel>>(
+      stream: service.streamPartidos(campeonato.id),
+      builder: (context, snapshot) {
+        final partidos = snapshot.data ?? [];
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const AppSectionHeader(
+                  title: 'Llaves eliminatorias',
+                  subtitle: 'De la ronda inicial hasta la gran final.',
+                ),
+                const SizedBox(height: 16),
+                const _MatchSkeletonColumn(),
+              ],
+            ),
+          );
+        }
+
+        // El listado plano "fixture por grupo" ya no se muestra acá: la
+        // tabla de posiciones y los clasificados cubren esa información
+        // de forma más útil. Esta sección queda solo para la llave
+        // visual de la fase eliminatoria.
+        final List<MapEntry<String, List<PartidoModel>>> rondasLlave;
+
+        if (_esEliminacionPura) {
+          rondasLlave = FixtureGrouping.rondasEliminatorias(partidos);
+        } else if (_esGruposEliminacion) {
+          final deFaseFinal = partidos
+              .where((p) => p.grupoId == null || p.grupoId!.isEmpty)
+              .toList();
+
+          rondasLlave = FixtureGrouping.rondasEliminatorias(deFaseFinal);
+        } else {
+          rondasLlave = const [];
+        }
+
+        if (rondasLlave.isEmpty) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const AppSectionHeader(
+                title: 'Llaves eliminatorias',
+                subtitle: 'De la ronda inicial hasta la gran final.',
+              ),
+              const SizedBox(height: 16),
+              const AppInlineEmptyState(
+                icon: Icons.account_tree_outlined,
+                text: 'Todavía no hay llaves eliminatorias generadas.',
+              ),
+            ],
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AppSectionHeader(
+              title: 'Llaves eliminatorias',
+              subtitle: 'De la ronda inicial hasta la gran final.',
+            ),
+            const SizedBox(height: 16),
+            AppBracketView(
+              rondas: rondasLlave,
+              deporte: campeonato.deporteEfectivo,
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Quién clasifica de la fase de grupos a la fase final (directos por
+/// grupo + mejores terceros), calculado en vivo con los resultados
+/// actuales. Solo aplica al formato "grupos + eliminación".
+class _ClasificadosSection extends StatelessWidget {
+  final PublicHomeService service;
+  final CampeonatoModel campeonato;
+
+  const _ClasificadosSection({
+    required this.service,
+    required this.campeonato,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final config = campeonato.configuracion;
+    final total =
+        config.cantidadGrupos * config.clasificanPorGrupo +
+        config.mejoresTerceros;
+
+    return StreamBuilder<List<TablaPosicionModel>>(
+      stream: service.streamTabla(campeonato.id),
+      builder: (context, snapshot) {
+        final tabla = snapshot.data ?? [];
+
+        final clasificados = Clasificacion.calcular(
+          tabla: tabla,
+          clasificanPorGrupo: config.clasificanPorGrupo,
+          mejoresTerceros: config.mejoresTerceros,
+        );
+
+        return AppClasificadosCard(
+          clasificados: clasificados,
+          totalEsperado: total,
+        );
+      },
+    );
+  }
+}
+
+enum _VistaTabla { general, porGrupos }
+
+class _TableSection extends StatefulWidget {
   final PublicHomeService service;
   final CampeonatoModel campeonato;
 
   const _TableSection({required this.service, required this.campeonato});
 
-  /// Encabezados según el deporte:
+  @override
+  State<_TableSection> createState() => _TableSectionState();
+}
+
+class _TableSectionState extends State<_TableSection> {
+  _VistaTabla _vista = _VistaTabla.general;
+
+  CampeonatoModel get campeonato => widget.campeonato;
+
+  /// Encabezados según el deporte, con una columna "Grupo" opcional
+  /// (vista general con varios grupos):
   /// - Fútbol: PJ, G, E, P, GF, GC, DG, Pts.
   /// - Vóley: PJ, G, P, SF, SC, DS, PF, PC, DP, Pts (sets y puntos).
   /// - Básquet: PJ, G, P, PF, PC, DP, Pts.
-  List<String> _headers() {
-    if (campeonato.esVolley) {
-      return const [
-        '#',
-        'Equipo',
-        'PJ',
-        'G',
-        'P',
-        'SF',
-        'SC',
-        'DS',
-        'PF',
-        'PC',
-        'DP',
-        'Pts',
-      ];
-    }
+  List<String> _headers({required bool incluirGrupo}) {
+    final base = campeonato.esVolley
+        ? const [
+            '#',
+            'Equipo',
+            'PJ',
+            'G',
+            'P',
+            'SF',
+            'SC',
+            'DS',
+            'PF',
+            'PC',
+            'DP',
+            'Pts',
+          ]
+        : campeonato.esBasket
+        ? const ['#', 'Equipo', 'PJ', 'G', 'P', 'PF', 'PC', 'DP', 'Pts']
+        : const ['#', 'Equipo', 'PJ', 'G', 'E', 'P', 'GF', 'GC', 'DG', 'Pts'];
 
-    if (campeonato.esBasket) {
-      return const ['#', 'Equipo', 'PJ', 'G', 'P', 'PF', 'PC', 'DP', 'Pts'];
-    }
+    if (!incluirGrupo) return base;
 
-    return const ['#', 'Equipo', 'PJ', 'G', 'E', 'P', 'GF', 'GC', 'DG', 'Pts'];
+    return [...base]..insert(2, 'Grupo');
   }
 
   /// Estadísticas por equipo para la card compacta de móvil, sin
   /// posición/nombre/puntos (esos van en la cabecera de la card).
-  List<MapEntry<String, String>> _statsCompactos(TablaPosicionModel item) {
-    if (campeonato.esVolley) {
-      return [
-        MapEntry('PJ', '${item.partidosJugados}'),
-        MapEntry('G', '${item.partidosGanados}'),
-        MapEntry('P', '${item.partidosPerdidos}'),
-        MapEntry('SF', '${item.golesFavor}'),
-        MapEntry('SC', '${item.golesContra}'),
-        MapEntry('DS', '${item.diferenciaGoles}'),
-        MapEntry('PF', '${item.puntosFavor}'),
-        MapEntry('PC', '${item.puntosContra}'),
-        MapEntry('DP', '${item.diferenciaPuntos}'),
-      ];
+  List<MapEntry<String, String>> _statsCompactos(
+    TablaPosicionModel item, {
+    required bool incluirGrupo,
+  }) {
+    final base = campeonato.esVolley
+        ? [
+            MapEntry('PJ', '${item.partidosJugados}'),
+            MapEntry('G', '${item.partidosGanados}'),
+            MapEntry('P', '${item.partidosPerdidos}'),
+            MapEntry('SF', '${item.golesFavor}'),
+            MapEntry('SC', '${item.golesContra}'),
+            MapEntry('DS', '${item.diferenciaGoles}'),
+            MapEntry('PF', '${item.puntosFavor}'),
+            MapEntry('PC', '${item.puntosContra}'),
+            MapEntry('DP', '${item.diferenciaPuntos}'),
+          ]
+        : campeonato.esBasket
+        ? [
+            MapEntry('PJ', '${item.partidosJugados}'),
+            MapEntry('G', '${item.partidosGanados}'),
+            MapEntry('P', '${item.partidosPerdidos}'),
+            MapEntry('PF', '${item.golesFavor}'),
+            MapEntry('PC', '${item.golesContra}'),
+            MapEntry('DP', '${item.diferenciaGoles}'),
+          ]
+        : [
+            MapEntry('PJ', '${item.partidosJugados}'),
+            MapEntry('G', '${item.partidosGanados}'),
+            MapEntry('E', '${item.partidosEmpatados}'),
+            MapEntry('P', '${item.partidosPerdidos}'),
+            MapEntry('GF', '${item.golesFavor}'),
+            MapEntry('GC', '${item.golesContra}'),
+            MapEntry('DG', '${item.diferenciaGoles}'),
+          ];
+
+    if (!incluirGrupo || item.grupoId == null || item.grupoId!.isEmpty) {
+      return base;
     }
 
-    if (campeonato.esBasket) {
-      return [
-        MapEntry('PJ', '${item.partidosJugados}'),
-        MapEntry('G', '${item.partidosGanados}'),
-        MapEntry('P', '${item.partidosPerdidos}'),
-        MapEntry('PF', '${item.golesFavor}'),
-        MapEntry('PC', '${item.golesContra}'),
-        MapEntry('DP', '${item.diferenciaGoles}'),
-      ];
-    }
-
-    return [
-      MapEntry('PJ', '${item.partidosJugados}'),
-      MapEntry('G', '${item.partidosGanados}'),
-      MapEntry('E', '${item.partidosEmpatados}'),
-      MapEntry('P', '${item.partidosPerdidos}'),
-      MapEntry('GF', '${item.golesFavor}'),
-      MapEntry('GC', '${item.golesContra}'),
-      MapEntry('DG', '${item.diferenciaGoles}'),
-    ];
+    return [MapEntry('Grupo', _grupoCorto(item.grupoId!)), ...base];
   }
 
-  List<Widget> _row(TablaPosicionModel item) {
+  /// La tabla va angosta y compacta solo en fútbol, donde comparte fila
+  /// con la card de goleadores (ver [_ChampionshipContent]) y necesita
+  /// ese espacio recortado. Vóley/básquet no tienen esa card al lado, así
+  /// que la tabla usa toda la pantalla disponible con el espaciado normal.
+  bool get _compacta => campeonato.esFutbol;
+
+  List<Widget> _row(TablaPosicionModel item, {required bool incluirGrupo}) {
     final posicion = _PositionCell(position: item.posicion);
     // maxWidth acotado: sin esto, TextOverflow.ellipsis no recorta nada
     // porque DataCell le da a su contenido ancho intrínseco (ilimitado).
     final nombre = ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 170),
+      constraints: BoxConstraints(maxWidth: _compacta ? 128 : 190),
       child: Text(
         item.equipoNombre,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: AppTextStyles.bodyMedium,
+        style: (_compacta ? AppTextStyles.tableCell : AppTextStyles.bodyMedium)
+            .copyWith(fontWeight: FontWeight.w700),
       ),
     );
     final puntos = Text(
       '${item.puntos}',
-      style: AppTextStyles.bodyMedium.copyWith(
-        color: AppColors.primaryDark,
-        fontWeight: FontWeight.w900,
-      ),
+      style: (_compacta ? AppTextStyles.tableCell : AppTextStyles.bodyMedium)
+          .copyWith(color: AppColors.primaryDark, fontWeight: FontWeight.w900),
     );
+    final grupo = Text(
+      item.grupoId == null ? '-' : _grupoCorto(item.grupoId!),
+      style: AppTextStyles.small.copyWith(fontWeight: FontWeight.w700),
+    );
+
+    final List<Widget> stats;
 
     if (campeonato.esVolley) {
       // En vóley golesFavor/golesContra guardan sets a favor/en contra.
-      return [
-        posicion,
-        nombre,
+      stats = [
         Text('${item.partidosJugados}'),
         Text('${item.partidosGanados}'),
         Text('${item.partidosPerdidos}'),
@@ -469,12 +806,8 @@ class _TableSection extends StatelessWidget {
         Text('${item.diferenciaPuntos}'),
         puntos,
       ];
-    }
-
-    if (campeonato.esBasket) {
-      return [
-        posicion,
-        nombre,
+    } else if (campeonato.esBasket) {
+      stats = [
         Text('${item.partidosJugados}'),
         Text('${item.partidosGanados}'),
         Text('${item.partidosPerdidos}'),
@@ -483,34 +816,146 @@ class _TableSection extends StatelessWidget {
         Text('${item.diferenciaGoles}'),
         puntos,
       ];
+    } else {
+      stats = [
+        Text('${item.partidosJugados}'),
+        Text('${item.partidosGanados}'),
+        Text('${item.partidosEmpatados}'),
+        Text('${item.partidosPerdidos}'),
+        Text('${item.golesFavor}'),
+        Text('${item.golesContra}'),
+        Text('${item.diferenciaGoles}'),
+        puntos,
+      ];
     }
 
-    return [
-      posicion,
-      nombre,
-      Text('${item.partidosJugados}'),
-      Text('${item.partidosGanados}'),
-      Text('${item.partidosEmpatados}'),
-      Text('${item.partidosPerdidos}'),
-      Text('${item.golesFavor}'),
-      Text('${item.golesContra}'),
-      Text('${item.diferenciaGoles}'),
-      puntos,
-    ];
+    return [posicion, nombre, if (incluirGrupo) grupo, ...stats];
+  }
+
+  /// Arma una tabla (móvil o escritorio) para una lista de equipos ya
+  /// lista para mostrar, con la posición ya calculada para ese contexto
+  /// (general o por grupo).
+  Widget _tabla(
+    BuildContext context,
+    List<TablaPosicionModel> items, {
+    required bool incluirGrupo,
+  }) {
+    final isMobile = Responsive.isMobile(context);
+
+    if (isMobile) {
+      // En móvil una DataTable con hasta 12 columnas obliga a un scroll
+      // horizontal poco descubrible y filas muy angostas. Se reemplaza
+      // por una card por equipo con sus estadísticas en una grilla
+      // compacta, igual que se hizo con AppHeroCard.
+      if (items.isEmpty) {
+        return AppCard(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Text(
+                'Todavía no hay tabla de posiciones.',
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      return Column(
+        children: items.map((item) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: AppStandingCard(
+              item: item,
+              stats: _statsCompactos(item, incluirGrupo: incluirGrupo),
+            ),
+          );
+        }).toList(),
+      );
+    }
+
+    return AppTableContainer(
+      headers: _headers(incluirGrupo: incluirGrupo),
+      rows: items.map((item) => _row(item, incluirGrupo: incluirGrupo)).toList(),
+      emptyMessage: 'Todavía no hay tabla de posiciones.',
+      compact: _compacta,
+    );
+  }
+
+  int _compararGeneral(TablaPosicionModel a, TablaPosicionModel b) {
+    var compare = b.puntos.compareTo(a.puntos);
+    if (compare != 0) return compare;
+
+    compare = b.diferenciaGoles.compareTo(a.diferenciaGoles);
+    if (compare != 0) return compare;
+
+    compare = b.golesFavor.compareTo(a.golesFavor);
+    if (compare != 0) return compare;
+
+    compare = a.golesContra.compareTo(b.golesContra);
+    if (compare != 0) return compare;
+
+    return a.equipoNombre.compareTo(b.equipoNombre);
+  }
+
+  /// Copia cada equipo con la posición recalculada para el ranking
+  /// general (1..N sobre todos los grupos juntos): la posición que trae
+  /// el modelo es la posición dentro de su propio grupo, no sirve acá.
+  List<TablaPosicionModel> _rankingGeneral(List<TablaPosicionModel> tabla) {
+    final ordenado = [...tabla]..sort(_compararGeneral);
+
+    return List.generate(ordenado.length, (i) {
+      final item = ordenado[i];
+
+      return TablaPosicionModel(
+        equipoId: item.equipoId,
+        equipoNombre: item.equipoNombre,
+        grupoId: item.grupoId,
+        partidosJugados: item.partidosJugados,
+        partidosGanados: item.partidosGanados,
+        partidosEmpatados: item.partidosEmpatados,
+        partidosPerdidos: item.partidosPerdidos,
+        golesFavor: item.golesFavor,
+        golesContra: item.golesContra,
+        diferenciaGoles: item.diferenciaGoles,
+        puntos: item.puntos,
+        posicion: i + 1,
+        fechaActualizacion: item.fechaActualizacion,
+        puntosFavor: item.puntosFavor,
+        puntosContra: item.puntosContra,
+        diferenciaPuntos: item.diferenciaPuntos,
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
     return StreamBuilder<List<TablaPosicionModel>>(
-      stream: service.streamTabla(campeonato.id),
+      stream: widget.service.streamTabla(campeonato.id),
       builder: (context, snapshot) {
         final tabla = snapshot.data ?? [];
 
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const AppCard(child: AppLoading(message: 'Cargando tabla...'));
         }
+
+        // Se agrupa por grupoId: los campeonatos sin fase de grupos (o
+        // sin ese dato todavía) caen en un único grupo "sin nombre".
+        final porGrupo = <String, List<TablaPosicionModel>>{};
+
+        for (final item in tabla) {
+          final clave = item.grupoId ?? '';
+          porGrupo.putIfAbsent(clave, () => []).add(item);
+        }
+
+        for (final lista in porGrupo.values) {
+          lista.sort((a, b) => a.posicion.compareTo(b.posicion));
+        }
+
+        final claves = porGrupo.keys.toList()..sort();
+        final hayVariosGrupos = claves.length > 1;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -519,50 +964,106 @@ class _TableSection extends StatelessWidget {
               title: 'Tabla de posiciones',
               subtitle: campeonato.esVolley
                   ? 'Partidos, sets y puntos de cada equipo.'
-                  : 'Desempeño general de los equipos.',
+                  : !hayVariosGrupos
+                  ? 'Desempeño general de los equipos.'
+                  : _vista == _VistaTabla.general
+                  ? 'Todos los equipos juntos, sin importar su grupo.'
+                  : 'Cada grupo con su propia tabla.',
             ),
-            const SizedBox(height: 14),
-            // En móvil una DataTable con hasta 12 columnas obliga a un
-            // scroll horizontal poco descubrible y filas muy angostas.
-            // Se reemplaza por una card por equipo con sus estadísticas
-            // en una grilla compacta, igual que se hizo con AppHeroCard.
-            if (isMobile)
-              tabla.isEmpty
-                  ? AppCard(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Text(
-                            'Todavía no hay tabla de posiciones.',
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  : Column(
-                      children: tabla.map((item) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: AppStandingCard(
-                            item: item,
-                            stats: _statsCompactos(item),
-                          ),
-                        );
-                      }).toList(),
-                    )
-            else
-              AppTableContainer(
-                headers: _headers(),
-                rows: tabla.map(_row).toList(),
-                emptyMessage: 'Todavía no hay tabla de posiciones.',
+            if (hayVariosGrupos) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  AppFilterPill(
+                    text: 'General',
+                    selected: _vista == _VistaTabla.general,
+                    onTap: () => setState(() => _vista = _VistaTabla.general),
+                  ),
+                  AppFilterPill(
+                    text: 'Por grupos',
+                    selected: _vista == _VistaTabla.porGrupos,
+                    onTap: () =>
+                        setState(() => _vista = _VistaTabla.porGrupos),
+                  ),
+                ],
               ),
+            ],
+            const SizedBox(height: 14),
+            if (!hayVariosGrupos)
+              _tabla(context, tabla, incluirGrupo: false)
+            else if (_vista == _VistaTabla.general)
+              _tabla(context, _rankingGeneral(tabla), incluirGrupo: true)
+            else
+              ...claves.map((clave) {
+                final index = claves.indexOf(clave);
+
+                return Padding(
+                  padding: EdgeInsets.only(
+                    bottom: index < claves.length - 1 ? 22 : 0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(clave, style: AppTextStyles.heading3),
+                      const SizedBox(height: 10),
+                      _tabla(context, porGrupo[clave]!, incluirGrupo: false),
+                    ],
+                  ),
+                );
+              }),
           ],
         );
       },
     );
   }
+}
+
+/// Estado de carga para "Próximos partidos" / "Últimos resultados":
+/// dos siluetas del alto aproximado de un [AppMatchCard] en vez de un
+/// spinner suelto.
+class _MatchSkeletonColumn extends StatelessWidget {
+  const _MatchSkeletonColumn();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        AppSkeletonMatchCard(),
+        SizedBox(height: 10),
+        AppSkeletonMatchCard(),
+      ],
+    );
+  }
+}
+
+/// Estado de carga para "Goleadores": filas de ranking con la misma
+/// silueta que [_ScorerTile].
+class _RankingSkeletonColumn extends StatelessWidget {
+  const _RankingSkeletonColumn();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        AppSkeletonListTile(),
+        SizedBox(height: 10),
+        AppSkeletonListTile(),
+        SizedBox(height: 10),
+        AppSkeletonListTile(),
+      ],
+    );
+  }
+}
+
+/// "Grupo B" -> "B": en la tabla de posiciones el grupo se muestra solo
+/// con su letra, tanto en la columna de la tabla de escritorio como en
+/// el chip de la card de móvil (ver `nombreGrupo` en GrupoService, que
+/// siempre arma el nombre como "Grupo" seguido de una letra).
+String _grupoCorto(String grupoId) {
+  final partes = grupoId.trim().split(RegExp(r'\s+'));
+  return partes.isEmpty ? grupoId : partes.last;
 }
 
 class _PositionCell extends StatelessWidget {
@@ -575,8 +1076,8 @@ class _PositionCell extends StatelessWidget {
     final isTop = position <= 3;
 
     return Container(
-      width: 30,
-      height: 30,
+      width: 26,
+      height: 26,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: isTop ? AppColors.primaryLight : AppColors.surfaceSoft,
@@ -606,49 +1107,9 @@ class _ScorersSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // El ranking individual solo existe para fútbol/futsal.
-    // Vóley y básquet quedan preparados para estadísticas de jugadores
-    // en una siguiente fase.
-    if (campeonato.esVolley) {
-      return const AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppSectionHeader(
-              title: 'Estadísticas',
-              subtitle: 'Estadísticas individuales de vóley.',
-            ),
-            SizedBox(height: 16),
-            AppInlineEmptyState(
-              icon: Icons.sports_volleyball_outlined,
-              text:
-                  'Las estadísticas por jugador de vóley estarán disponibles próximamente. Mientras tanto revisa la tabla con sets y puntos.',
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (campeonato.esBasket) {
-      return const AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppSectionHeader(
-              title: 'Anotadores',
-              subtitle: 'Ranking individual de puntos.',
-            ),
-            SizedBox(height: 16),
-            AppInlineEmptyState(
-              icon: Icons.sports_basketball_outlined,
-              text:
-                  'El registro de puntos por jugador estará disponible próximamente. El marcador por equipo ya se registra en Resultados.',
-            ),
-          ],
-        ),
-      );
-    }
-
+    // El ranking individual (goleadores) solo existe para fútbol/futsal:
+    // vóley y básquet no registran goles/puntos por jugador, así que
+    // este widget ni se llama para esos deportes (ver el build principal).
     return AppCard(
       child: StreamBuilder<List<RankingGoleadorModel>>(
         stream: service.streamRankingGoleadores(campeonato.id),
@@ -664,7 +1125,7 @@ class _ScorersSection extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               if (snapshot.connectionState == ConnectionState.waiting)
-                const AppLoading(message: 'Cargando goleadores...')
+                const _RankingSkeletonColumn()
               else if (ranking.isEmpty)
                 const AppInlineEmptyState(
                   icon: Icons.sports_soccer_outlined,

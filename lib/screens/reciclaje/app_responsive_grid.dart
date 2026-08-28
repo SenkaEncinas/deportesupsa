@@ -25,8 +25,8 @@ class AppResponsiveGrid extends StatelessWidget {
         final columns = Responsive.isMobile(context)
             ? (mobileColumns ?? 1)
             : Responsive.isTablet(context)
-                ? (tabletColumns ?? 2)
-                : (desktopColumns ?? 3);
+            ? (tabletColumns ?? 2)
+            : (desktopColumns ?? 3);
 
         final itemWidth =
             (constraints.maxWidth - (spacing * (columns - 1))) / columns;
@@ -35,12 +35,7 @@ class AppResponsiveGrid extends StatelessWidget {
           spacing: spacing,
           runSpacing: spacing,
           children: children
-              .map(
-                (child) => SizedBox(
-                  width: itemWidth,
-                  child: child,
-                ),
-              )
+              .map((child) => SizedBox(width: itemWidth, child: child))
               .toList(),
         );
       },

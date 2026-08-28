@@ -33,15 +33,9 @@ class AppResponsivePair extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          flex: firstFlex,
-          child: first,
-        ),
+        Expanded(flex: firstFlex, child: first),
         SizedBox(width: spacing),
-        Expanded(
-          flex: secondFlex,
-          child: second,
-        ),
+        Expanded(flex: secondFlex, child: second),
       ],
     );
   }

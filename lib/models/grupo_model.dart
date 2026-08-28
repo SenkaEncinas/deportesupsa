@@ -23,8 +23,10 @@ class GrupoModel {
       nombre: stringFromJson(map['nombre']),
       orden: intFromJson(map['orden']),
       equipoIds: stringListFromJson(map['equipoIds']),
-      generadoPorSistema:
-          boolFromJson(map['generadoPorSistema'], defaultValue: true),
+      generadoPorSistema: boolFromJson(
+        map['generadoPorSistema'],
+        defaultValue: true,
+      ),
       fechaCreacion: dateFromJson(map['fechaCreacion']),
     );
   }

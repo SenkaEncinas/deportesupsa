@@ -7,6 +7,7 @@ import '../models/jugador_model.dart';
 import '../models/partido_model.dart';
 import '../models/ranking_goleador_model.dart';
 import '../models/tabla_posicion_model.dart';
+import '../models/tarjeta_model.dart';
 
 class GolJugadorInput {
   final String equipoId;
@@ -46,7 +47,7 @@ class TarjetaJugadorInput {
 
 class ResultadoService {
   ResultadoService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -80,6 +81,50 @@ class ResultadoService {
 
   CollectionReference<Map<String, dynamic>> _ranking(String campeonatoId) {
     return _campeonato(campeonatoId).collection('ranking_goleadores');
+  }
+
+  /// Todas las tarjetas/sanciones a jugadores del campeonato (fútbol:
+  /// amarillas/rojas; vóley/básquet: sanción por mesa/forzada), para el
+  /// módulo de "Jugadores sancionados".
+  Stream<List<TarjetaModel>> streamTarjetas(String campeonatoId) {
+    return _tarjetas(campeonatoId)
+        .orderBy('fechaRegistro', descending: true)
+        .snapshots()
+        .map((snap) {
+          return snap.docs.map((doc) {
+            return TarjetaModel.fromMap(doc.id, doc.data());
+          }).toList();
+        });
+  }
+
+  /// Goles por jugador ya registrados de un partido puntual, para
+  /// precargar el formulario cuando se edita un resultado existente.
+  Future<List<GolModel>> getGolesPartido({
+    required String campeonatoId,
+    required String partidoId,
+  }) async {
+    final snap = await _goles(
+      campeonatoId,
+    ).where('partidoId', isEqualTo: partidoId).get();
+
+    return snap.docs
+        .map((doc) => GolModel.fromMap(doc.id, doc.data()))
+        .toList();
+  }
+
+  /// Tarjetas/sanciones ya registradas de un partido puntual, para
+  /// precargar el formulario cuando se edita un resultado existente.
+  Future<List<TarjetaModel>> getTarjetasPartido({
+    required String campeonatoId,
+    required String partidoId,
+  }) async {
+    final snap = await _tarjetas(
+      campeonatoId,
+    ).where('partidoId', isEqualTo: partidoId).get();
+
+    return snap.docs
+        .map((doc) => TarjetaModel.fromMap(doc.id, doc.data()))
+        .toList();
   }
 
   /// Registra el resultado de un partido según el deporte del campeonato.
@@ -135,7 +180,8 @@ class ResultadoService {
 
     final partido = PartidoModel.fromMap(partidoDoc.id, partidoDoc.data()!);
 
-    final esAdministrativo = tipoResultado == TipoResultado.walkover ||
+    final esAdministrativo =
+        tipoResultado == TipoResultado.walkover ||
         tipoResultado == TipoResultado.sancion;
 
     if (esAdministrativo &&
@@ -201,7 +247,12 @@ class ResultadoService {
           );
         }
       }
+    }
 
+    // Las tarjetas/sanciones por jugador aplican a cualquier deporte
+    // (en fútbol son amarillas/rojas; en vóley/básquet, sanción por mesa
+    // o forzada) y son opcionales: solo se validan si se registró alguna.
+    if (tipoResultado == TipoResultado.normal) {
       for (final tarjeta in tarjetasJugadores) {
         if (tarjeta.amarillas < 0 || tarjeta.rojas < 0) {
           throw Exception('Las tarjetas no pueden tener valores negativos.');
@@ -313,7 +364,8 @@ class ResultadoService {
         // ---- Fútbol/futsal: goles, con penales si no se permite empate. ----
         final requiereGanador =
             !campeonato.configuracion.permiteEmpate ||
-                campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
+            campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta ||
+            _esFaseFinalSinEmpate(campeonato, partido);
 
         if (empate && requiereGanador) {
           if (penalesLocal == null || penalesVisitante == null) {
@@ -344,13 +396,13 @@ class ResultadoService {
       }
     }
 
-    final golesAnteriores = await _goles(campeonatoId)
-        .where('partidoId', isEqualTo: partidoId)
-        .get();
+    final golesAnteriores = await _goles(
+      campeonatoId,
+    ).where('partidoId', isEqualTo: partidoId).get();
 
-    final tarjetasAnteriores = await _tarjetas(campeonatoId)
-        .where('partidoId', isEqualTo: partidoId)
-        .get();
+    final tarjetasAnteriores = await _tarjetas(
+      campeonatoId,
+    ).where('partidoId', isEqualTo: partidoId).get();
 
     final batch = _db.batch();
 
@@ -419,6 +471,21 @@ class ResultadoService {
     await recalcularTablaYRanking(campeonatoId);
   }
 
+  /// En formatos de dos fases (grupos+eliminación, liga+final,
+  /// liga+playoffs) la fase de grupos/liga permite empate, pero la fase
+  /// final no debería. Esos partidos de fase final siempre se crean con
+  /// "cruce manual" (no hay generador automático de llaves todavía), así
+  /// que `generadoPorSistema == false` es la señal confiable de que un
+  /// partido pertenece a la fase final y no a la fase de grupos/liga.
+  bool _esFaseFinalSinEmpate(CampeonatoModel campeonato, PartidoModel partido) {
+    final formatoDosFases =
+        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion ||
+        campeonato.tipoCampeonato == TipoCampeonato.ligaFinal ||
+        campeonato.tipoCampeonato == TipoCampeonato.ligaPlayoffs;
+
+    return formatoDosFases && !partido.generadoPorSistema;
+  }
+
   Future<void> recalcularTablaYRanking(String campeonatoId) async {
     await _recalcularTabla(campeonatoId);
     await _recalcularRanking(campeonatoId);
@@ -436,11 +503,30 @@ class ResultadoService {
       campeonato.data()!,
     );
 
+    // Fase de grupos / grupos + eliminación: cada grupo maneja su propia
+    // tabla (posición 1..N dentro del grupo), así que la fase final
+    // (partidos sin grupoId) no debe mezclarse en el cálculo.
+    final usaGrupos =
+        campeonatoModel.tipoCampeonato == TipoCampeonato.faseGrupos ||
+        campeonatoModel.tipoCampeonato == TipoCampeonato.gruposEliminacion;
+
     final equiposSnap = await _equipos(campeonatoId).get();
-    final partidosSnap = await _partidos(campeonatoId)
-        .where('estado', isEqualTo: PartidoEstado.finalizado)
-        .where('resultadoRegistrado', isEqualTo: true)
-        .get();
+    final todosPartidosSnap = await _partidos(campeonatoId).get();
+
+    final todosPartidos = todosPartidosSnap.docs.map((doc) {
+      return PartidoModel.fromMap(doc.id, doc.data());
+    }).toList();
+
+    // Grupo de cada equipo: se deduce de cualquier partido (jugado o no)
+    // que tenga grupoId, para que el equipo aparezca en su grupo desde
+    // que se inscribe, no recién cuando juega su primer partido.
+    final equipoGrupo = <String, String>{};
+
+    for (final partido in todosPartidos) {
+      if (partido.grupoId == null || partido.grupoId!.isEmpty) continue;
+      equipoGrupo[partido.equipoLocalId] = partido.grupoId!;
+      equipoGrupo[partido.equipoVisitanteId] = partido.grupoId!;
+    }
 
     final acumulados = <String, _TablaAcumulada>{};
 
@@ -450,12 +536,24 @@ class ResultadoService {
       acumulados[equipo.id] = _TablaAcumulada(
         equipoId: equipo.id,
         equipoNombre: equipo.nombre,
+        grupoId: usaGrupos ? equipoGrupo[equipo.id] : null,
       );
     }
 
-    for (final doc in partidosSnap.docs) {
-      final partido = PartidoModel.fromMap(doc.id, doc.data());
+    final partidosFinalizados = todosPartidos.where((partido) {
+      if (partido.estado != PartidoEstado.finalizado ||
+          !partido.resultadoRegistrado) {
+        return false;
+      }
+      // En formatos de grupos, la fase final (sin grupoId) no cuenta
+      // para la tabla: es eliminatoria, no de puntos.
+      if (usaGrupos && (partido.grupoId == null || partido.grupoId!.isEmpty)) {
+        return false;
+      }
+      return true;
+    });
 
+    for (final partido in partidosFinalizados) {
       if (partido.golesLocal == null || partido.golesVisitante == null) {
         continue;
       }
@@ -508,14 +606,12 @@ class ResultadoService {
       }
     }
 
-    final tablaOrdenada = acumulados.values.toList();
-
-    for (final item in tablaOrdenada) {
+    for (final item in acumulados.values) {
       item.diferenciaGoles = item.golesFavor - item.golesContra;
       item.diferenciaPuntos = item.puntosFavor - item.puntosContra;
     }
 
-    tablaOrdenada.sort((a, b) {
+    int compararTabla(_TablaAcumulada a, _TablaAcumulada b) {
       var compare = b.puntos.compareTo(a.puntos);
       if (compare != 0) return compare;
 
@@ -529,7 +625,45 @@ class ResultadoService {
       if (compare != 0) return compare;
 
       return a.equipoNombre.compareTo(b.equipoNombre);
-    });
+    }
+
+    final tablaOrdenada = <_TablaAcumulada>[];
+
+    if (usaGrupos) {
+      // Una tabla independiente por grupo: la posición 1..N se calcula
+      // dentro de cada grupo, no contra todo el campeonato.
+      final porGrupo = <String?, List<_TablaAcumulada>>{};
+
+      for (final item in acumulados.values) {
+        porGrupo.putIfAbsent(item.grupoId, () => []).add(item);
+      }
+
+      final clavesOrdenadas = porGrupo.keys.toList()
+        ..sort((a, b) {
+          if (a == null && b == null) return 0;
+          if (a == null) return 1;
+          if (b == null) return -1;
+          return a.compareTo(b);
+        });
+
+      for (final clave in clavesOrdenadas) {
+        final lista = porGrupo[clave]!..sort(compararTabla);
+
+        for (int i = 0; i < lista.length; i++) {
+          lista[i].posicion = i + 1;
+        }
+
+        tablaOrdenada.addAll(lista);
+      }
+    } else {
+      final lista = acumulados.values.toList()..sort(compararTabla);
+
+      for (int i = 0; i < lista.length; i++) {
+        lista[i].posicion = i + 1;
+      }
+
+      tablaOrdenada.addAll(lista);
+    }
 
     final tablaAnterior = await _tabla(campeonatoId).get();
 
@@ -539,12 +673,11 @@ class ResultadoService {
       batch.delete(doc.reference);
     }
 
-    for (int i = 0; i < tablaOrdenada.length; i++) {
-      final item = tablaOrdenada[i];
-
+    for (final item in tablaOrdenada) {
       final tablaModel = TablaPosicionModel(
         equipoId: item.equipoId,
         equipoNombre: item.equipoNombre,
+        grupoId: item.grupoId,
         partidosJugados: item.partidosJugados,
         partidosGanados: item.partidosGanados,
         partidosEmpatados: item.partidosEmpatados,
@@ -553,17 +686,14 @@ class ResultadoService {
         golesContra: item.golesContra,
         diferenciaGoles: item.diferenciaGoles,
         puntos: item.puntos,
-        posicion: i + 1,
+        posicion: item.posicion,
         fechaActualizacion: DateTime.now(),
         puntosFavor: item.puntosFavor,
         puntosContra: item.puntosContra,
         diferenciaPuntos: item.diferenciaPuntos,
       );
 
-      batch.set(
-        _tabla(campeonatoId).doc(item.equipoId),
-        tablaModel.toMap(),
-      );
+      batch.set(_tabla(campeonatoId).doc(item.equipoId), tablaModel.toMap());
     }
 
     await batch.commit();
@@ -641,6 +771,8 @@ class ResultadoService {
 class _TablaAcumulada {
   final String equipoId;
   final String equipoNombre;
+  final String? grupoId;
+  int posicion = 0;
   int partidosJugados = 0;
   int partidosGanados = 0;
   int partidosEmpatados = 0;
@@ -656,6 +788,7 @@ class _TablaAcumulada {
   _TablaAcumulada({
     required this.equipoId,
     required this.equipoNombre,
+    this.grupoId,
   });
 }
 

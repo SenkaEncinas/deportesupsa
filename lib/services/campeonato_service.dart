@@ -2,10 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/campeonato_model.dart';
 import '../models/equipo_model.dart';
+import '../utils/fixture_grouping.dart';
 
 class CampeonatoService {
   CampeonatoService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
 
@@ -16,13 +17,11 @@ class CampeonatoService {
     return _campeonatos
         .orderBy('fechaCreacion', descending: true)
         .snapshots()
-        .map(
-      (snap) {
-        return snap.docs.map((doc) {
-          return CampeonatoModel.fromMap(doc.id, doc.data());
-        }).toList();
-      },
-    );
+        .map((snap) {
+          return snap.docs.map((doc) {
+            return CampeonatoModel.fromMap(doc.id, doc.data());
+          }).toList();
+        });
   }
 
   Stream<CampeonatoModel?> streamCampeonato(String campeonatoId) {
@@ -116,6 +115,77 @@ class CampeonatoService {
     });
   }
 
+  /// Pasa un campeonato de "Grupos + eliminación" de la fase de grupos a
+  /// la fase eliminatoria: a partir de acá, "Agregar cruce manual" deja
+  /// de limitarse a equipos del mismo grupo, para poder armar las llaves
+  /// con los clasificados que decida el admin.
+  Future<void> activarFaseEliminatoria(CampeonatoModel campeonato) async {
+    if (!campeonato.tieneFasesSeparadas) {
+      throw Exception(
+        'Solo los campeonatos de "Grupos + eliminación" tienen fase eliminatoria para activar.',
+      );
+    }
+
+    if (campeonato.estaEnFaseEliminatoria) {
+      throw Exception('Este campeonato ya está en fase eliminatoria.');
+    }
+
+    await _campeonatos.doc(campeonato.id).update({
+      'faseActual': FaseCampeonato.eliminatoria,
+      'fechaActualizacion': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Ajusta "clasifican por grupo" y "mejores terceros" de un campeonato
+  /// que ya existe (grupos ya armados, equipos ya inscritos), sin tener
+  /// que recrearlo. Solo aplica a "Grupos + eliminación": recalcula la
+  /// ronda inicial (octavos, cuartos...) y exige que el total clasificado
+  /// (grupos × clasificanPorGrupo + mejoresTerceros) sea potencia de 2.
+  Future<void> actualizarClasificacionGrupos({
+    required CampeonatoModel campeonato,
+    required int clasificanPorGrupo,
+    required int mejoresTerceros,
+  }) async {
+    if (campeonato.tipoCampeonato != TipoCampeonato.gruposEliminacion) {
+      throw Exception(
+        'Solo los campeonatos de "Grupos + eliminación" tienen mejores terceros.',
+      );
+    }
+
+    final grupos = campeonato.configuracion.cantidadGrupos;
+
+    if (clasificanPorGrupo <= 0) {
+      throw Exception('Debe clasificar al menos 1 equipo por grupo.');
+    }
+
+    if (mejoresTerceros < 0) {
+      throw Exception('La cantidad de mejores terceros no puede ser negativa.');
+    }
+
+    if (mejoresTerceros > grupos) {
+      throw Exception(
+        'Los mejores terceros no pueden ser más que la cantidad de grupos ($grupos).',
+      );
+    }
+
+    final total = grupos * clasificanPorGrupo + mejoresTerceros;
+
+    // Antes esto bloqueaba guardar si el total no era potencia de 2. Se
+    // sacó el bloqueo a pedido explícito (mismo criterio que al crear el
+    // campeonato): hay casos reales donde la llave no cuadra pareja y
+    // aun así hace falta poder guardar la configuración — el ajuste de
+    // la llave se resuelve aparte. `GruposScreen` avisa igual desde la
+    // UI si el total no arma una llave pareja.
+
+    await _campeonatos.doc(campeonato.id).update({
+      'configuracion.clasificanPorGrupo': clasificanPorGrupo,
+      'configuracion.mejoresTerceros': mejoresTerceros,
+      'configuracion.rondaEliminatoriaInicial':
+          FixtureGrouping.claveRondaSegunEquipos(total),
+      'fechaActualizacion': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<List<String>> validarParaActivar(String campeonatoId) async {
     final errores = <String>[];
 
@@ -147,11 +217,9 @@ class CampeonatoService {
       );
     }
 
-    final minimo =
-        campeonato.configuracion.cantidadMinimaJugadoresPorEquipo;
+    final minimo = campeonato.configuracion.cantidadMinimaJugadoresPorEquipo;
 
-    final maximo =
-        campeonato.configuracion.cantidadMaximaJugadoresPorEquipo;
+    final maximo = campeonato.configuracion.cantidadMaximaJugadoresPorEquipo;
 
     for (final equipo in equiposActivos) {
       if (equipo.cantidadJugadoresRegistrados < minimo) {

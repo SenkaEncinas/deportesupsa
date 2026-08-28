@@ -9,19 +9,32 @@ import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
+import 'reciclaje/app_inline_empty_state.dart';
 import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_page.dart';
+import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import 'resultado_form_screen.dart';
 
-class ResultadosScreen extends StatelessWidget {
+class ResultadosScreen extends StatefulWidget {
   final String campeonatoId;
 
-  const ResultadosScreen({
-    super.key,
-    required this.campeonatoId,
-  });
+  const ResultadosScreen({super.key, required this.campeonatoId});
+
+  @override
+  State<ResultadosScreen> createState() => _ResultadosScreenState();
+}
+
+class _ResultadosScreenState extends State<ResultadosScreen> {
+  final _searchController = TextEditingController();
+  String _search = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   String _resultadoTexto(PartidoModel partido, CampeonatoModel? campeonato) {
     if (!partido.resultadoRegistrado) return 'Sin resultado';
@@ -34,6 +47,20 @@ class ResultadosScreen extends StatelessWidget {
     return partido.marcadorTexto;
   }
 
+  List<PartidoModel> _filtrar(List<PartidoModel> partidos) {
+    final search = _search.trim().toLowerCase();
+    if (search.isEmpty) return partidos;
+
+    return partidos.where((partido) {
+      final searchable = [
+        partido.equipoLocalNombre,
+        partido.equipoVisitanteNombre,
+      ].join(' ').toLowerCase();
+
+      return searchable.contains(search);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final campeonatoService = CampeonatoService();
@@ -41,12 +68,12 @@ class ResultadosScreen extends StatelessWidget {
 
     return Scaffold(
       body: StreamBuilder<CampeonatoModel?>(
-        stream: campeonatoService.streamCampeonato(campeonatoId),
+        stream: campeonatoService.streamCampeonato(widget.campeonatoId),
         builder: (context, campeonatoSnapshot) {
           final campeonato = campeonatoSnapshot.data;
 
           return StreamBuilder<List<PartidoModel>>(
-            stream: partidoService.streamPartidos(campeonatoId),
+            stream: partidoService.streamPartidos(widget.campeonatoId),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const AppLoading(message: 'Cargando partidos...');
@@ -61,6 +88,8 @@ class ResultadosScreen extends StatelessWidget {
               }
 
               final partidos = snapshot.data ?? [];
+              final filtrados = _filtrar(partidos);
+              final campeonatoId = widget.campeonatoId;
 
               return SingleChildScrollView(
                 child: AppPage(
@@ -83,35 +112,60 @@ class ResultadosScreen extends StatelessWidget {
                               'Primero genera el fixture para poder registrar resultados.',
                         )
                       : Column(
-                          children: partidos.map((partido) {
-                            final habilitado =
-                                campeonato?.estado == CampeonatoEstado.activo &&
-                                    partido.estado !=
-                                        PartidoEstado.pendienteProgramacion;
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppTextField(
+                              label: 'Buscar partido',
+                              hint: 'Nombre de alguno de los equipos...',
+                              controller: _searchController,
+                              prefixIcon: Icons.search_rounded,
+                              onChanged: (value) {
+                                setState(() => _search = value);
+                              },
+                            ),
+                            const SizedBox(height: 18),
+                            if (filtrados.isEmpty)
+                              const AppInlineEmptyState(
+                                icon: Icons.search_off_rounded,
+                                text:
+                                    'No hay partidos que coincidan con la búsqueda.',
+                              )
+                            else
+                              Column(
+                                children: filtrados.map((partido) {
+                                  final habilitado =
+                                      campeonato?.estado ==
+                                          CampeonatoEstado.activo &&
+                                      partido.estado !=
+                                          PartidoEstado.pendienteProgramacion;
 
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _ResultadoCard(
-                                partido: partido,
-                                campeonato: campeonato,
-                                resultadoTexto:
-                                    _resultadoTexto(partido, campeonato),
-                                habilitado: habilitado,
-                                onEditar: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => ResultadoFormScreen(
-                                        campeonatoId: campeonatoId,
-                                        partido: partido,
-                                        campeonato: campeonato,
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _ResultadoCard(
+                                      partido: partido,
+                                      campeonato: campeonato,
+                                      resultadoTexto: _resultadoTexto(
+                                        partido,
+                                        campeonato,
                                       ),
+                                      habilitado: habilitado,
+                                      onEditar: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => ResultadoFormScreen(
+                                              campeonatoId: campeonatoId,
+                                              partido: partido,
+                                              campeonato: campeonato,
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     ),
                                   );
-                                },
+                                }).toList(),
                               ),
-                            );
-                          }).toList(),
+                          ],
                         ),
                 ),
               );
@@ -154,20 +208,11 @@ class _ResultadoCard extends StatelessWidget {
               type: AppBadge.typeFromEstado(partido.estado),
             ),
             if (partido.grupoId != null && partido.grupoId!.isNotEmpty)
-              AppBadge(
-                text: partido.grupoId!,
-                type: AppBadgeType.info,
-              ),
+              AppBadge(text: partido.grupoId!, type: AppBadgeType.info),
             if (partido.definidoPorPenales)
-              const AppBadge(
-                text: 'Penales',
-                type: AppBadgeType.warning,
-              ),
+              const AppBadge(text: 'Penales', type: AppBadgeType.warning),
             if (partido.definidoPorProrroga)
-              const AppBadge(
-                text: 'Prórroga',
-                type: AppBadgeType.warning,
-              ),
+              const AppBadge(text: 'Prórroga', type: AppBadgeType.warning),
           ],
         ),
         const SizedBox(height: 10),
@@ -193,10 +238,7 @@ class _ResultadoCard extends StatelessWidget {
       ],
     );
 
-    final marcador = Text(
-      resultadoTexto,
-      style: AppTextStyles.heading3,
-    );
+    final marcador = Text(resultadoTexto, style: AppTextStyles.heading3);
 
     final boton = AppButton.secondary(
       text: partido.resultadoRegistrado ? 'Editar' : 'Registrar',

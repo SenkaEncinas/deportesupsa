@@ -3,14 +3,7 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 
-enum AppBadgeType {
-  success,
-  warning,
-  danger,
-  info,
-  neutral,
-  primary,
-}
+enum AppBadgeType { success, warning, danger, info, neutral, primary }
 
 class AppBadge extends StatelessWidget {
   final String text;
@@ -114,8 +107,5 @@ class _BadgeColors {
   final Color background;
   final Color foreground;
 
-  const _BadgeColors({
-    required this.background,
-    required this.foreground,
-  });
+  const _BadgeColors({required this.background, required this.foreground});
 }

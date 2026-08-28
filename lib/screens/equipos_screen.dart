@@ -10,15 +10,47 @@ import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
+import 'reciclaje/app_inline_empty_state.dart';
 import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
+import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 
-class EquiposScreen extends StatelessWidget {
+class EquiposScreen extends StatefulWidget {
   final String campeonatoId;
 
   const EquiposScreen({super.key, required this.campeonatoId});
+
+  @override
+  State<EquiposScreen> createState() => _EquiposScreenState();
+}
+
+class _EquiposScreenState extends State<EquiposScreen> {
+  final _searchController = TextEditingController();
+  String _search = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<EquipoModel> _filtrar(List<EquipoModel> equipos) {
+    final search = _search.trim().toLowerCase();
+    if (search.isEmpty) return equipos;
+
+    return equipos.where((equipo) {
+      final searchable = [
+        equipo.nombre,
+        equipo.representante,
+        equipo.carrera ?? '',
+        equipo.facultad ?? '',
+      ].join(' ').toLowerCase();
+
+      return searchable.contains(search);
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,12 +59,12 @@ class EquiposScreen extends StatelessWidget {
 
     return Scaffold(
       body: StreamBuilder<CampeonatoModel?>(
-        stream: campeonatoService.streamCampeonato(campeonatoId),
+        stream: campeonatoService.streamCampeonato(widget.campeonatoId),
         builder: (context, campeonatoSnapshot) {
           final campeonato = campeonatoSnapshot.data;
 
           return StreamBuilder<List<EquipoModel>>(
-            stream: equipoService.streamEquipos(campeonatoId),
+            stream: equipoService.streamEquipos(widget.campeonatoId),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const AppLoading(message: 'Cargando equipos...');
@@ -47,6 +79,7 @@ class EquiposScreen extends StatelessWidget {
               }
 
               final equipos = snapshot.data ?? [];
+              final filtrados = _filtrar(equipos);
 
               return SingleChildScrollView(
                 child: AppPage(
@@ -68,8 +101,9 @@ class EquiposScreen extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  EquipoFormScreen(campeonatoId: campeonatoId),
+                              builder: (_) => EquipoFormScreen(
+                                campeonatoId: widget.campeonatoId,
+                              ),
                             ),
                           );
                         },
@@ -93,16 +127,39 @@ class EquiposScreen extends StatelessWidget {
                                     context,
                                     MaterialPageRoute(
                                       builder: (_) => EquipoFormScreen(
-                                        campeonatoId: campeonatoId,
+                                        campeonatoId: widget.campeonatoId,
                                       ),
                                     ),
                                   );
                                 },
                         )
-                      : _EquiposGrid(
-                          campeonatoId: campeonatoId,
-                          campeonato: campeonato,
-                          equipos: equipos,
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppTextField(
+                              label: 'Buscar equipo',
+                              hint:
+                                  'Nombre, representante, carrera o facultad...',
+                              controller: _searchController,
+                              prefixIcon: Icons.search_rounded,
+                              onChanged: (value) {
+                                setState(() => _search = value);
+                              },
+                            ),
+                            const SizedBox(height: 18),
+                            if (filtrados.isEmpty)
+                              const AppInlineEmptyState(
+                                icon: Icons.search_off_rounded,
+                                text:
+                                    'No hay equipos que coincidan con la búsqueda.',
+                              )
+                            else
+                              _EquiposGrid(
+                                campeonatoId: widget.campeonatoId,
+                                campeonato: campeonato,
+                                equipos: filtrados,
+                              ),
+                          ],
                         ),
                 ),
               );

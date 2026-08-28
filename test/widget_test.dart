@@ -15,6 +15,7 @@ import 'package:futsal/models/campeonato_model.dart';
 import 'package:futsal/models/partido_model.dart';
 import 'package:futsal/models/tabla_posicion_model.dart';
 import 'package:futsal/screens/reciclaje/app_badge.dart';
+import 'package:futsal/screens/reciclaje/app_bracket_view.dart';
 import 'package:futsal/screens/reciclaje/app_card.dart';
 import 'package:futsal/screens/reciclaje/app_hero_card.dart';
 import 'package:futsal/screens/reciclaje/app_match_card.dart';
@@ -79,6 +80,41 @@ TablaPosicionModel _posicionDePrueba({
     puntosContra: 398,
     diferenciaPuntos: 58,
   );
+}
+
+/// Llave de cuartos → semifinal → final, con nombres largos de equipo
+/// para forzar el peor caso de ancho dentro de cada card de la llave.
+List<MapEntry<String, List<PartidoModel>>> _rondasLlaveDePrueba() {
+  PartidoModel partido(String local, String visitante, {bool jugado = false}) {
+    return PartidoModel.fromMap('p-$local-$visitante', {
+      'jornada': 1,
+      'vuelta': 1,
+      'equipoLocalId': local,
+      'equipoLocalNombre': local,
+      'equipoVisitanteId': visitante,
+      'equipoVisitanteNombre': visitante,
+      'golesLocal': jugado ? 2 : null,
+      'golesVisitante': jugado ? 1 : null,
+      'resultadoRegistrado': jugado,
+      'ganadorId': jugado ? local : null,
+    });
+  }
+
+  return [
+    MapEntry('Cuartos de final', [
+      partido('Ingeniería de Sistemas Computacionales', 'Derecho', jugado: true),
+      partido('Administración de Empresas y Negocios', 'Psicología'),
+      partido('Arquitectura y Urbanismo', 'Comunicación Social', jugado: true),
+      partido('Medicina', 'Ingeniería Industrial'),
+    ]),
+    MapEntry('Semifinales', [
+      partido('Ingeniería de Sistemas Computacionales', 'Administración de Empresas y Negocios'),
+      partido('Arquitectura y Urbanismo', 'Medicina'),
+    ]),
+    MapEntry('Final', [
+      partido('Ingeniería de Sistemas Computacionales', 'Arquitectura y Urbanismo'),
+    ]),
+  ];
 }
 
 /// Caso más ancho posible: vóley usa 9 estadísticas además de
@@ -346,6 +382,23 @@ void main() {
 
       expect(tester.takeException(), isNull);
     });
+  });
+
+  group('AppBracketView sin overflow', () {
+    for (final entry in _anchosReferencia.entries) {
+      testWidgets('en ${entry.key}', (tester) async {
+        await _pumpAt(
+          tester,
+          entry.value,
+          AppBracketView(
+            rondas: _rondasLlaveDePrueba(),
+            deporte: DeporteTipo.futbol,
+          ),
+        );
+
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 
   group('AppResponsiveGrid sin overflow', () {

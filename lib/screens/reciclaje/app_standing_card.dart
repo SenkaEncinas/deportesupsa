@@ -22,7 +22,7 @@ class AppStandingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surfaceSoft,
         borderRadius: BorderRadius.circular(15),
@@ -34,7 +34,7 @@ class AppStandingCard extends StatelessWidget {
           Row(
             children: [
               _PositionBadge(position: item.posicion),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   item.equipoNombre,
@@ -45,11 +45,11 @@ class AppStandingCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 11,
-                  vertical: 6,
+                  horizontal: 9,
+                  vertical: 5,
                 ),
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
@@ -66,10 +66,10 @@ class AppStandingCard extends StatelessWidget {
             ],
           ),
           if (stats.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 6,
+              runSpacing: 6,
               children: stats.map((stat) {
                 return _StatChip(label: stat.key, value: stat.value);
               }).toList(),
@@ -123,8 +123,8 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 46),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      constraints: const BoxConstraints(minWidth: 40),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(10),

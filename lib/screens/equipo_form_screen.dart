@@ -15,11 +15,7 @@ class EquipoFormScreen extends StatefulWidget {
   final String campeonatoId;
   final EquipoModel? equipo;
 
-  const EquipoFormScreen({
-    super.key,
-    required this.campeonatoId,
-    this.equipo,
-  });
+  const EquipoFormScreen({super.key, required this.campeonatoId, this.equipo});
 
   bool get isEditing => equipo != null;
 
@@ -162,6 +158,7 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
           child: AppCard(
             child: Form(
               key: _formKey,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 children: [
                   _SectionTitle(
@@ -176,7 +173,10 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
                     controller: _nombreController,
                     prefixIcon: Icons.groups_2_outlined,
                     validator: (value) {
-                      return _required(value, 'El nombre del equipo es obligatorio.');
+                      return _required(
+                        value,
+                        'El nombre del equipo es obligatorio.',
+                      );
                     },
                   ),
                   const SizedBox(height: 16),
@@ -186,7 +186,10 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
                     controller: _representanteController,
                     prefixIcon: Icons.person_outline,
                     validator: (value) {
-                      return _required(value, 'El representante es obligatorio.');
+                      return _required(
+                        value,
+                        'El representante es obligatorio.',
+                      );
                     },
                   ),
                   const SizedBox(height: 16),
@@ -295,20 +298,13 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _SectionTitle({
-    required this.title,
-    required this.subtitle,
-  });
+  const _SectionTitle({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(
-          Icons.circle,
-          color: AppColors.primary,
-          size: 12,
-        ),
+        const Icon(Icons.circle, color: AppColors.primary, size: 12),
         const SizedBox(width: 8),
         Expanded(
           child: Column(

@@ -4,13 +4,17 @@ import 'app_colors.dart';
 import 'app_sizes.dart';
 import 'app_text_styles.dart';
 
-enum AppButtonVariant {
-  primary,
-  secondary,
-  danger,
-  ghost,
-}
+enum AppButtonVariant { primary, secondary, danger, ghost }
 
+/// Botón de la app con jerarquía Material 3 real por variante:
+/// - primary: [FilledButton] (acción principal de la pantalla).
+/// - secondary: [OutlinedButton] (acción alternativa).
+/// - danger: [FilledButton] en rojo (acción destructiva).
+/// - ghost: [TextButton] (acción terciaria, de bajo énfasis).
+///
+/// La API pública (AppButton.primary/secondary/danger/ghost con
+/// text/onPressed/icon/loading/expanded/height) no cambió, así que
+/// ningún llamador existente necesita tocarse.
 class AppButton extends StatelessWidget {
   final String text;
   final VoidCallback? onPressed;
@@ -73,7 +77,7 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = _colors();
+    final foreground = _foregroundColor();
 
     final child = Row(
       mainAxisSize: expanded ? MainAxisSize.max : MainAxisSize.min,
@@ -85,90 +89,112 @@ class AppButton extends StatelessWidget {
             height: 17,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              valueColor: AlwaysStoppedAnimation<Color>(colors.foreground),
+              valueColor: AlwaysStoppedAnimation<Color>(foreground),
             ),
           )
         else if (icon != null)
-          Icon(
-            icon,
-            size: 18,
-            color: colors.foreground,
-          ),
+          Icon(icon, size: 18, color: foreground),
         if (loading || icon != null) const SizedBox(width: 8),
         Flexible(
           child: Text(
             text,
             overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.button.copyWith(
-              color: colors.foreground,
-            ),
+            style: AppTextStyles.button.copyWith(color: foreground),
           ),
         ),
       ],
     );
 
-    final button = SizedBox(
-      height: height ?? AppSizes.fieldHeight,
-      width: expanded ? double.infinity : null,
-      child: ElevatedButton(
-        onPressed: loading ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          elevation: 0,
-          backgroundColor: colors.background,
-          foregroundColor: colors.foreground,
-          disabledBackgroundColor: colors.background.withValues(alpha: 0.65),
-          disabledForegroundColor: colors.foreground.withValues(alpha: 0.65),
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            side: BorderSide(color: colors.border),
-          ),
-        ),
-        child: child,
-      ),
+    final effectiveOnPressed = loading ? null : onPressed;
+    final minSize = Size(64, height ?? AppSizes.fieldHeight);
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
     );
+    final padding = const EdgeInsets.symmetric(horizontal: 18);
 
-    return button;
-  }
-
-  _ButtonColors _colors() {
+    final Widget button;
     switch (variant) {
       case AppButtonVariant.primary:
-        return const _ButtonColors(
-          background: AppColors.primary,
-          foreground: AppColors.white,
-          border: AppColors.primary,
+        button = FilledButton(
+          onPressed: effectiveOnPressed,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.white,
+            disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.5),
+            disabledForegroundColor: AppColors.white.withValues(alpha: 0.7),
+            minimumSize: minSize,
+            padding: padding,
+            shape: shape,
+          ),
+          child: child,
         );
-      case AppButtonVariant.secondary:
-        return const _ButtonColors(
-          background: AppColors.white,
-          foreground: AppColors.primary,
-          border: AppColors.primary,
-        );
+
       case AppButtonVariant.danger:
-        return const _ButtonColors(
-          background: AppColors.danger,
-          foreground: AppColors.white,
-          border: AppColors.danger,
+        button = FilledButton(
+          onPressed: effectiveOnPressed,
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.danger,
+            foregroundColor: AppColors.white,
+            disabledBackgroundColor: AppColors.danger.withValues(alpha: 0.5),
+            disabledForegroundColor: AppColors.white.withValues(alpha: 0.7),
+            minimumSize: minSize,
+            padding: padding,
+            shape: shape,
+          ),
+          child: child,
         );
+
+      case AppButtonVariant.secondary:
+        button = OutlinedButton(
+          onPressed: effectiveOnPressed,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: AppColors.white,
+            foregroundColor: AppColors.primary,
+            disabledForegroundColor: AppColors.primary.withValues(alpha: 0.5),
+            side: BorderSide(
+              color: effectiveOnPressed == null
+                  ? AppColors.primary.withValues(alpha: 0.4)
+                  : AppColors.primary,
+            ),
+            minimumSize: minSize,
+            padding: padding,
+            shape: shape,
+          ),
+          child: child,
+        );
+
       case AppButtonVariant.ghost:
-        return const _ButtonColors(
-          background: Colors.transparent,
-          foreground: AppColors.textSecondary,
-          border: Colors.transparent,
+        button = TextButton(
+          onPressed: effectiveOnPressed,
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.textSecondary,
+            disabledForegroundColor: AppColors.textSecondary.withValues(
+              alpha: 0.5,
+            ),
+            minimumSize: minSize,
+            padding: padding,
+            shape: shape,
+          ),
+          child: child,
         );
     }
+
+    return SizedBox(
+      height: height ?? AppSizes.fieldHeight,
+      width: expanded ? double.infinity : null,
+      child: button,
+    );
   }
-}
 
-class _ButtonColors {
-  final Color background;
-  final Color foreground;
-  final Color border;
-
-  const _ButtonColors({
-    required this.background,
-    required this.foreground,
-    required this.border,
-  });
+  Color _foregroundColor() {
+    switch (variant) {
+      case AppButtonVariant.primary:
+      case AppButtonVariant.danger:
+        return AppColors.white;
+      case AppButtonVariant.secondary:
+        return AppColors.primary;
+      case AppButtonVariant.ghost:
+        return AppColors.textSecondary;
+    }
+  }
 }

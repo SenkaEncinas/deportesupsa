@@ -8,6 +8,7 @@ import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
+import 'reciclaje/app_filter_pill.dart';
 import 'reciclaje/app_hero_card.dart';
 import 'reciclaje/app_inline_empty_state.dart';
 import 'reciclaje/app_loading.dart';
@@ -25,12 +26,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-enum _ChampionshipFilter {
-  todos,
-  inscripcion,
-  activo,
-  finalizado,
-}
+enum _ChampionshipFilter { todos, inscripcion, activo, finalizado }
 
 class _HomeScreenState extends State<HomeScreen> {
   final PublicHomeService _service = PublicHomeService();
@@ -51,7 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _ChampionshipFilter.todos => true,
         _ChampionshipFilter.inscripcion =>
           campeonato.estado == CampeonatoEstado.inscripcion,
-        _ChampionshipFilter.activo => campeonato.estado == CampeonatoEstado.activo,
+        _ChampionshipFilter.activo =>
+          campeonato.estado == CampeonatoEstado.activo,
         _ChampionshipFilter.finalizado =>
           campeonato.estado == CampeonatoEstado.finalizado,
       };
@@ -98,9 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
             stream: _service.streamCampeonatosPublicos(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const AppLoading(
-                  message: 'Cargando campeonatos...',
-                );
+                return const AppLoading(message: 'Cargando campeonatos...');
               }
 
               if (snapshot.hasError) {
@@ -137,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       AppHeroCard(
-                        title: 'Portal público de campeonatos UPSA',
+                        title: 'Deportes UPSA',
                         description:
                             'Consulta campeonatos activos, fixtures, resultados, tablas de posiciones y ranking de goleadores desde un solo lugar.',
                         chips: const [
@@ -202,7 +197,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         const AppInlineEmptyState(
                           icon: Icons.search_off_rounded,
                           text: 'No hay campeonatos con esos filtros.',
-                          subtitle: 'Prueba cambiando el estado o el texto de búsqueda.',
+                          subtitle:
+                              'Prueba cambiando el estado o el texto de búsqueda.',
                         )
                       else
                         AppResponsiveGrid(
@@ -258,10 +254,7 @@ class _FiltersCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Buscar campeonato',
-            style: AppTextStyles.heading3,
-          ),
+          Text('Buscar campeonato', style: AppTextStyles.heading3),
           const SizedBox(height: 12),
           TextField(
             controller: controller,
@@ -289,22 +282,22 @@ class _FiltersCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              _FilterPill(
+              AppFilterPill(
                 text: 'Todos',
                 selected: filter == _ChampionshipFilter.todos,
                 onTap: () => onFilterChanged(_ChampionshipFilter.todos),
               ),
-              _FilterPill(
+              AppFilterPill(
                 text: 'Inscripción',
                 selected: filter == _ChampionshipFilter.inscripcion,
                 onTap: () => onFilterChanged(_ChampionshipFilter.inscripcion),
               ),
-              _FilterPill(
+              AppFilterPill(
                 text: 'Activo',
                 selected: filter == _ChampionshipFilter.activo,
                 onTap: () => onFilterChanged(_ChampionshipFilter.activo),
               ),
-              _FilterPill(
+              AppFilterPill(
                 text: 'Finalizado',
                 selected: filter == _ChampionshipFilter.finalizado,
                 onTap: () => onFilterChanged(_ChampionshipFilter.finalizado),
@@ -312,43 +305,6 @@ class _FiltersCard extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _FilterPill extends StatelessWidget {
-  final String text;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _FilterPill({
-    required this.text,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.surfaceSoft,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
-          ),
-        ),
-        child: Text(
-          text,
-          style: AppTextStyles.small.copyWith(
-            color: selected ? AppColors.white : AppColors.textSecondary,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
       ),
     );
   }

@@ -33,10 +33,10 @@ class HistorialJugadorScreen extends StatelessWidget {
         .orderBy('fecha', descending: true)
         .snapshots()
         .map((snap) {
-      return snap.docs.map((doc) {
-        return HistorialCambioModel.fromMap(doc.id, doc.data());
-      }).toList();
-    });
+          return snap.docs.map((doc) {
+            return HistorialCambioModel.fromMap(doc.id, doc.data());
+          }).toList();
+        });
   }
 
   String _fechaTexto(DateTime? fecha) {
@@ -54,9 +54,11 @@ class HistorialJugadorScreen extends StatelessWidget {
   String _mapText(Map<String, dynamic> data) {
     if (data.isEmpty) return 'Sin datos';
 
-    return data.entries.map((entry) {
-      return '${entry.key}: ${entry.value}';
-    }).join('\n');
+    return data.entries
+        .map((entry) {
+          return '${entry.key}: ${entry.value}';
+        })
+        .join('\n');
   }
 
   @override
