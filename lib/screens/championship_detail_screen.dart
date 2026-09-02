@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/campeonato_model.dart';
+import '../models/equipo_model.dart';
 import '../models/partido_model.dart';
 import '../models/ranking_goleador_model.dart';
 import '../models/tabla_posicion_model.dart';
@@ -9,6 +10,7 @@ import '../utils/clasificacion.dart';
 import '../utils/fixture_grouping.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_bracket_view.dart';
+import 'reciclaje/app_button.dart';
 import 'reciclaje/app_clasificados_card.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_filter_pill.dart';
@@ -66,10 +68,10 @@ class ChampionshipDetailScreen extends StatelessWidget {
                     title: campeonato.nombre,
                     subtitle: 'Información pública del campeonato.',
                     actions: [
-                      TextButton.icon(
+                      AppButton.secondary(
+                        text: 'Volver',
+                        icon: Icons.arrow_back_rounded,
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.arrow_back_rounded),
-                        label: const Text('Volver'),
                       ),
                     ],
                     child: _ChampionshipContent(
@@ -149,10 +151,6 @@ class _ChampionshipContent extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         _FixtureSection(service: service, campeonato: campeonato),
-        if (campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion) ...[
-          const SizedBox(height: 24),
-          _ClasificadosSection(service: service, campeonato: campeonato),
-        ],
         const SizedBox(height: 24),
         // Vóley y básquet no registran goles/puntos por jugador: sin esa
         // sección, la tabla usa todo el ancho en vez de dejar un hueco
@@ -166,21 +164,34 @@ class _ChampionshipContent extends StatelessWidget {
           )
         else
           _TableSection(service: service, campeonato: campeonato),
+        // Al final de la página y colapsada por defecto (ver
+        // AppClasificadosCard): es información de referencia, no hace
+        // falta que compita por atención con la tabla y el fixture.
+        if (campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion) ...[
+          const SizedBox(height: 24),
+          _ClasificadosSection(service: service, campeonato: campeonato),
+        ],
         const SizedBox(height: 28),
       ],
     );
   }
 }
 
-enum _MobileTab { resumen, fixture, tabla }
+/// Qué se muestra en el cuerpo de la vista móvil (fuera de la fase
+/// eliminatoria, ver [_MobileEliminationView]). "Resumen" (la home: info
+/// del campeonato + próximos partidos + últimos resultados) es lo único
+/// que se ve al entrar; el resto se abre desde el sidebar
+/// ([_MobileDrawer]) en vez de pestañas arriba, para no gastar espacio
+/// vertical en pantallas chicas.
+enum _MobileSeccion { resumen, tabla, clasificados }
 
-/// Versión móvil, separada en pestañas en vez de una sola columna larga:
-/// antes había que scrollear muchísimo para llegar a la tabla o los
-/// goleadores. Se arma con `AppFilterPill` (el mismo patrón de "General /
-/// Por grupos" que ya usa la tabla de posiciones) en vez de un `TabBar`
-/// de Material, para no meter un estilo de pestañas distinto al resto
-/// de la app.
-class _MobileChampionshipView extends StatefulWidget {
+/// Versión móvil. Mientras el campeonato está en fase de grupos (o no
+/// tiene fases separadas) se ve el encabezado compacto de siempre con un
+/// sidebar para saltar a tabla/clasificados. Apenas entra en fase
+/// eliminatoria, [_MobileEliminationView] toma toda la pantalla: ya no
+/// hay nada de la fase de grupos que valga la pena mostrar, solo la
+/// llave (y, en fútbol, goleadores + clasificados).
+class _MobileChampionshipView extends StatelessWidget {
   final PublicHomeService service;
   final CampeonatoModel campeonato;
 
@@ -190,136 +201,518 @@ class _MobileChampionshipView extends StatefulWidget {
   });
 
   @override
-  State<_MobileChampionshipView> createState() =>
-      _MobileChampionshipViewState();
+  Widget build(BuildContext context) {
+    if (campeonato.estaEnFaseEliminatoria) {
+      return _MobileEliminationView(service: service, campeonato: campeonato);
+    }
+
+    return _MobileGruposView(service: service, campeonato: campeonato);
+  }
 }
 
-class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
-  _MobileTab _tab = _MobileTab.resumen;
+class _MobileGruposView extends StatefulWidget {
+  final PublicHomeService service;
+  final CampeonatoModel campeonato;
+
+  const _MobileGruposView({required this.service, required this.campeonato});
+
+  @override
+  State<_MobileGruposView> createState() => _MobileGruposViewState();
+}
+
+class _MobileGruposViewState extends State<_MobileGruposView> {
+  _MobileSeccion _seccion = _MobileSeccion.resumen;
+  _VistaTabla _vistaTablaInicial = _VistaTabla.general;
 
   CampeonatoModel get campeonato => widget.campeonato;
   PublicHomeService get service => widget.service;
+
+  void _ir(_MobileSeccion seccion, {_VistaTabla? vistaTabla}) {
+    setState(() {
+      _seccion = seccion;
+      if (vistaTabla != null) _vistaTablaInicial = vistaTabla;
+    });
+  }
+
+  String _tituloSeccion() {
+    switch (_seccion) {
+      case _MobileSeccion.resumen:
+        return campeonato.nombre;
+      case _MobileSeccion.tabla:
+        return 'Tabla de posiciones';
+      case _MobileSeccion.clasificados:
+        return 'Clasificados';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final estadoTexto = ChampionshipPublicCard.estadoTexto(campeonato.estado);
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      endDrawer: _MobileDrawer(campeonato: campeonato, seccionActual: _seccion, onSelect: _ir),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    tooltip: 'Volver',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 6),
+                  const AppLogoMark(compact: true),
+                  const Spacer(),
+                  // El menú va a la derecha (el sidebar se abre como
+                  // endDrawer, desde ese borde).
+                  Builder(
+                    builder: (context) => IconButton(
+                      onPressed: () => Scaffold.of(context).openEndDrawer(),
+                      icon: const Icon(Icons.menu_rounded),
+                      tooltip: 'Más secciones',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _tituloSeccion(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.heading3,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  AppBadge(
+                    text: estadoTexto,
+                    type: ChampionshipPublicCard.badgeType(campeonato.estado),
+                    icon: Icons.sports_soccer,
+                  ),
+                  if (campeonato.tieneFasesSeparadas)
+                    AppBadge(
+                      text: campeonato.estaEnFaseDeGrupos
+                          ? 'Fase de grupos'
+                          : 'Fase eliminatoria',
+                      type: campeonato.estaEnFaseDeGrupos
+                          ? AppBadgeType.info
+                          : AppBadgeType.warning,
+                      icon: campeonato.estaEnFaseDeGrupos
+                          ? Icons.grid_view_rounded
+                          : Icons.bolt_outlined,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _MobileTopStats(service: service, campeonato: campeonato),
+              const SizedBox(height: 18),
+              switch (_seccion) {
+                _MobileSeccion.resumen => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _NextMatchesSection(
+                      service: service,
+                      campeonatoId: campeonato.id,
+                      deporte: campeonato.deporteEfectivo,
+                    ),
+                    const SizedBox(height: 16),
+                    _LastResultsSection(
+                      service: service,
+                      campeonatoId: campeonato.id,
+                      deporte: campeonato.deporteEfectivo,
+                    ),
+                  ],
+                ),
+                _MobileSeccion.tabla => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _TableSection(
+                      service: service,
+                      campeonato: campeonato,
+                      vistaInicial: _vistaTablaInicial,
+                    ),
+                    if (campeonato.esFutbol) ...[
+                      const SizedBox(height: 20),
+                      _ScorersSection(
+                        service: service,
+                        campeonato: campeonato,
+                      ),
+                    ],
+                  ],
+                ),
+                // colapsable:false en móvil: ya se llegó acá navegando
+                // desde el sidebar, así que no hace falta un toque extra
+                // para desplegarlo. El toggle +/- queda solo para
+                // escritorio, donde comparte una sola página larga con
+                // el resto del contenido.
+                _MobileSeccion.clasificados => _ClasificadosSection(
+                  service: service,
+                  campeonato: campeonato,
+                  colapsable: false,
+                ),
+              },
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Toda la pantalla una vez que el campeonato entra en fase eliminatoria:
+/// nada de la info de la fase de grupos (resumen, próximos partidos,
+/// tabla, estadísticas) tiene sentido ya, así que se reemplaza por
+/// completo. Solo queda la llave y, en fútbol, goleadores y clasificados
+/// -siempre desplegados, sin el toggle: acá ya son el destino en sí, no
+/// hace falta un toque extra para verlos-. Sin sidebar: no hay ninguna
+/// otra sección a la que saltar.
+class _MobileEliminationView extends StatelessWidget {
+  final PublicHomeService service;
+  final CampeonatoModel campeonato;
+
+  const _MobileEliminationView({
+    required this.service,
+    required this.campeonato,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    tooltip: 'Volver',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 6),
+                  const AppLogoMark(compact: true),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      campeonato.nombre,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.heading3,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              const AppBadge(
+                text: 'Fase eliminatoria',
+                type: AppBadgeType.warning,
+                icon: Icons.bolt_outlined,
+              ),
+              const SizedBox(height: 18),
+              _FixtureSection(service: service, campeonato: campeonato),
+              if (campeonato.esFutbol) ...[
+                const SizedBox(height: 20),
+                _ScorersSection(service: service, campeonato: campeonato),
+                const SizedBox(height: 20),
+                _ClasificadosSection(
+                  service: service,
+                  campeonato: campeonato,
+                  colapsable: false,
+                ),
+              ],
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fila de chips chicos con ícono (equipos, partidos, goles/finalizados)
+/// en vez de las `StatCard` grandes de escritorio: en móvil esa info es
+/// secundaria al fixture/resultados, así que ocupa una sola línea.
+class _MobileTopStats extends StatelessWidget {
+  final PublicHomeService service;
+  final CampeonatoModel campeonato;
+
+  const _MobileTopStats({required this.service, required this.campeonato});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        StreamBuilder<List<EquipoModel>>(
+          stream: service.streamEquipos(campeonato.id),
+          builder: (context, snapshot) {
+            return _MiniStatChip(
+              icon: Icons.groups_2_outlined,
+              value: '${snapshot.data?.length ?? 0}',
+              label: 'equipos',
+              color: AppColors.primary,
+            );
+          },
+        ),
+        StreamBuilder<List<PartidoModel>>(
+          stream: service.streamPartidos(campeonato.id),
+          builder: (context, snapshot) {
+            return _MiniStatChip(
+              icon: Icons.sports_soccer,
+              value: '${(snapshot.data ?? []).length}',
+              label: 'partidos',
+              color: AppColors.secondary,
+            );
+          },
+        ),
+        if (campeonato.esFutbol)
+          StreamBuilder<List<PartidoModel>>(
+            stream: service.streamPartidos(campeonato.id),
+            builder: (context, snapshot) {
+              final totalGoles = (snapshot.data ?? [])
+                  .where((p) => p.resultadoRegistrado)
+                  .fold<int>(
+                    0,
+                    (total, p) =>
+                        total + (p.golesLocal ?? 0) + (p.golesVisitante ?? 0),
+                  );
+
+              return _MiniStatChip(
+                icon: Icons.emoji_events_outlined,
+                value: '$totalGoles',
+                label: 'goles',
+                color: AppColors.info,
+              );
+            },
+          )
+        else
+          StreamBuilder<List<PartidoModel>>(
+            stream: service.streamPartidos(campeonato.id),
+            builder: (context, snapshot) {
+              final finalizados = (snapshot.data ?? [])
+                  .where((p) => p.resultadoRegistrado)
+                  .length;
+
+              return _MiniStatChip(
+                icon: Icons.emoji_events_outlined,
+                value: '$finalizados',
+                label: 'finalizados',
+                color: AppColors.info,
+              );
+            },
+          ),
+      ],
+    );
+  }
+}
+
+class _MiniStatChip extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  const _MiniStatChip({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            value,
+            style: AppTextStyles.small.copyWith(
+              fontWeight: FontWeight.w900,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: AppTextStyles.small.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Sidebar de navegación en móvil: fixture/llaves, tabla (general y por
+/// grupos como accesos directos) y clasificados a la fase final, para no
+/// competir con el título por el ancho de pantalla como hacían las
+/// pestañas de antes.
+class _MobileDrawer extends StatelessWidget {
+  final CampeonatoModel campeonato;
+  final _MobileSeccion seccionActual;
+  final void Function(_MobileSeccion seccion, {_VistaTabla? vistaTabla})
+  onSelect;
+
+  const _MobileDrawer({
+    required this.campeonato,
+    required this.seccionActual,
+    required this.onSelect,
+  });
+
+  bool get _usaGrupos =>
+      campeonato.tipoCampeonato == TipoCampeonato.faseGrupos ||
+      campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      backgroundColor: AppColors.background,
+      child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back_rounded),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                const SizedBox(width: 6),
-                const AppLogoMark(compact: true),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(campeonato.nombre, style: AppTextStyles.heading2),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                AppBadge(
-                  text: estadoTexto,
-                  type: ChampionshipPublicCard.badgeType(campeonato.estado),
-                  icon: Icons.sports_soccer,
-                ),
-                if (campeonato.tieneFasesSeparadas)
-                  AppBadge(
-                    text: campeonato.estaEnFaseDeGrupos
-                        ? 'Fase de grupos'
-                        : 'Fase eliminatoria',
-                    type: campeonato.estaEnFaseDeGrupos
-                        ? AppBadgeType.info
-                        : AppBadgeType.warning,
-                    icon: campeonato.estaEnFaseDeGrupos
-                        ? Icons.grid_view_rounded
-                        : Icons.bolt_outlined,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                AppFilterPill(
-                  text: 'Resumen',
-                  selected: _tab == _MobileTab.resumen,
-                  onTap: () => setState(() => _tab = _MobileTab.resumen),
-                ),
-                AppFilterPill(
-                  text: 'Fixture',
-                  selected: _tab == _MobileTab.fixture,
-                  onTap: () => setState(() => _tab = _MobileTab.fixture),
-                ),
-                AppFilterPill(
-                  text: 'Tabla',
-                  selected: _tab == _MobileTab.tabla,
-                  onTap: () => setState(() => _tab = _MobileTab.tabla),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            switch (_tab) {
-              _MobileTab.resumen => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 16, 12),
+              child: Row(
                 children: [
-                  _StatsSection(
-                    service: service,
-                    campeonato: campeonato,
-                    estadoTexto: estadoTexto,
-                  ),
-                  const SizedBox(height: 20),
-                  _NextMatchesSection(
-                    service: service,
-                    campeonatoId: campeonato.id,
-                    deporte: campeonato.deporteEfectivo,
-                  ),
-                  const SizedBox(height: 16),
-                  _LastResultsSection(
-                    service: service,
-                    campeonatoId: campeonato.id,
-                    deporte: campeonato.deporteEfectivo,
-                  ),
-                ],
-              ),
-              _MobileTab.fixture => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _FixtureSection(service: service, campeonato: campeonato),
-                  if (campeonato.tipoCampeonato ==
-                      TipoCampeonato.gruposEliminacion) ...[
-                    const SizedBox(height: 20),
-                    _ClasificadosSection(
-                      service: service,
-                      campeonato: campeonato,
+                  const AppLogoMark(compact: true),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      campeonato.nombre,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.heading3,
                     ),
-                  ],
+                  ),
                 ],
               ),
-              _MobileTab.tabla => Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _TableSection(service: service, campeonato: campeonato),
-                  if (campeonato.esFutbol) ...[
-                    const SizedBox(height: 20),
-                    _ScorersSection(service: service, campeonato: campeonato),
-                  ],
-                ],
+            ),
+            const Divider(height: 1, color: AppColors.border),
+            const SizedBox(height: 8),
+            _DrawerItem(
+              icon: Icons.home_outlined,
+              label: 'Resumen',
+              selected: seccionActual == _MobileSeccion.resumen,
+              onTap: () {
+                Navigator.pop(context);
+                onSelect(_MobileSeccion.resumen);
+              },
+            ),
+            _DrawerItem(
+              icon: Icons.leaderboard_outlined,
+              label: 'Tabla de posiciones',
+              selected: seccionActual == _MobileSeccion.tabla,
+              onTap: () {
+                Navigator.pop(context);
+                onSelect(_MobileSeccion.tabla, vistaTabla: _VistaTabla.general);
+              },
+            ),
+            if (_usaGrupos)
+              _DrawerItem(
+                icon: Icons.grid_view_rounded,
+                label: 'Tabla por grupos',
+                selected: seccionActual == _MobileSeccion.tabla,
+                onTap: () {
+                  Navigator.pop(context);
+                  onSelect(
+                    _MobileSeccion.tabla,
+                    vistaTabla: _VistaTabla.porGrupos,
+                  );
+                },
               ),
-            },
+            if (campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion)
+              _DrawerItem(
+                icon: Icons.emoji_events_outlined,
+                label: 'Clasificados a la fase final',
+                selected: seccionActual == _MobileSeccion.clasificados,
+                onTap: () {
+                  Navigator.pop(context);
+                  onSelect(_MobileSeccion.clasificados);
+                },
+              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _DrawerItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      child: Material(
+        color: selected ? AppColors.primaryLight : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
+                  color: selected ? AppColors.primaryDark : AppColors.textSecondary,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: selected
+                          ? AppColors.primaryDark
+                          : AppColors.textPrimary,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -370,15 +763,24 @@ class _StatsSection extends StatelessWidget {
       ),
       // Para fútbol se muestran los goles registrados; para vóley y
       // básquet se muestran los partidos finalizados.
+      //
+      // El total sale de los partidos (golesLocal + golesVisitante), no
+      // del ranking de goleadores: los resultados administrativos
+      // (walkover/sanción) suman goles al marcador del partido pero no
+      // generan goles por jugador, así que sumar solo el ranking
+      // subcontaba el total real del campeonato.
       if (campeonato.esFutbol)
-        StreamBuilder<List<RankingGoleadorModel>>(
-          stream: service.streamRankingGoleadores(campeonato.id),
+        StreamBuilder<List<PartidoModel>>(
+          stream: service.streamPartidos(campeonato.id),
           builder: (context, snapshot) {
-            final ranking = snapshot.data ?? [];
-            final totalGoles = ranking.fold<int>(
-              0,
-              (total, item) => total + item.totalGoles,
-            );
+            final partidos = snapshot.data ?? [];
+            final totalGoles = partidos
+                .where((p) => p.resultadoRegistrado)
+                .fold<int>(
+                  0,
+                  (total, p) =>
+                      total + (p.golesLocal ?? 0) + (p.golesVisitante ?? 0),
+                );
 
             return StatCard(
               title: 'Goles',
@@ -636,10 +1038,12 @@ class _FixtureSection extends StatelessWidget {
 class _ClasificadosSection extends StatelessWidget {
   final PublicHomeService service;
   final CampeonatoModel campeonato;
+  final bool colapsable;
 
   const _ClasificadosSection({
     required this.service,
     required this.campeonato,
+    this.colapsable = true,
   });
 
   @override
@@ -663,6 +1067,7 @@ class _ClasificadosSection extends StatelessWidget {
         return AppClasificadosCard(
           clasificados: clasificados,
           totalEsperado: total,
+          colapsable: colapsable,
         );
       },
     );
@@ -675,14 +1080,24 @@ class _TableSection extends StatefulWidget {
   final PublicHomeService service;
   final CampeonatoModel campeonato;
 
-  const _TableSection({required this.service, required this.campeonato});
+  /// Vista con la que arranca ("General" o "Por grupos"): el drawer de
+  /// móvil tiene un acceso directo a "Tabla por grupos", así que puede
+  /// abrir esta sección con ese filtro ya aplicado en vez de forzar un
+  /// toque extra sobre el toggle interno.
+  final _VistaTabla vistaInicial;
+
+  const _TableSection({
+    required this.service,
+    required this.campeonato,
+    this.vistaInicial = _VistaTabla.general,
+  });
 
   @override
   State<_TableSection> createState() => _TableSectionState();
 }
 
 class _TableSectionState extends State<_TableSection> {
-  _VistaTabla _vista = _VistaTabla.general;
+  late _VistaTabla _vista = widget.vistaInicial;
 
   CampeonatoModel get campeonato => widget.campeonato;
 

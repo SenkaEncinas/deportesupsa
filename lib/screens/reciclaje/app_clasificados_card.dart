@@ -12,69 +12,125 @@ import 'app_text_styles.dart';
 /// eliminación: los que pasan directo por grupo y los mejores terceros,
 /// junto con la ronda con la que arrancaría la llave (octavos, cuartos,
 /// etc.) según cuántos clasifican en total.
-class AppClasificadosCard extends StatelessWidget {
+///
+/// Colapsada por defecto: es información de referencia que no necesita
+/// competir por atención con el fixture ni la tabla. Un toggle +/- en la
+/// esquina superior derecha del encabezado la despliega si alguien
+/// quiere verla.
+///
+/// [colapsable] en `false` la deja siempre desplegada y sin el toggle:
+/// se usa en la vista de fase eliminatoria en móvil, donde esta card ya
+/// es un destino explícito (no compite con nada más en pantalla), así
+/// que no tiene sentido pedir un toque extra para verla.
+class AppClasificadosCard extends StatefulWidget {
   final List<ClasificadoInfo> clasificados;
   final int totalEsperado;
+  final bool colapsable;
 
   const AppClasificadosCard({
     super.key,
     required this.clasificados,
     required this.totalEsperado,
+    this.colapsable = true,
   });
 
   @override
+  State<AppClasificadosCard> createState() => _AppClasificadosCardState();
+}
+
+class _AppClasificadosCardState extends State<AppClasificadosCard> {
+  bool _expandido = false;
+
+  bool get _mostrarContenido => !widget.colapsable || _expandido;
+
+  @override
   Widget build(BuildContext context) {
-    final ronda = FixtureGrouping.rondaSegunEquipos(totalEsperado);
-    final faltan = totalEsperado - clasificados.length;
+    final ronda = FixtureGrouping.rondaSegunEquipos(widget.totalEsperado);
+    final faltan = widget.totalEsperado - widget.clasificados.length;
 
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Expanded(
-                child: AppSectionHeader(
-                  title: 'Clasificados a la fase final',
-                  subtitle:
-                      'Directos por grupo y mejores terceros, en vivo según los resultados actuales.',
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: widget.colapsable
+                ? () => setState(() => _expandido = !_expandido)
+                : null,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Expanded(
+                  child: AppSectionHeader(
+                    title: 'Clasificados a la fase final',
+                    subtitle:
+                        'Directos por grupo y mejores terceros, en vivo según los resultados actuales.',
+                  ),
+                ),
+                if (widget.totalEsperado >= 2) ...[
+                  AppBadge(text: ronda, type: AppBadgeType.primary),
+                  const SizedBox(width: 8),
+                ],
+                if (widget.colapsable) _ToggleIcon(expandido: _expandido),
+              ],
+            ),
+          ),
+          if (_mostrarContenido) ...[
+            const SizedBox(height: 14),
+            if (widget.clasificados.isEmpty)
+              Text(
+                'Todavía no hay clasificados definidos: se calculan a medida que se juegan los partidos de grupos.',
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              )
+            else
+              Column(
+                children: widget.clasificados.map((clasificado) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _ClasificadoRow(clasificado: clasificado),
+                  );
+                }).toList(),
+              ),
+            if (faltan > 0) ...[
+              const SizedBox(height: 6),
+              Text(
+                faltan == 1
+                    ? 'Falta 1 cupo por definir.'
+                    : 'Faltan $faltan cupos por definir.',
+                style: AppTextStyles.small.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              if (totalEsperado >= 2)
-                AppBadge(text: ronda, type: AppBadgeType.primary),
             ],
-          ),
-          const SizedBox(height: 14),
-          if (clasificados.isEmpty)
-            Text(
-              'Todavía no hay clasificados definidos: se calculan a medida que se juegan los partidos de grupos.',
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            )
-          else
-            Column(
-              children: clasificados.map((clasificado) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _ClasificadoRow(clasificado: clasificado),
-                );
-              }).toList(),
-            ),
-          if (faltan > 0) ...[
-            const SizedBox(height: 6),
-            Text(
-              faltan == 1
-                  ? 'Falta 1 cupo por definir.'
-                  : 'Faltan $faltan cupos por definir.',
-              style: AppTextStyles.small.copyWith(
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _ToggleIcon extends StatelessWidget {
+  final bool expandido;
+
+  const _ToggleIcon({required this.expandido});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 28,
+      height: 28,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Icon(
+        expandido ? Icons.remove : Icons.add,
+        size: 18,
+        color: AppColors.primaryDark,
       ),
     );
   }
