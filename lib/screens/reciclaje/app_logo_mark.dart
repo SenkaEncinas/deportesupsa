@@ -18,42 +18,61 @@ class AppLogoMark extends StatelessWidget {
         ? AppColors.white.withValues(alpha: 0.18)
         : AppColors.border;
 
+    // El logo actual ("Copa UPSA" + búho) es prácticamente cuadrado, a
+    // diferencia del wordmark horizontal anterior: la marca necesita una
+    // caja cuadrada propia en vez de una altura fija con ancho libre,
+    // que lo dejaba chiquito y perdido en el medio de una caja angosta.
+    final size = compact ? 46.0 : 64.0;
+
     return Container(
-      height: compact ? 46 : 56,
-      padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 14, vertical: 8),
+      width: size,
+      height: size,
+      padding: EdgeInsets.all(compact ? 6 : 9),
       decoration: BoxDecoration(
         color: backgroundColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(compact ? 13 : 16),
         border: Border.all(color: borderColor),
+        boxShadow: dark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
       ),
       child: Image.asset(
         'assets/images/logo_upsa.png',
         fit: BoxFit.contain,
         errorBuilder: (_, _, _) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/images/logo_upsa_40.png',
-                width: 30,
-                height: 30,
-                errorBuilder: (_, _, _) {
-                  return Icon(
-                    Icons.school_outlined,
-                    color: dark ? AppColors.white : AppColors.primary,
-                    size: 24,
-                  );
-                },
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'UPSA',
-                style: AppTextStyles.title.copyWith(
-                  color: dark ? AppColors.white : AppColors.primaryDark,
-                  fontWeight: FontWeight.w900,
+          return FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/logo_upsa.png',
+                  width: 30,
+                  height: 30,
+                  errorBuilder: (_, _, _) {
+                    return Icon(
+                      Icons.school_outlined,
+                      color: dark ? AppColors.white : AppColors.primary,
+                      size: 24,
+                    );
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  'UPSA',
+                  style: AppTextStyles.title.copyWith(
+                    color: dark ? AppColors.white : AppColors.primaryDark,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
           );
         },
       ),

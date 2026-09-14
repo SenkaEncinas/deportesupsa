@@ -3,12 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/campeonato_model.dart';
 import '../models/historial_cambio_model.dart';
 import '../models/jugador_model.dart';
+import 'auditoria_service.dart';
 
 class JugadorService {
   JugadorService({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _auditoriaService = AuditoriaService(firestore: firestore);
 
   final FirebaseFirestore _db;
+  final AuditoriaService _auditoriaService;
 
   DocumentReference<Map<String, dynamic>> _campeonato(String campeonatoId) {
     return _db.collection('campeonatos').doc(campeonatoId);
@@ -177,6 +180,19 @@ class JugadorService {
         'usuarioNombre': usuarioNombre,
         'fecha': FieldValue.serverTimestamp(),
       });
+
+      await _auditoriaService.registrar(
+        campeonatoId: campeonatoId,
+        usuarioId: usuarioId,
+        usuarioNombre: usuarioNombre,
+        accion: 'Agregar jugador',
+        modulo: 'Jugadores',
+        documentoAfectado: jugadorId,
+        detalle:
+            'Se agregó a $nombreCompleto ($codigoNormalizado) al equipo '
+            '$equipoNombre con el campeonato activo.',
+        observacion: observacion,
+      );
     }
 
     return jugadorId;
@@ -262,6 +278,20 @@ class JugadorService {
     );
 
     await jugadorRef.collection('historial_cambios').add(historial.toMap());
+
+    final nombreJugador =
+        datosAnteriores['nombreCompleto'] as String? ?? jugadorId;
+
+    await _auditoriaService.registrar(
+      campeonatoId: campeonatoId,
+      usuarioId: usuarioId,
+      usuarioNombre: usuarioNombre,
+      accion: 'Editar jugador',
+      modulo: 'Jugadores',
+      documentoAfectado: jugadorId,
+      detalle: 'Se editó a $nombreJugador (${cambios.keys.join(', ')}).',
+      observacion: observacion,
+    );
   }
 
   Future<void> cambiarEstadoJugador({

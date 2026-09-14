@@ -8,6 +8,7 @@ import '../models/partido_model.dart';
 import '../models/ranking_goleador_model.dart';
 import '../models/tabla_posicion_model.dart';
 import '../models/tarjeta_model.dart';
+import 'auditoria_service.dart';
 
 class GolJugadorInput {
   final String equipoId;
@@ -47,9 +48,11 @@ class TarjetaJugadorInput {
 
 class ResultadoService {
   ResultadoService({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _auditoriaService = AuditoriaService(firestore: firestore);
 
   final FirebaseFirestore _db;
+  final AuditoriaService _auditoriaService;
 
   DocumentReference<Map<String, dynamic>> _campeonato(String campeonatoId) {
     return _db.collection('campeonatos').doc(campeonatoId);
@@ -146,6 +149,7 @@ class ResultadoService {
     String tipoResultado = TipoResultado.normal,
     String? observacionResultado,
     required String usuarioId,
+    required String usuarioNombre,
     int? penalesLocal,
     int? penalesVisitante,
     bool definidoPorProrroga = false,
@@ -469,6 +473,22 @@ class ResultadoService {
     await batch.commit();
 
     await recalcularTablaYRanking(campeonatoId);
+
+    final esEdicion = partido.resultadoRegistrado;
+
+    await _auditoriaService.registrar(
+      campeonatoId: campeonatoId,
+      usuarioId: usuarioId,
+      usuarioNombre: usuarioNombre,
+      accion: esEdicion ? 'Editar resultado' : 'Registrar resultado',
+      modulo: 'Resultados',
+      documentoAfectado: partidoId,
+      detalle:
+          '${esEdicion ? 'Se editó' : 'Se registró'} el resultado de '
+          '${partido.equipoLocalNombre} $golesLocal - $golesVisitante '
+          '${partido.equipoVisitanteNombre}.',
+      observacion: observacionResultado,
+    );
   }
 
   /// En formatos de dos fases (grupos+eliminación, liga+final,

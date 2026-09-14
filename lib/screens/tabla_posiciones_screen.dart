@@ -31,14 +31,35 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
   final PartidoService _partidoService = PartidoService();
   final _searchController = TextEditingController();
   String _search = '';
+  String? _equipoFiltro;
 
   late Future<_HistorialPartidosData> _dataFuture;
 
+  List<String> _equiposDisponibles(List<_PartidoHistorialItem> items) {
+    final equipos = <String>{};
+
+    for (final item in items) {
+      equipos.add(item.partido.equipoLocalNombre);
+      equipos.add(item.partido.equipoVisitanteNombre);
+    }
+
+    final lista = equipos.toList()..sort();
+    return lista;
+  }
+
   List<_PartidoHistorialItem> _filtrar(List<_PartidoHistorialItem> items) {
     final search = _search.trim().toLowerCase();
-    if (search.isEmpty) return items;
+    final equipoFiltro = _equipoFiltro;
 
     return items.where((item) {
+      if (equipoFiltro != null &&
+          item.partido.equipoLocalNombre != equipoFiltro &&
+          item.partido.equipoVisitanteNombre != equipoFiltro) {
+        return false;
+      }
+
+      if (search.isEmpty) return true;
+
       final searchable = [
         item.partido.equipoLocalNombre,
         item.partido.equipoVisitanteNombre,
@@ -254,15 +275,62 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        AppTextField(
-                          label: 'Buscar partido',
-                          hint: 'Nombre de alguno de los equipos...',
-                          controller: _searchController,
-                          prefixIcon: Icons.search_rounded,
-                          onChanged: (value) {
-                            setState(() => _search = value);
-                          },
-                        ),
+                        Responsive.isMobile(context)
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  AppTextField(
+                                    label: 'Buscar partido',
+                                    hint:
+                                        'Nombre de alguno de los equipos...',
+                                    controller: _searchController,
+                                    prefixIcon: Icons.search_rounded,
+                                    onChanged: (value) {
+                                      setState(() => _search = value);
+                                    },
+                                  ),
+                                  const SizedBox(height: 14),
+                                  _EquipoFiltroDropdown(
+                                    equipos: _equiposDisponibles(
+                                      data.partidos,
+                                    ),
+                                    valor: _equipoFiltro,
+                                    onChanged: (value) {
+                                      setState(() => _equipoFiltro = value);
+                                    },
+                                  ),
+                                ],
+                              )
+                            : Row(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Expanded(
+                                    flex: 2,
+                                    child: AppTextField(
+                                      label: 'Buscar partido',
+                                      hint:
+                                          'Nombre de alguno de los equipos...',
+                                      controller: _searchController,
+                                      prefixIcon: Icons.search_rounded,
+                                      onChanged: (value) {
+                                        setState(() => _search = value);
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: _EquipoFiltroDropdown(
+                                      equipos: _equiposDisponibles(
+                                        data.partidos,
+                                      ),
+                                      valor: _equipoFiltro,
+                                      onChanged: (value) {
+                                        setState(() => _equipoFiltro = value);
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
                         const SizedBox(height: 18),
                         Builder(
                           builder: (context) {
@@ -298,6 +366,47 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+class _EquipoFiltroDropdown extends StatelessWidget {
+  final List<String> equipos;
+  final String? valor;
+  final void Function(String?) onChanged;
+
+  const _EquipoFiltroDropdown({
+    required this.equipos,
+    required this.valor,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Filtrar por equipo', style: AppTextStyles.label),
+        const SizedBox(height: 7),
+        DropdownButtonFormField<String>(
+          initialValue: valor,
+          isExpanded: true,
+          icon: const Icon(Icons.filter_list_rounded, size: 20),
+          style: AppTextStyles.body,
+          decoration: const InputDecoration(hintText: 'Todos los equipos'),
+          items: [
+            const DropdownMenuItem<String>(
+              value: null,
+              child: Text('Todos los equipos'),
+            ),
+            ...equipos.map(
+              (equipo) =>
+                  DropdownMenuItem<String>(value: equipo, child: Text(equipo)),
+            ),
+          ],
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }

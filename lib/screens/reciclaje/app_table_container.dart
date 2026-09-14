@@ -45,33 +45,47 @@ class AppTableContainer extends StatelessWidget {
       padding: EdgeInsets.zero,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(AppColors.surfaceSoft),
-            dividerThickness: 1,
-            columnSpacing: compact ? 16 : 56,
-            horizontalMargin: compact ? 12 : 24,
-            headingRowHeight: compact ? 38 : 56,
-            dataRowMinHeight: compact ? 36 : 48,
-            dataRowMaxHeight: compact ? 40 : 56,
-            headingTextStyle: compact
-                ? AppTextStyles.tableHeader.copyWith(fontSize: 12)
-                : AppTextStyles.tableHeader,
-            dataTextStyle: compact
-                ? AppTextStyles.tableCell.copyWith(fontSize: 12)
-                : AppTextStyles.tableCell,
-            columns: headers
-                .map((header) => DataColumn(label: Text(header)))
-                .toList(),
-            rows: rows
-                .map(
-                  (row) => DataRow(
-                    cells: row.map((cell) => DataCell(cell)).toList(),
+        // LayoutBuilder + ConstrainedBox(minWidth) para que la tabla
+        // ocupe todo el ancho disponible cuando sus columnas no lo
+        // necesitan (ej. junto a "Goleadores" en desktop), sin perder el
+        // scroll horizontal para cuando sí hacen falta más columnas de
+        // las que entran (ej. pantallas angostas).
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: DataTable(
+                  headingRowColor: WidgetStateProperty.all(
+                    AppColors.surfaceSoft,
                   ),
-                )
-                .toList(),
-          ),
+                  dividerThickness: 1,
+                  columnSpacing: compact ? 16 : 56,
+                  horizontalMargin: compact ? 12 : 24,
+                  headingRowHeight: compact ? 38 : 56,
+                  dataRowMinHeight: compact ? 36 : 48,
+                  dataRowMaxHeight: compact ? 40 : 56,
+                  headingTextStyle: compact
+                      ? AppTextStyles.tableHeader.copyWith(fontSize: 12)
+                      : AppTextStyles.tableHeader,
+                  dataTextStyle: compact
+                      ? AppTextStyles.tableCell.copyWith(fontSize: 12)
+                      : AppTextStyles.tableCell,
+                  columns: headers
+                      .map((header) => DataColumn(label: Text(header)))
+                      .toList(),
+                  rows: rows
+                      .map(
+                        (row) => DataRow(
+                          cells: row.map((cell) => DataCell(cell)).toList(),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

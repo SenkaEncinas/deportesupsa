@@ -1,0 +1,14 @@
+LOGOS DE PATROCINADORES
+
+Que va en cada carpeta
+- principal/  -> el auspiciador principal (EM). Sale solo, centrado y mas grande.
+- esta carpeta -> el resto. Salen en la tira de abajo, repartidos parejo.
+
+El orden lo da el nombre del archivo (por eso van numerados 1_, 2_, 3_...).
+Se descubren solos: agregar o sacar un archivo alcanza, no hay que tocar codigo.
+
+Formato recomendado al reemplazar
+- PNG con fondo transparente (o blanco).
+- Tira de abajo: ~600 px de ancho.
+- Principal (EM): ~1000 px de ancho.
+- Sin margenes grandes alrededor del logo: el recorte ajustado se ve mas parejo.

@@ -66,22 +66,27 @@ flutter:
 
   assets:
     - assets/images/logo_upsa.png
-    - assets/images/logo_upsa_40.png
-  
+    - assets/fonts/noto_emoji_deportes.ttf
+    # Carpetas completas: los logos de patrocinadores que se dejen acá se
+    # empaquetan solos y el flyer los descubre por el AssetManifest.
+    # `principal/` va aparte porque Flutter no baja a subcarpetas solo.
+    - assets/images/patrocinadores/
+    - assets/images/patrocinadores/principal/
+
 flutter_launcher_icons:
-  image_path: "assets/images/logo_upsa_40.png"
+  image_path: "assets/images/logo_upsa.png"
 
   android: true
   ios: true
 
   windows:
     generate: true
-    image_path: "assets/images/logo_upsa_40.png"
+    image_path: "assets/images/logo_upsa.png"
     icon_size: 256
 
   web:
     generate: true
-    image_path: "assets/images/logo_upsa_40.png"
+    image_path: "assets/images/logo_upsa.png"
 
 
   # To add assets to your application, add an assets section, like this:

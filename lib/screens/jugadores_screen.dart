@@ -69,7 +69,20 @@ class JugadoresScreen extends StatefulWidget {
 
 class _JugadoresScreenState extends State<JugadoresScreen> {
   final _searchController = TextEditingController();
+  final _campeonatoService = CampeonatoService();
+  final _jugadorService = JugadorService();
+  late final Stream<CampeonatoModel?> _campeonatoStream;
+  late final Stream<List<JugadorModel>> _jugadoresStream;
   String _search = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _campeonatoStream = _campeonatoService.streamCampeonato(
+      widget.campeonatoId,
+    );
+    _jugadoresStream = _jugadorService.streamJugadores(widget.campeonatoId);
+  }
 
   @override
   void dispose() {
@@ -94,17 +107,16 @@ class _JugadoresScreenState extends State<JugadoresScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final campeonatoService = CampeonatoService();
-    final jugadorService = JugadorService();
+    final jugadorService = _jugadorService;
 
     return Scaffold(
       body: StreamBuilder<CampeonatoModel?>(
-        stream: campeonatoService.streamCampeonato(widget.campeonatoId),
+        stream: _campeonatoStream,
         builder: (context, campeonatoSnapshot) {
           final campeonato = campeonatoSnapshot.data;
 
           return StreamBuilder<List<JugadorModel>>(
-            stream: jugadorService.streamJugadores(widget.campeonatoId),
+            stream: _jugadoresStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const AppLoading(message: 'Cargando jugadores...');

@@ -13,6 +13,7 @@ import 'reciclaje/app_hero_card.dart';
 import 'reciclaje/app_inline_empty_state.dart';
 import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_page.dart';
+import 'reciclaje/app_public_footer.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_section_header.dart';
 import 'reciclaje/app_text_styles.dart';
@@ -110,121 +111,127 @@ class _HomeScreenState extends State<HomeScreen> {
               final filtered = _filterCampeonatos(campeonatos);
 
               return SingleChildScrollView(
-                child: AppPage(
-                  title: 'UPSA Campeonatos',
-                  subtitle:
-                      'Fixture, resultados, tabla de posiciones y goleadores de los campeonatos universitarios.',
-                  actions: [
-                    AppButton.secondary(
-                      text: isMobile ? 'Admin' : 'Ingresar admin',
-                      icon: Icons.admin_panel_settings_outlined,
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const LoginScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppHeroCard(
-                        title: 'Deportes UPSA',
-                        description:
-                            'Consulta campeonatos activos, fixtures, resultados, tablas de posiciones y ranking de goleadores desde un solo lugar.',
-                        chips: const [
-                          AppHeroChipData(
-                            icon: Icons.school_outlined,
-                            text: 'UPSA',
-                          ),
-                          AppHeroChipData(
-                            icon: Icons.sports_soccer,
-                            text: 'Fútbol y futsal',
-                          ),
-                          AppHeroChipData(
-                            icon: Icons.public_outlined,
-                            text: 'Vista pública',
-                          ),
-                        ],
-                        infoItems: [
-                          AppHeroInfoItem(
-                            icon: Icons.emoji_events_outlined,
-                            label: 'Campeonatos',
-                            value: '${campeonatos.length}',
-                          ),
-                          AppHeroInfoItem(
-                            icon: Icons.verified_outlined,
-                            label: 'Activos',
-                            value:
-                                '${campeonatos.where((item) => item.estado == CampeonatoEstado.activo).length}',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 22),
-                      _FiltersCard(
-                        controller: _searchController,
-                        filter: _filter,
-                        onFilterChanged: (value) {
-                          setState(() {
-                            _filter = value;
-                          });
-                        },
-                        onSearchChanged: (value) {
-                          setState(() {
-                            _searchText = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 22),
-                      AppSectionHeader(
-                        title: 'Campeonatos disponibles',
-                        subtitle: campeonatos.isEmpty
-                            ? 'Aún no hay campeonatos creados.'
-                            : 'Selecciona un campeonato para ver su información pública.',
-                      ),
-                      const SizedBox(height: 14),
-                      if (campeonatos.isEmpty)
-                        const AppEmptyState(
-                          icon: Icons.emoji_events_outlined,
-                          title: 'Todavía no hay campeonatos',
-                          message:
-                              'Cuando un administrador cree un campeonato, se mostrará aquí la información pública.',
-                        )
-                      else if (filtered.isEmpty)
-                        const AppInlineEmptyState(
-                          icon: Icons.search_off_rounded,
-                          text: 'No hay campeonatos con esos filtros.',
-                          subtitle:
-                              'Prueba cambiando el estado o el texto de búsqueda.',
-                        )
-                      else
-                        AppResponsiveGrid(
-                          mobileColumns: 1,
-                          tabletColumns: 2,
-                          desktopColumns: 3,
-                          spacing: 16,
-                          children: filtered.map((campeonato) {
-                            return ChampionshipPublicCard(
-                              campeonato: campeonato,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChampionshipDetailScreen(
-                                      campeonato: campeonato,
-                                    ),
-                                  ),
-                                );
-                              },
+                child: Column(
+                  children: [
+                    AppPage(
+                      title: 'UPSA Campeonatos',
+                      subtitle:
+                          'Fixture, resultados, tabla de posiciones y goleadores de los campeonatos universitarios.',
+                      actions: [
+                        AppButton.secondary(
+                          text: isMobile ? 'Admin' : 'Ingresar admin',
+                          icon: Icons.admin_panel_settings_outlined,
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const LoginScreen(),
+                              ),
                             );
-                          }).toList(),
+                          },
                         ),
-                      const SizedBox(height: 30),
-                    ],
-                  ),
+                      ],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppHeroCard(
+                            title: 'Deportes UPSA',
+                            description:
+                                'Consulta campeonatos activos, fixtures, resultados, tablas de posiciones y ranking de goleadores desde un solo lugar.',
+                            chips: const [
+                              AppHeroChipData(
+                                icon: Icons.school_outlined,
+                                text: 'UPSA',
+                              ),
+                              AppHeroChipData(
+                                icon: Icons.sports_soccer,
+                                text: 'Fútbol y futsal',
+                              ),
+                              AppHeroChipData(
+                                icon: Icons.public_outlined,
+                                text: 'Vista pública',
+                              ),
+                            ],
+                            infoItems: [
+                              AppHeroInfoItem(
+                                icon: Icons.emoji_events_outlined,
+                                label: 'Campeonatos',
+                                value: '${campeonatos.length}',
+                              ),
+                              AppHeroInfoItem(
+                                icon: Icons.verified_outlined,
+                                label: 'Activos',
+                                value:
+                                    '${campeonatos.where((item) => item.estado == CampeonatoEstado.activo).length}',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 22),
+                          _FiltersCard(
+                            controller: _searchController,
+                            filter: _filter,
+                            onFilterChanged: (value) {
+                              setState(() {
+                                _filter = value;
+                              });
+                            },
+                            onSearchChanged: (value) {
+                              setState(() {
+                                _searchText = value;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 22),
+                          AppSectionHeader(
+                            title: 'Campeonatos disponibles',
+                            subtitle: campeonatos.isEmpty
+                                ? 'Aún no hay campeonatos creados.'
+                                : 'Selecciona un campeonato para ver su información pública.',
+                          ),
+                          const SizedBox(height: 14),
+                          if (campeonatos.isEmpty)
+                            const AppEmptyState(
+                              icon: Icons.emoji_events_outlined,
+                              title: 'Todavía no hay campeonatos',
+                              message:
+                                  'Cuando un administrador cree un campeonato, se mostrará aquí la información pública.',
+                            )
+                          else if (filtered.isEmpty)
+                            const AppInlineEmptyState(
+                              icon: Icons.search_off_rounded,
+                              text: 'No hay campeonatos con esos filtros.',
+                              subtitle:
+                                  'Prueba cambiando el estado o el texto de búsqueda.',
+                            )
+                          else
+                            AppResponsiveGrid(
+                              mobileColumns: 1,
+                              tabletColumns: 2,
+                              desktopColumns: 3,
+                              spacing: 16,
+                              children: filtered.map((campeonato) {
+                                return ChampionshipPublicCard(
+                                  campeonato: campeonato,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            ChampionshipDetailScreen(
+                                              campeonato: campeonato,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          const SizedBox(height: 30),
+                        ],
+                      ),
+                    ),
+                    const AppPublicFooter(),
+                  ],
                 ),
               );
             },

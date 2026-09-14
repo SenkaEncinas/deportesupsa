@@ -3,12 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/equipo_model.dart';
 import '../models/historial_cambio_model.dart';
 import '../models/tabla_posicion_model.dart';
+import 'auditoria_service.dart';
 
 class EquipoService {
   EquipoService({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _auditoriaService = AuditoriaService(firestore: firestore);
 
   final FirebaseFirestore _db;
+  final AuditoriaService _auditoriaService;
 
   CollectionReference<Map<String, dynamic>> _equipos(String campeonatoId) {
     return _db
@@ -139,6 +142,19 @@ class EquipoService {
     );
 
     await equipoRef.collection('historial_planilla').add(historial.toMap());
+
+    final nombreEquipo = datosAnteriores['nombre'] as String? ?? equipoId;
+
+    await _auditoriaService.registrar(
+      campeonatoId: campeonatoId,
+      usuarioId: usuarioId,
+      usuarioNombre: usuarioNombre,
+      accion: 'Editar equipo',
+      modulo: 'Equipos',
+      documentoAfectado: equipoId,
+      detalle: 'Se editó al equipo $nombreEquipo (${cambios.keys.join(', ')}).',
+      observacion: observacion,
+    );
   }
 
   Future<void> cambiarEstadoEquipo({

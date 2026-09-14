@@ -442,6 +442,7 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
             ? null
             : _observacionController.text.trim(),
         usuarioId: admin.id,
+        usuarioNombre: admin.nombre,
         penalesLocal: penalesLocal,
         penalesVisitante: penalesVisitante,
         definidoPorProrroga: _esBasket(campeonato)

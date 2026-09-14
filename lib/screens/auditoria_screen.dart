@@ -26,16 +26,18 @@ class AuditoriaScreen extends StatefulWidget {
 
 class _AuditoriaScreenState extends State<AuditoriaScreen> {
   final _searchController = TextEditingController();
+  final _campeonatoService = CampeonatoService();
+  late final Stream<CampeonatoModel?> _campeonatoStream;
+  late final Stream<List<AuditoriaModel>> _auditoriaStream;
   String _search = '';
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Stream<List<AuditoriaModel>> _streamAuditoria() {
-    return FirebaseFirestore.instance
+  void initState() {
+    super.initState();
+    _campeonatoStream = _campeonatoService.streamCampeonato(
+      widget.campeonatoId,
+    );
+    _auditoriaStream = FirebaseFirestore.instance
         .collection('campeonatos')
         .doc(widget.campeonatoId)
         .collection('auditoria')
@@ -47,6 +49,12 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
             return AuditoriaModel.fromMap(doc.id, doc.data());
           }).toList();
         });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   List<AuditoriaModel> _filtrar(List<AuditoriaModel> auditorias) {
@@ -80,16 +88,14 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final campeonatoService = CampeonatoService();
-
     return Scaffold(
       body: StreamBuilder<CampeonatoModel?>(
-        stream: campeonatoService.streamCampeonato(widget.campeonatoId),
+        stream: _campeonatoStream,
         builder: (context, campeonatoSnapshot) {
           final campeonato = campeonatoSnapshot.data;
 
           return StreamBuilder<List<AuditoriaModel>>(
-            stream: _streamAuditoria(),
+            stream: _auditoriaStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const AppLoading(message: 'Cargando auditoría...');

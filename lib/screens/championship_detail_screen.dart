@@ -20,6 +20,7 @@ import 'reciclaje/app_logo_mark.dart';
 import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_match_card.dart';
 import 'reciclaje/app_page.dart';
+import 'reciclaje/app_public_footer.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_responsive_pair.dart';
 import 'reciclaje/app_section_header.dart';
@@ -64,20 +65,25 @@ class ChampionshipDetailScreen extends StatelessWidget {
                   campeonato: campeonato,
                 )
               : SingleChildScrollView(
-                  child: AppPage(
-                    title: campeonato.nombre,
-                    subtitle: 'Información pública del campeonato.',
-                    actions: [
-                      AppButton.secondary(
-                        text: 'Volver',
-                        icon: Icons.arrow_back_rounded,
-                        onPressed: () => Navigator.pop(context),
+                  child: Column(
+                    children: [
+                      AppPage(
+                        title: campeonato.nombre,
+                        subtitle: 'Información pública del campeonato.',
+                        actions: [
+                          AppButton.secondary(
+                            text: 'Volver',
+                            icon: Icons.arrow_back_rounded,
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                        child: _ChampionshipContent(
+                          service: service,
+                          campeonato: campeonato,
+                        ),
                       ),
+                      const AppPublicFooter(),
                     ],
-                    child: _ChampionshipContent(
-                      service: service,
-                      campeonato: campeonato,
-                    ),
                   ),
                 ),
         ),
@@ -251,7 +257,11 @@ class _MobileGruposViewState extends State<_MobileGruposView> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      endDrawer: _MobileDrawer(campeonato: campeonato, seccionActual: _seccion, onSelect: _ir),
+      endDrawer: _MobileDrawer(
+        campeonato: campeonato,
+        seccionActual: _seccion,
+        onSelect: _ir,
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -344,10 +354,7 @@ class _MobileGruposViewState extends State<_MobileGruposView> {
                     ),
                     if (campeonato.esFutbol) ...[
                       const SizedBox(height: 20),
-                      _ScorersSection(
-                        service: service,
-                        campeonato: campeonato,
-                      ),
+                      _ScorersSection(service: service, campeonato: campeonato),
                     ],
                   ],
                 ),
@@ -362,6 +369,12 @@ class _MobileGruposViewState extends State<_MobileGruposView> {
                   colapsable: false,
                 ),
               },
+              // El footer va fuera del padding lateral para que la
+              // franja de auspiciadores ocupe todo el ancho.
+              const Padding(
+                padding: EdgeInsets.only(top: 24),
+                child: AppPublicFooter(),
+              ),
             ],
           ),
         ),
@@ -696,7 +709,9 @@ class _DrawerItem extends StatelessWidget {
                 Icon(
                   icon,
                   size: 20,
-                  color: selected ? AppColors.primaryDark : AppColors.textSecondary,
+                  color: selected
+                      ? AppColors.primaryDark
+                      : AppColors.textSecondary,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -1293,7 +1308,9 @@ class _TableSectionState extends State<_TableSection> {
 
     return AppTableContainer(
       headers: _headers(incluirGrupo: incluirGrupo),
-      rows: items.map((item) => _row(item, incluirGrupo: incluirGrupo)).toList(),
+      rows: items
+          .map((item) => _row(item, incluirGrupo: incluirGrupo))
+          .toList(),
       emptyMessage: 'Todavía no hay tabla de posiciones.',
       compact: _compacta,
     );
@@ -1399,8 +1416,7 @@ class _TableSectionState extends State<_TableSection> {
                   AppFilterPill(
                     text: 'Por grupos',
                     selected: _vista == _VistaTabla.porGrupos,
-                    onTap: () =>
-                        setState(() => _vista = _VistaTabla.porGrupos),
+                    onTap: () => setState(() => _vista = _VistaTabla.porGrupos),
                   ),
                 ],
               ),

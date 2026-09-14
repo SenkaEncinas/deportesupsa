@@ -251,28 +251,52 @@ class _PdfsScreenState extends State<PdfsScreen> {
       return;
     }
 
-    final resultados = <PdfResultadoPartidoItem>[];
+    // Un solo viaje de red (en tandas de 30, límite de `whereIn`) en vez
+    // de una consulta por partido: `Printing.layoutPdf` en Flutter Web
+    // necesita disparar cerca del click original (el navegador expira el
+    // "user activation" tras unos segundos de espera async); con muchas
+    // consultas secuenciales el llamado a imprimir llegaba tarde y el
+    // navegador lo bloqueaba en silencio, dejando el botón sin reaccionar.
+    final golesPorPartido = <String, List<PdfGolPartidoItem>>{};
+    final idsPartidos = partidosFiltrados.map((p) => p.id).toList();
 
-    for (final partido in partidosFiltrados) {
+    for (var i = 0; i < idsPartidos.length; i += 30) {
+      final lote = idsPartidos.sublist(
+        i,
+        i + 30 > idsPartidos.length ? idsPartidos.length : i + 30,
+      );
+
       final golesSnap = await FirebaseFirestore.instance
           .collection('campeonatos')
           .doc(widget.campeonatoId)
           .collection('goles')
-          .where('partidoId', isEqualTo: partido.id)
+          .where('partidoId', whereIn: lote)
           .get();
 
-      final goles = golesSnap.docs.map((doc) {
+      for (final doc in golesSnap.docs) {
         final data = doc.data();
+        final partidoId = (data['partidoId'] ?? '').toString();
 
-        return PdfGolPartidoItem(
-          jugadorNombre: (data['jugadorNombre'] ?? '').toString(),
-          equipoNombre: (data['equipoNombre'] ?? '').toString(),
-          cantidad: (data['cantidad'] as num?)?.toInt() ?? 0,
-        );
-      }).toList();
-
-      resultados.add(PdfResultadoPartidoItem(partido: partido, goles: goles));
+        golesPorPartido
+            .putIfAbsent(partidoId, () => [])
+            .add(
+              PdfGolPartidoItem(
+                jugadorNombre: (data['jugadorNombre'] ?? '').toString(),
+                equipoNombre: (data['equipoNombre'] ?? '').toString(),
+                cantidad: (data['cantidad'] as num?)?.toInt() ?? 0,
+              ),
+            );
+      }
     }
+
+    final resultados = partidosFiltrados
+        .map(
+          (partido) => PdfResultadoPartidoItem(
+            partido: partido,
+            goles: golesPorPartido[partido.id] ?? const [],
+          ),
+        )
+        .toList();
 
     final bytes = await _pdfService.generarResultadosPorRangoPdf(
       campeonato: data.campeonato!,
