@@ -61,19 +61,28 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
     }).toList();
   }
 
+  // Los streams se crean una sola vez y no dentro de build(): si se
+  // reconstruyen en cada build, cada setState (una tecla en un
+  // buscador, por ejemplo) genera una suscripción nueva, el
+  // StreamBuilder vuelve a "waiting" y la pantalla entera se
+  // reemplaza por el loading, perdiendo el foco del campo.
+  late final CampeonatoService _campeonatoService = CampeonatoService();
+  late final PartidoService _partidoService = PartidoService();
+  late final Stream<CampeonatoModel?> _campeonatoStream = _campeonatoService
+      .streamCampeonato(widget.campeonatoId);
+  late final Stream<List<PartidoModel>> _partidosStream = _partidoService
+      .streamPartidos(widget.campeonatoId);
+
   @override
   Widget build(BuildContext context) {
-    final campeonatoService = CampeonatoService();
-    final partidoService = PartidoService();
-
     return Scaffold(
       body: StreamBuilder<CampeonatoModel?>(
-        stream: campeonatoService.streamCampeonato(widget.campeonatoId),
+        stream: _campeonatoStream,
         builder: (context, campeonatoSnapshot) {
           final campeonato = campeonatoSnapshot.data;
 
           return StreamBuilder<List<PartidoModel>>(
-            stream: partidoService.streamPartidos(widget.campeonatoId),
+            stream: _partidosStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const AppLoading(message: 'Cargando partidos...');

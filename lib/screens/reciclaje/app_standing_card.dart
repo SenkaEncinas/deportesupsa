@@ -56,7 +56,9 @@ class AppStandingCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  '${item.puntos} pts',
+                  item.puntosIgualacion > 0
+                      ? '${item.puntos} pts (+${item.puntosIgualacion})'
+                      : '${item.puntos} pts',
                   style: AppTextStyles.small.copyWith(
                     color: AppColors.primaryDark,
                     fontWeight: FontWeight.w900,

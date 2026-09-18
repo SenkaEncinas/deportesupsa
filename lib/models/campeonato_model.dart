@@ -320,6 +320,19 @@ class ReglasPuntuacion {
     return const ReglasPuntuacion(victoria: 3, empate: 1, derrota: 0);
   }
 
+  /// Vóley: no hay empates (el partido se define por sets) y el que
+  /// pierde igual suma 1 punto por presentarse y jugar.
+  factory ReglasPuntuacion.voley() {
+    return const ReglasPuntuacion(victoria: 2, empate: 0, derrota: 1);
+  }
+
+  /// Reglas que corresponden al deporte de un campeonato nuevo.
+  factory ReglasPuntuacion.porDeporte(String deporte) {
+    return deporte == DeporteTipo.volley
+        ? ReglasPuntuacion.voley()
+        : ReglasPuntuacion.defaultRules();
+  }
+
   factory ReglasPuntuacion.fromMap(Map<String, dynamic>? map) {
     if (map == null) return ReglasPuntuacion.defaultRules();
 
@@ -349,6 +362,14 @@ class CampeonatoModel {
   final ReglasPuntuacion reglasPuntuacion;
   final List<String> reglasDesempate;
   final String faseActual;
+
+  /// Puntos de igualación por equipo (`equipoId` -> puntos), cargados a
+  /// mano por el admin. Sirven para compensar a los grupos que tienen
+  /// menos equipos que los demás y por lo tanto juegan menos partidos:
+  /// sin esto, un grupo de 3 nunca puede competir en puntos contra uno
+  /// de 4 a la hora de comparar los mejores terceros.
+  final Map<String, int> igualaciones;
+
   final DateTime? fechaCreacion;
   final DateTime? fechaActualizacion;
   final String creadoPor;
@@ -367,6 +388,7 @@ class CampeonatoModel {
     required this.reglasPuntuacion,
     required this.reglasDesempate,
     this.faseActual = FaseCampeonato.grupos,
+    this.igualaciones = const {},
     this.fechaCreacion,
     this.fechaActualizacion,
     required this.creadoPor,
@@ -400,6 +422,7 @@ class CampeonatoModel {
         map['faseActual'],
         defaultValue: FaseCampeonato.grupos,
       ),
+      igualaciones: igualacionesFromJson(map['igualaciones']),
       fechaCreacion: dateFromJson(map['fechaCreacion']),
       fechaActualizacion: dateFromJson(map['fechaActualizacion']),
       creadoPor: stringFromJson(map['creadoPor']),
@@ -420,6 +443,7 @@ class CampeonatoModel {
       'reglasPuntuacion': reglasPuntuacion.toMap(),
       'reglasDesempate': reglasDesempate,
       'faseActual': faseActual,
+      'igualaciones': igualaciones,
       'fechaCreacion': dateToJson(fechaCreacion),
       'fechaActualizacion': dateToJson(fechaActualizacion),
       'creadoPor': creadoPor,
@@ -433,6 +457,21 @@ class CampeonatoModel {
   /// Deporte efectivo: los campeonatos antiguos sin deporte son fútbol.
   String get deporteEfectivo =>
       deporte.trim().isEmpty ? DeporteTipo.futbol : deporte;
+
+  /// Puntos de igualación de un equipo (0 si no tiene).
+  int igualacionDe(String equipoId) => igualaciones[equipoId] ?? 0;
+
+  bool get tieneIgualaciones =>
+      igualaciones.values.any((puntos) => puntos != 0);
+
+  /// Reglas de puntaje que se aplican de verdad al armar la tabla.
+  ///
+  /// En vóley mandan las reglas del deporte (2 por ganar, 1 por perder)
+  /// aunque el documento guardado traiga las de fútbol: los campeonatos
+  /// creados antes de esta corrección quedaron con 3/1/0 guardado y no
+  /// habría forma de arreglarles la tabla sin tocar la base.
+  ReglasPuntuacion get reglasPuntuacionEfectivas =>
+      esVolley ? ReglasPuntuacion.voley() : reglasPuntuacion;
 
   bool get esFutbol => deporteEfectivo == DeporteTipo.futbol;
   bool get esVolley => deporteEfectivo == DeporteTipo.volley;

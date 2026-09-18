@@ -37,6 +37,24 @@ bool boolFromJson(dynamic value, {bool defaultValue = false}) {
   return defaultValue;
 }
 
+/// Mapa `equipoId` -> puntos de igualación. Tolera valores nulos o mal
+/// tipados (documentos viejos) en vez de reventar al abrir el campeonato.
+Map<String, int> igualacionesFromJson(dynamic value) {
+  if (value is! Map) return const {};
+
+  final resultado = <String, int>{};
+
+  value.forEach((clave, valor) {
+    final equipoId = clave?.toString().trim() ?? '';
+    if (equipoId.isEmpty) return;
+
+    final puntos = intFromJson(valor);
+    if (puntos != 0) resultado[equipoId] = puntos;
+  });
+
+  return resultado;
+}
+
 List<String> stringListFromJson(dynamic value) {
   if (value == null) return [];
   if (value is List) {

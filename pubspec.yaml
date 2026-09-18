@@ -66,6 +66,8 @@ flutter:
 
   assets:
     - assets/images/logo_upsa.png
+    - assets/images/logo_57nations.png
+    - assets/images/logo_57nations_blanco.png
     - assets/fonts/noto_emoji_deportes.ttf
     # Carpetas completas: los logos de patrocinadores que se dejen acá se
     # empaquetan solos y el flyer los descubre por el AssetManifest.

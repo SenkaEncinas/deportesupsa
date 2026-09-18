@@ -23,6 +23,7 @@ import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_match_card.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
+import 'llaves_screen.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
@@ -46,6 +47,16 @@ class _FixtureScreenState extends State<FixtureScreen> {
   final GrupoService _grupoService = GrupoService();
   final PartidoService _partidoService = PartidoService();
   final PdfService _pdfService = PdfService();
+
+  // Los streams se crean una sola vez y no dentro de build(): si se
+  // reconstruyen en cada build, cada setState (una tecla en un
+  // buscador, por ejemplo) genera una suscripción nueva, el
+  // StreamBuilder vuelve a "waiting" y la pantalla entera se
+  // reemplaza por el loading, perdiendo el foco del campo.
+  late final Stream<CampeonatoModel?> _campeonatoStream = _campeonatoService
+      .streamCampeonato(widget.campeonatoId);
+  late final Stream<List<PartidoModel>> _partidosStream = _partidoService
+      .streamPartidos(widget.campeonatoId);
 
   bool _loading = false;
   _FixtureFiltro _filtro = _FixtureFiltro.todos;
@@ -103,8 +114,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
       // grupo (fase de grupos pura, o grupos+eliminación sin activar la
       // fase eliminatoria), el diálogo necesita saber a qué grupo
       // pertenece cada equipo para no dejar armar cruces entre grupos.
-      final restringirAGrupo =
-          campeonato?.debeRestringirCrucesAlGrupo ?? false;
+      final restringirAGrupo = campeonato?.debeRestringirCrucesAlGrupo ?? false;
 
       final grupos = restringirAGrupo
           ? await _grupoService.getGrupos(widget.campeonatoId)
@@ -135,6 +145,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
         jornada: result.jornada,
         idaYVuelta: result.idaYVuelta,
         grupoId: result.grupoId,
+        privilegio: result.privilegio,
       );
 
       if (!mounted) return;
@@ -183,7 +194,17 @@ class _FixtureScreenState extends State<FixtureScreen> {
       if (!mounted) return;
       AppSnackbars.success(
         context,
-        'Fase eliminatoria activada: ya puedes cruzar equipos de distintos grupos.',
+        'Fase eliminatoria activada: ahora armá las llaves.',
+      );
+
+      // Se abre directo la pantalla de llaves: activar la fase y armar
+      // los cruces es un mismo momento, no tiene sentido hacer que el
+      // admin vaya a buscarla.
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LlavesScreen(campeonatoId: widget.campeonatoId),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
@@ -322,12 +343,12 @@ class _FixtureScreenState extends State<FixtureScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: StreamBuilder<CampeonatoModel?>(
-        stream: _campeonatoService.streamCampeonato(widget.campeonatoId),
+        stream: _campeonatoStream,
         builder: (context, campeonatoSnapshot) {
           final campeonato = campeonatoSnapshot.data;
 
           return StreamBuilder<List<PartidoModel>>(
-            stream: _partidoService.streamPartidos(widget.campeonatoId),
+            stream: _partidosStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const AppLoading(message: 'Cargando fixture...');
@@ -387,8 +408,9 @@ class _FixtureScreenState extends State<FixtureScreen> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  GruposScreen(campeonatoId: widget.campeonatoId),
+                              builder: (_) => GruposScreen(
+                                campeonatoId: widget.campeonatoId,
+                              ),
                             ),
                           );
                         },
@@ -410,6 +432,18 @@ class _FixtureScreenState extends State<FixtureScreen> {
                         icon: Icons.bolt_outlined,
                         loading: _loading,
                         onPressed: () => _activarFaseEliminatoria(campeonato),
+                      ),
+                    if (campeonato != null && campeonato.tieneFasesSeparadas)
+                      AppButton.secondary(
+                        text: 'Llaves',
+                        icon: Icons.account_tree_outlined,
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                LlavesScreen(campeonatoId: widget.campeonatoId),
+                          ),
+                        ),
                       ),
                     if (puedeEditarFixture)
                       AppButton.secondary(
@@ -554,7 +588,8 @@ class _FixtureScreenState extends State<FixtureScreen> {
                                   titulo: entry.key,
                                   partidos: entry.value,
                                   puedeEditar: puedeEditarFixture,
-                                  deporte: campeonato?.deporteEfectivo ??
+                                  deporte:
+                                      campeonato?.deporteEfectivo ??
                                       DeporteTipo.futbol,
                                   onProgramar: _programarPartido,
                                 );
@@ -769,6 +804,14 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
   EquipoModel? _visitante;
   bool _idaYVuelta = false;
 
+  /// Privilegio: deja cruzar equipos de distintos grupos aunque todavía
+  /// sea fase de grupos. El partido queda fuera de los grupos y no suma
+  /// para la tabla.
+  bool _privilegio = false;
+
+  /// Con privilegio se ignora la restricción de grupo del diálogo.
+  bool get _restringir => widget.restringirAGrupo && !_privilegio;
+
   final TextEditingController _jornadaController = TextEditingController(
     text: '1',
   );
@@ -811,17 +854,18 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
         grupoId: _grupoController.text.trim().isEmpty
             ? null
             : _grupoController.text.trim(),
+        privilegio: _privilegio,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final grupoLocal = widget.restringirAGrupo ? _grupoDe(_local) : null;
+    final grupoLocal = _restringir ? _grupoDe(_local) : null;
 
     final visitantes = widget.equipos.where((equipo) {
       if (equipo.id == _local?.id) return false;
-      if (widget.restringirAGrupo && grupoLocal != null) {
+      if (_restringir && grupoLocal != null) {
         return _grupoDe(equipo) == grupoLocal;
       }
       return true;
@@ -839,10 +883,31 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
             children: [
               if (widget.restringirAGrupo) ...[
                 _InfoBox(
-                  text:
-                      'Todavía es fase de grupos: solo puedes cruzar equipos del mismo grupo. Activa la fase eliminatoria para armar cruces entre grupos distintos.',
+                  text: _privilegio
+                      ? 'Privilegio activado: puedes cruzar equipos de cualquier grupo. El partido queda fuera de los grupos y no suma para la tabla.'
+                      : 'Todavía es fase de grupos: solo puedes cruzar equipos del mismo grupo. Actíva "Privilegio" para un partido especial entre grupos distintos.',
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 10),
+                SwitchListTile(
+                  value: _privilegio,
+                  onChanged: (value) {
+                    setState(() {
+                      _privilegio = value;
+                      // Al cambiar el modo, la pareja elegida puede dejar
+                      // de ser válida: se limpia el visitante.
+                      if (!value && _grupoDe(_visitante) != _grupoDe(_local)) {
+                        _visitante = null;
+                      }
+                    });
+                  },
+                  title: const Text('PRIVILEGIO'),
+                  subtitle: const Text(
+                    'Partido especial fuera de grupos: permite cruzar equipos de distintos grupos.',
+                  ),
+                  activeThumbColor: AppColors.secondary,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 6),
               ],
               _EquipoDropdown(
                 label: 'Equipo local',
@@ -856,14 +921,14 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
                       _visitante = null;
                     }
 
-                    if (widget.restringirAGrupo &&
+                    if (_restringir &&
                         _grupoDe(_visitante) != _grupoDe(value)) {
                       _visitante = null;
                     }
                   });
                 },
               ),
-              if (widget.restringirAGrupo && _local != null) ...[
+              if (_restringir && _local != null) ...[
                 const SizedBox(height: 8),
                 Text(
                   grupoLocal == null
@@ -1003,6 +1068,7 @@ class _CruceManualResult {
   final int jornada;
   final bool idaYVuelta;
   final String? grupoId;
+  final bool privilegio;
 
   const _CruceManualResult({
     required this.local,
@@ -1010,6 +1076,7 @@ class _CruceManualResult {
     required this.jornada,
     required this.idaYVuelta,
     this.grupoId,
+    this.privilegio = false,
   });
 }
 

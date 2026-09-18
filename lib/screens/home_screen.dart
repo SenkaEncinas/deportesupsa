@@ -36,6 +36,14 @@ class _HomeScreenState extends State<HomeScreen> {
   _ChampionshipFilter _filter = _ChampionshipFilter.todos;
   String _searchText = '';
 
+  // Los streams se crean una sola vez y no dentro de build(): si se
+  // reconstruyen en cada build, cada setState (una tecla en un
+  // buscador, por ejemplo) genera una suscripción nueva, el
+  // StreamBuilder vuelve a "waiting" y la pantalla entera se
+  // reemplaza por el loading, perdiendo el foco del campo.
+  late final Stream<List<CampeonatoModel>> _campeonatosStream = _service
+      .streamCampeonatosPublicos();
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -93,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: SafeArea(
           child: StreamBuilder<List<CampeonatoModel>>(
-            stream: _service.streamCampeonatosPublicos(),
+            stream: _campeonatosStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const AppLoading(message: 'Cargando campeonatos...');

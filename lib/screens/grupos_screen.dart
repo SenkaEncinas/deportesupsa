@@ -42,6 +42,18 @@ class _GruposScreenState extends State<GruposScreen> {
   final GrupoService _grupoService = GrupoService();
   final PublicHomeService _publicHomeService = PublicHomeService();
 
+  // Los streams se crean una sola vez y no dentro de build(): si se
+  // reconstruyen en cada build, cada setState (una tecla en un
+  // buscador, por ejemplo) genera una suscripción nueva, el
+  // StreamBuilder vuelve a "waiting" y la pantalla entera se
+  // reemplaza por el loading, perdiendo el foco del campo.
+  late final Stream<CampeonatoModel?> _campeonatoStream = _campeonatoService
+      .streamCampeonato(widget.campeonatoId);
+  late final Stream<List<EquipoModel>> _equiposStream = _equipoService
+      .streamEquipos(widget.campeonatoId);
+  late final Stream<List<GrupoModel>> _gruposStream = _grupoService
+      .streamGrupos(widget.campeonatoId);
+
   bool _loading = false;
 
   Future<void> _generarAutomatico(CampeonatoModel campeonato) async {
@@ -207,12 +219,12 @@ class _GruposScreenState extends State<GruposScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: StreamBuilder<CampeonatoModel?>(
-        stream: _campeonatoService.streamCampeonato(widget.campeonatoId),
+        stream: _campeonatoStream,
         builder: (context, campeonatoSnapshot) {
           final campeonato = campeonatoSnapshot.data;
 
           return StreamBuilder<List<EquipoModel>>(
-            stream: _equipoService.streamEquipos(widget.campeonatoId),
+            stream: _equiposStream,
             builder: (context, equiposSnapshot) {
               final equipos = equiposSnapshot.data ?? [];
               final activos = equipos
@@ -220,7 +232,7 @@ class _GruposScreenState extends State<GruposScreen> {
                   .toList();
 
               return StreamBuilder<List<GrupoModel>>(
-                stream: _grupoService.streamGrupos(widget.campeonatoId),
+                stream: _gruposStream,
                 builder: (context, gruposSnapshot) {
                   if (campeonatoSnapshot.connectionState ==
                           ConnectionState.waiting ||

@@ -85,14 +85,7 @@ class _AppClasificadosCardState extends State<AppClasificadosCard> {
                 ),
               )
             else
-              Column(
-                children: widget.clasificados.map((clasificado) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _ClasificadoRow(clasificado: clasificado),
-                  );
-                }).toList(),
-              ),
+              Column(children: _filasPorBloque(widget.clasificados)),
             if (faltan > 0) ...[
               const SizedBox(height: 6),
               Text(
@@ -109,6 +102,62 @@ class _AppClasificadosCardState extends State<AppClasificadosCard> {
         ],
       ),
     );
+  }
+}
+
+/// Arma la lista con un encabezado por bloque (primeros de grupo,
+/// segundos, mejores terceros) y el número de siembra a la izquierda,
+/// que es el orden con el que se cruzan las llaves.
+List<Widget> _filasPorBloque(List<ClasificadoInfo> clasificados) {
+  final filas = <Widget>[];
+  int? bloqueAnterior;
+
+  for (var i = 0; i < clasificados.length; i++) {
+    final clasificado = clasificados[i];
+    final bloque = clasificado.porMejorTercero
+        ? -1
+        : clasificado.posicionEnGrupo;
+
+    if (bloque != bloqueAnterior) {
+      filas.add(
+        Padding(
+          padding: EdgeInsets.only(top: filas.isEmpty ? 0 : 12, bottom: 8),
+          child: Text(
+            _tituloBloque(clasificado),
+            style: AppTextStyles.small.copyWith(
+              color: AppColors.textMuted,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.1,
+            ),
+          ),
+        ),
+      );
+      bloqueAnterior = bloque;
+    }
+
+    filas.add(
+      Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: _ClasificadoRow(clasificado: clasificado, siembra: i + 1),
+      ),
+    );
+  }
+
+  return filas;
+}
+
+String _tituloBloque(ClasificadoInfo clasificado) {
+  if (clasificado.porMejorTercero) return 'MEJORES TERCEROS';
+
+  switch (clasificado.posicionEnGrupo) {
+    case 1:
+      return 'PRIMEROS DE GRUPO';
+    case 2:
+      return 'SEGUNDOS DE GRUPO';
+    case 3:
+      return 'TERCEROS DE GRUPO';
+    default:
+      return '${clasificado.posicionEnGrupo}° DE CADA GRUPO';
   }
 }
 
@@ -139,7 +188,10 @@ class _ToggleIcon extends StatelessWidget {
 class _ClasificadoRow extends StatelessWidget {
   final ClasificadoInfo clasificado;
 
-  const _ClasificadoRow({required this.clasificado});
+  /// Puesto en la tabla general de clasificados (1 = mejor sembrado).
+  final int siembra;
+
+  const _ClasificadoRow({required this.clasificado, required this.siembra});
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +215,7 @@ class _ClasificadoRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(9),
             ),
             child: Text(
-              '${equipo.posicion}',
+              '$siembra',
               style: AppTextStyles.small.copyWith(
                 color: AppColors.primaryDark,
                 fontWeight: FontWeight.w900,
@@ -172,20 +224,36 @@ class _ClasificadoRow extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              equipo.equipoNombre,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.bodyMedium.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  equipo.equipoNombre,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  '${equipo.posicion}° de grupo · ${equipo.puntos} pts · DIF ${equipo.diferenciaGoles >= 0 ? '+' : ''}${equipo.diferenciaGoles}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.small.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 8),
           if (equipo.grupoId != null && equipo.grupoId!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(right: 6),
-              child: AppBadge(text: equipo.grupoId!, type: AppBadgeType.neutral),
+              child: AppBadge(
+                text: equipo.grupoId!,
+                type: AppBadgeType.neutral,
+              ),
             ),
           AppBadge(
             text: clasificado.porMejorTercero ? 'Mejor 3ro' : 'Directo',

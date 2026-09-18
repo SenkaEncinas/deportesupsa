@@ -6,6 +6,8 @@ import 'auditoria_screen.dart';
 import 'equipos_screen.dart';
 import 'fixture_screen.dart';
 import 'grupos_screen.dart';
+import 'igualacion_screen.dart';
+import 'llaves_screen.dart';
 import 'jugadores_sancionados_screen.dart';
 import 'jugadores_screen.dart';
 import 'pdfs_screen.dart';
@@ -40,6 +42,14 @@ class DetalleCampeonatoScreen extends StatefulWidget {
 
 class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
   final CampeonatoService _service = CampeonatoService();
+
+  // Los streams se crean una sola vez y no dentro de build(): si se
+  // reconstruyen en cada build, cada setState (una tecla en un
+  // buscador, por ejemplo) genera una suscripción nueva, el
+  // StreamBuilder vuelve a "waiting" y la pantalla entera se
+  // reemplaza por el loading, perdiendo el foco del campo.
+  late final Stream<CampeonatoModel?> _campeonatoStream = _service
+      .streamCampeonato(widget.campeonatoId);
 
   bool _loadingEstado = false;
 
@@ -144,7 +154,7 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
         ),
         child: SafeArea(
           child: StreamBuilder<CampeonatoModel?>(
-            stream: _service.streamCampeonato(widget.campeonatoId),
+            stream: _campeonatoStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const AppLoading(message: 'Cargando campeonato...');
@@ -270,6 +280,12 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
                             campeonatoId: campeonato.id,
                           ),
                         ),
+                        onIgualacion: () => _goTo(
+                          IgualacionScreen(campeonatoId: campeonato.id),
+                        ),
+                        onLlaves: () => _goTo(
+                          LlavesScreen(campeonatoId: campeonato.id),
+                        ),
                         onPdfs: () =>
                             _goTo(PdfsScreen(campeonatoId: campeonato.id)),
                         onAuditoria: () =>
@@ -349,6 +365,8 @@ class _ModulesGrid extends StatelessWidget {
   final VoidCallback onTabla;
   final VoidCallback onRanking;
   final VoidCallback onSancionados;
+  final VoidCallback onIgualacion;
+  final VoidCallback onLlaves;
   final VoidCallback onPdfs;
   final VoidCallback onAuditoria;
 
@@ -362,6 +380,8 @@ class _ModulesGrid extends StatelessWidget {
     required this.onTabla,
     required this.onRanking,
     required this.onSancionados,
+    required this.onIgualacion,
+    required this.onLlaves,
     required this.onPdfs,
     required this.onAuditoria,
   });
@@ -437,6 +457,25 @@ class _ModulesGrid extends StatelessWidget {
           tag: 'Público',
           onTap: onRanking,
         ),
+      if (campeonato.tieneFasesSeparadas)
+        _ModuleItem(
+          title: 'Llaves',
+          description:
+              'Generar y retocar los cruces de la fase eliminatoria.',
+          icon: Icons.account_tree_outlined,
+          enabled: campeonato.estado != CampeonatoEstado.inscripcion,
+          tag: 'Competencia',
+          onTap: onLlaves,
+        ),
+      _ModuleItem(
+        title: 'Igualación',
+        description:
+            'Sumar puntos a los grupos con menos equipos para compararlos parejo.',
+        icon: Icons.balance_outlined,
+        enabled: campeonato.estado != CampeonatoEstado.inscripcion,
+        tag: 'Competencia',
+        onTap: onIgualacion,
+      ),
       _ModuleItem(
         title: 'Sancionados',
         description: campeonato.esFutbol

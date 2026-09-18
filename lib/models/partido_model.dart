@@ -82,6 +82,11 @@ class PartidoModel {
   final String tipoDefinicion;
   final List<SetPartido> sets;
 
+  /// Partido especial creado con "PRIVILEGIO": queda fuera de los grupos
+  /// a propósito (no suma para la tabla) y tampoco forma parte de la
+  /// llave eliminatoria, aunque comparta con ella el no tener grupo.
+  final bool privilegio;
+
   const PartidoModel({
     required this.id,
     required this.jornada,
@@ -109,6 +114,7 @@ class PartidoModel {
     this.definidoPorProrroga = false,
     this.tipoDefinicion = TipoDefinicion.normal,
     this.sets = const [],
+    this.privilegio = false,
   });
 
   factory PartidoModel.fromMap(String id, Map<String, dynamic> map) {
@@ -170,6 +176,7 @@ class PartidoModel {
         defaultValue: TipoDefinicion.normal,
       ),
       sets: _setsFromJson(map['sets']),
+      privilegio: boolFromJson(map['privilegio']),
     );
   }
 
@@ -200,6 +207,7 @@ class PartidoModel {
       'definidoPorProrroga': definidoPorProrroga,
       'tipoDefinicion': tipoDefinicion,
       'sets': sets.map((set) => set.toMap()).toList(),
+      'privilegio': privilegio,
     };
   }
 

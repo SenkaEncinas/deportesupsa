@@ -3,12 +3,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/campeonato_model.dart';
 import '../models/equipo_model.dart';
 import '../utils/fixture_grouping.dart';
+import 'auditoria_service.dart';
+import 'resultado_service.dart';
 
 class CampeonatoService {
   CampeonatoService({FirebaseFirestore? firestore})
-    : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance,
+      _auditoriaService = AuditoriaService(firestore: firestore);
 
   final FirebaseFirestore _db;
+  final AuditoriaService _auditoriaService;
 
   CollectionReference<Map<String, dynamic>> get _campeonatos =>
       _db.collection('campeonatos');
@@ -62,7 +66,7 @@ class CampeonatoService {
       'temporada': temporada.trim(),
       'cancha': cancha.trim().isEmpty ? 'Cancha UPSA' : cancha.trim(),
       'configuracion': configuracion.toMap(),
-      'reglasPuntuacion': ReglasPuntuacion.defaultRules().toMap(),
+      'reglasPuntuacion': ReglasPuntuacion.porDeporte(deporte).toMap(),
       'reglasDesempate': _reglasDesempatePorDeporte(deporte),
       'fechaCreacion': FieldValue.serverTimestamp(),
       'fechaActualizacion': FieldValue.serverTimestamp(),
@@ -134,6 +138,70 @@ class CampeonatoService {
       'faseActual': FaseCampeonato.eliminatoria,
       'fechaActualizacion': FieldValue.serverTimestamp(),
     });
+  }
+
+  /// Guarda los puntos de igualación de un campeonato (`equipoId` ->
+  /// puntos) y deja la tabla recalculada.
+  ///
+  /// La igualación existe para compensar a los grupos que tienen menos
+  /// equipos que el resto: si los grupos son de 4 y uno quedó con 3, ese
+  /// grupo juega un partido menos y sus equipos nunca podrían competir en
+  /// puntos con los demás al comparar mejores terceros. El profe carga
+  /// ahí los puntos que correspondan.
+  ///
+  /// Se exige que el grupo ya tenga todos sus partidos con resultado: la
+  /// igualación se decide sabiendo cómo terminó el grupo, no antes.
+  Future<void> guardarIgualaciones({
+    required CampeonatoModel campeonato,
+    required Map<String, int> igualaciones,
+    required String usuarioId,
+    required String usuarioNombre,
+    String? observacion,
+  }) async {
+    // Se guardan solo los que tienen puntos: un 0 es "sin igualación" y
+    // no necesita ocupar lugar en el documento.
+    final limpias = <String, int>{};
+
+    igualaciones.forEach((equipoId, puntos) {
+      final id = equipoId.trim();
+      if (id.isEmpty || puntos == 0) return;
+
+      if (puntos < 0) {
+        throw Exception('Los puntos de igualación no pueden ser negativos.');
+      }
+
+      if (puntos > 50) {
+        throw Exception('Los puntos de igualación no pueden superar 50.');
+      }
+
+      limpias[id] = puntos;
+    });
+
+    await _campeonatos.doc(campeonato.id).update({
+      'igualaciones': limpias,
+      'fechaActualizacion': FieldValue.serverTimestamp(),
+    });
+
+    final detalle = limpias.isEmpty
+        ? 'Se quitaron todos los puntos de igualación.'
+        : 'Puntos de igualación actualizados para ${limpias.length} equipo(s).';
+
+    await _auditoriaService.registrar(
+      campeonatoId: campeonato.id,
+      usuarioId: usuarioId,
+      usuarioNombre: usuarioNombre,
+      accion: 'igualacion',
+      modulo: 'Tabla de posiciones',
+      documentoAfectado: campeonato.id,
+      detalle: detalle,
+      observacion: observacion,
+    );
+
+    // La tabla guarda los puntos ya sumados, así que hay que rehacerla
+    // para que el cambio se vea.
+    await ResultadoService(
+      firestore: _db,
+    ).recalcularTablaYRanking(campeonato.id);
   }
 
   /// Ajusta "clasifican por grupo" y "mejores terceros" de un campeonato

@@ -108,6 +108,13 @@ class _ChampionshipContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final estadoTexto = ChampionshipPublicCard.estadoTexto(campeonato.estado);
 
+    // En fase eliminatoria la vista pública se reduce a la llave (y a
+    // los goleadores en fútbol): la tabla, los próximos partidos y las
+    // estadísticas son de la fase de grupos y ya no aportan nada.
+    if (campeonato.estaEnFaseEliminatoria) {
+      return _ContenidoEliminatoria(service: service, campeonato: campeonato);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -178,6 +185,36 @@ class _ChampionshipContent extends StatelessWidget {
           _ClasificadosSection(service: service, campeonato: campeonato),
         ],
         const SizedBox(height: 28),
+      ],
+    );
+  }
+}
+
+/// Contenido público cuando el campeonato está en fase eliminatoria:
+/// solo las llaves y, en fútbol, el ranking de goleadores. Vóley y
+/// básquet no registran goleadores, así que ahí queda únicamente la
+/// llave. Lo usan tanto escritorio como móvil, así que la regla es una
+/// sola y no se puede desincronizar entre las dos vistas.
+class _ContenidoEliminatoria extends StatelessWidget {
+  final PublicHomeService service;
+  final CampeonatoModel campeonato;
+
+  const _ContenidoEliminatoria({
+    required this.service,
+    required this.campeonato,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FixtureSection(service: service, campeonato: campeonato),
+        if (campeonato.esFutbol) ...[
+          const SizedBox(height: 24),
+          _ScorersSection(service: service, campeonato: campeonato),
+        ],
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -386,10 +423,9 @@ class _MobileGruposViewState extends State<_MobileGruposView> {
 /// Toda la pantalla una vez que el campeonato entra en fase eliminatoria:
 /// nada de la info de la fase de grupos (resumen, próximos partidos,
 /// tabla, estadísticas) tiene sentido ya, así que se reemplaza por
-/// completo. Solo queda la llave y, en fútbol, goleadores y clasificados
-/// -siempre desplegados, sin el toggle: acá ya son el destino en sí, no
-/// hace falta un toque extra para verlos-. Sin sidebar: no hay ninguna
-/// otra sección a la que saltar.
+/// completo. Queda la llave y, solo en fútbol, el ranking de goleadores
+/// (ver [_ContenidoEliminatoria], que es el mismo que usa escritorio).
+/// Sin sidebar: no hay ninguna otra sección a la que saltar.
 class _MobileEliminationView extends StatelessWidget {
   final PublicHomeService service;
   final CampeonatoModel campeonato;
@@ -438,18 +474,7 @@ class _MobileEliminationView extends StatelessWidget {
                 icon: Icons.bolt_outlined,
               ),
               const SizedBox(height: 18),
-              _FixtureSection(service: service, campeonato: campeonato),
-              if (campeonato.esFutbol) ...[
-                const SizedBox(height: 20),
-                _ScorersSection(service: service, campeonato: campeonato),
-                const SizedBox(height: 20),
-                _ClasificadosSection(
-                  service: service,
-                  campeonato: campeonato,
-                  colapsable: false,
-                ),
-              ],
-              const SizedBox(height: 12),
+              _ContenidoEliminatoria(service: service, campeonato: campeonato),
             ],
           ),
         ),
@@ -1000,10 +1025,18 @@ class _FixtureSection extends StatelessWidget {
         final List<MapEntry<String, List<PartidoModel>>> rondasLlave;
 
         if (_esEliminacionPura) {
-          rondasLlave = FixtureGrouping.rondasEliminatorias(partidos);
+          rondasLlave = FixtureGrouping.rondasEliminatorias(
+            partidos.where((p) => !p.privilegio).toList(),
+          );
         } else if (_esGruposEliminacion) {
+          // Los partidos con privilegio también van sin grupo, pero no
+          // son parte de la llave: se filtran para que no aparezcan
+          // como una ronda más.
           final deFaseFinal = partidos
-              .where((p) => p.grupoId == null || p.grupoId!.isEmpty)
+              .where(
+                (p) =>
+                    (p.grupoId == null || p.grupoId!.isEmpty) && !p.privilegio,
+              )
               .toList();
 
           rondasLlave = FixtureGrouping.rondasEliminatorias(deFaseFinal);
@@ -1210,10 +1243,31 @@ class _TableSectionState extends State<_TableSection> {
             .copyWith(fontWeight: FontWeight.w700),
       ),
     );
-    final puntos = Text(
-      '${item.puntos}',
-      style: (_compacta ? AppTextStyles.tableCell : AppTextStyles.bodyMedium)
-          .copyWith(color: AppColors.primaryDark, fontWeight: FontWeight.w900),
+    // Con igualación se muestra "14 (+2)": el total ya la incluye, y el
+    // paréntesis deja claro cuánto vino del ajuste manual del admin.
+    final puntos = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '${item.puntos}',
+          style:
+              (_compacta ? AppTextStyles.tableCell : AppTextStyles.bodyMedium)
+                  .copyWith(
+                    color: AppColors.primaryDark,
+                    fontWeight: FontWeight.w900,
+                  ),
+        ),
+        if (item.puntosIgualacion > 0) ...[
+          const SizedBox(width: 3),
+          Text(
+            '(+${item.puntosIgualacion})',
+            style: AppTextStyles.small.copyWith(
+              color: AppColors.secondaryDark,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ],
     );
     final grupo = Text(
       item.grupoId == null ? '-' : _grupoCorto(item.grupoId!),

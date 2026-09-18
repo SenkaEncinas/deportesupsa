@@ -90,14 +90,13 @@ class ResultadoService {
   /// amarillas/rojas; vóley/básquet: sanción por mesa/forzada), para el
   /// módulo de "Jugadores sancionados".
   Stream<List<TarjetaModel>> streamTarjetas(String campeonatoId) {
-    return _tarjetas(campeonatoId)
-        .orderBy('fechaRegistro', descending: true)
-        .snapshots()
-        .map((snap) {
-          return snap.docs.map((doc) {
-            return TarjetaModel.fromMap(doc.id, doc.data());
-          }).toList();
-        });
+    return _tarjetas(
+      campeonatoId,
+    ).orderBy('fechaRegistro', descending: true).snapshots().map((snap) {
+      return snap.docs.map((doc) {
+        return TarjetaModel.fromMap(doc.id, doc.data());
+      }).toList();
+    });
   }
 
   /// Goles por jugador ya registrados de un partido puntual, para
@@ -608,27 +607,42 @@ class ResultadoService {
         visitante.puntosContra += partido.golesLocal!;
       }
 
+      final reglas = campeonatoModel.reglasPuntuacionEfectivas;
+
+      // El punto por perder (vóley: 1) es por presentarse y jugar, así
+      // que un walkover no lo paga: el que no se presentó suma 0.
+      final puntosPerdedor = partido.tipoResultado == TipoResultado.walkover
+          ? 0
+          : reglas.derrota;
+
       if (partido.golesLocal! > partido.golesVisitante!) {
         local.partidosGanados++;
         visitante.partidosPerdidos++;
-        local.puntos += campeonatoModel.reglasPuntuacion.victoria;
-        visitante.puntos += campeonatoModel.reglasPuntuacion.derrota;
+        local.puntos += reglas.victoria;
+        visitante.puntos += puntosPerdedor;
       } else if (partido.golesLocal! < partido.golesVisitante!) {
         visitante.partidosGanados++;
         local.partidosPerdidos++;
-        visitante.puntos += campeonatoModel.reglasPuntuacion.victoria;
-        local.puntos += campeonatoModel.reglasPuntuacion.derrota;
+        visitante.puntos += reglas.victoria;
+        local.puntos += puntosPerdedor;
       } else {
         local.partidosEmpatados++;
         visitante.partidosEmpatados++;
-        local.puntos += campeonatoModel.reglasPuntuacion.empate;
-        visitante.puntos += campeonatoModel.reglasPuntuacion.empate;
+        local.puntos += reglas.empate;
+        visitante.puntos += reglas.empate;
       }
     }
 
     for (final item in acumulados.values) {
       item.diferenciaGoles = item.golesFavor - item.golesContra;
       item.diferenciaPuntos = item.puntosFavor - item.puntosContra;
+
+      // Igualación: puntos cargados a mano por el admin para compensar a
+      // los grupos con menos equipos. Se suman al final, ya con todos los
+      // partidos contados, y entran en el orden de la tabla como
+      // cualquier otro punto.
+      item.puntosIgualacion = campeonatoModel.igualacionDe(item.equipoId);
+      item.puntos += item.puntosIgualacion;
     }
 
     int compararTabla(_TablaAcumulada a, _TablaAcumulada b) {
@@ -711,6 +725,7 @@ class ResultadoService {
         puntosFavor: item.puntosFavor,
         puntosContra: item.puntosContra,
         diferenciaPuntos: item.diferenciaPuntos,
+        puntosIgualacion: item.puntosIgualacion,
       );
 
       batch.set(_tabla(campeonatoId).doc(item.equipoId), tablaModel.toMap());
@@ -804,6 +819,7 @@ class _TablaAcumulada {
   int puntosFavor = 0;
   int puntosContra = 0;
   int diferenciaPuntos = 0;
+  int puntosIgualacion = 0;
 
   _TablaAcumulada({
     required this.equipoId,

@@ -24,6 +24,12 @@ class TablaPosicionModel {
   final int puntosContra;
   final int diferenciaPuntos;
 
+  /// Puntos de igualación cargados a mano por el admin para compensar a
+  /// los grupos con menos equipos (ver `CampeonatoModel.igualaciones`).
+  /// Ya vienen sumados dentro de [puntos]; se guardan aparte solo para
+  /// poder mostrarlos ("+2") y saber de dónde salieron.
+  final int puntosIgualacion;
+
   const TablaPosicionModel({
     required this.equipoId,
     required this.equipoNombre,
@@ -41,6 +47,7 @@ class TablaPosicionModel {
     this.puntosFavor = 0,
     this.puntosContra = 0,
     this.diferenciaPuntos = 0,
+    this.puntosIgualacion = 0,
   });
 
   factory TablaPosicionModel.empty({
@@ -81,6 +88,7 @@ class TablaPosicionModel {
       puntosFavor: intFromJson(map['puntosFavor']),
       puntosContra: intFromJson(map['puntosContra']),
       diferenciaPuntos: intFromJson(map['diferenciaPuntos']),
+      puntosIgualacion: intFromJson(map['puntosIgualacion']),
     );
   }
 
@@ -102,6 +110,7 @@ class TablaPosicionModel {
       'puntosFavor': puntosFavor,
       'puntosContra': puntosContra,
       'diferenciaPuntos': diferenciaPuntos,
+      'puntosIgualacion': puntosIgualacion,
     };
   }
 }

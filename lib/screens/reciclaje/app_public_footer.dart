@@ -199,17 +199,92 @@ class _BandaMarca extends StatelessWidget {
               const SizedBox(height: 22),
               const Divider(height: 1, color: Colors.white24),
               const SizedBox(height: 14),
-              Text(
-                '© ${DateTime.now().year} Universidad Privada de Santa Cruz de la Sierra · Coordinación de Deportes',
-                textAlign: TextAlign.center,
-                style: AppTextStyles.small.copyWith(
-                  color: Colors.white.withValues(alpha: 0.72),
-                ),
-              ),
+              // Copyright y crédito de autoría en la misma línea cuando
+              // hay ancho; apilados y centrados en celular.
+              isMobile
+                  ? Column(
+                      children: [
+                        _Copyright(centrado: true),
+                        const SizedBox(height: 12),
+                        const _CreditoCreador(),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(child: _Copyright(centrado: false)),
+                        const SizedBox(width: 16),
+                        const _CreditoCreador(),
+                      ],
+                    ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _Copyright extends StatelessWidget {
+  final bool centrado;
+
+  const _Copyright({required this.centrado});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '© ${DateTime.now().year} Universidad Privada de Santa Cruz de la Sierra · Coordinación de Deportes',
+      textAlign: centrado ? TextAlign.center : TextAlign.start,
+      style: AppTextStyles.small.copyWith(
+        color: Colors.white.withValues(alpha: 0.72),
+      ),
+    );
+  }
+}
+
+/// Crédito de quien desarrolló la aplicación. Va discreto: texto chico y
+/// el isotipo en su versión monocromática blanca, que es la que el manual
+/// de marca de 57 Nations define para fondos oscuros.
+class _CreditoCreador extends StatelessWidget {
+  const _CreditoCreador();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          'Desarrollado por',
+          style: AppTextStyles.small.copyWith(
+            color: Colors.white.withValues(alpha: 0.55),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Opacity(
+          opacity: 0.9,
+          child: Image.asset(
+            'assets/images/logo_57nations_blanco.png',
+            height: 17,
+            fit: BoxFit.contain,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (_, _, _) => Text(
+              '57 Nations',
+              style: AppTextStyles.small.copyWith(
+                color: AppColors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'Nations',
+          style: AppTextStyles.small.copyWith(
+            color: Colors.white.withValues(alpha: 0.9),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }

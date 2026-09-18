@@ -32,6 +32,14 @@ enum _CampeonatoFilter { todos, inscripcion, activo, finalizado }
 
 class _CampeonatosScreenState extends State<CampeonatosScreen> {
   final CampeonatoService _service = CampeonatoService();
+
+  // Los streams se crean una sola vez y no dentro de build(): si se
+  // reconstruyen en cada build, cada setState (una tecla en un
+  // buscador, por ejemplo) genera una suscripción nueva, el
+  // StreamBuilder vuelve a "waiting" y la pantalla entera se
+  // reemplaza por el loading, perdiendo el foco del campo.
+  late final Stream<List<CampeonatoModel>> _campeonatosStream = _service
+      .streamCampeonatos();
   final TextEditingController _searchController = TextEditingController();
 
   _CampeonatoFilter _filter = _CampeonatoFilter.todos;
@@ -114,7 +122,7 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
         ),
         child: SafeArea(
           child: StreamBuilder<List<CampeonatoModel>>(
-            stream: _service.streamCampeonatos(),
+            stream: _campeonatosStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const AppLoading(message: 'Cargando campeonatos...');

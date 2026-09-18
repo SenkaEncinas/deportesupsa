@@ -76,6 +76,7 @@ class PartidoService {
     required EquipoModel local,
     required EquipoModel visitante,
     required bool generadoPorSistema,
+    bool privilegio = false,
   }) {
     return {
       'jornada': jornada,
@@ -101,6 +102,7 @@ class PartidoService {
       'definidoPorProrroga': false,
       'tipoDefinicion': TipoDefinicion.normal,
       'sets': const [],
+      'privilegio': privilegio,
       'fechaCreacion': FieldValue.serverTimestamp(),
       'fechaActualizacion': FieldValue.serverTimestamp(),
     };
@@ -432,7 +434,15 @@ class PartidoService {
     required EquipoModel equipoLocal,
     required EquipoModel equipoVisitante,
     required String? grupoIdSolicitado,
+    bool privilegio = false,
   }) async {
+    // Partido con privilegio: queda fuera de los grupos a propósito, así
+    // que no se valida que ambos equipos sean del mismo grupo y se
+    // guarda sin grupoId. Al no tener grupo, no suma para la tabla de la
+    // fase de grupos (ver `_recalcularTabla`), que es justamente lo que
+    // se busca para un amistoso o un partido especial.
+    if (privilegio) return null;
+
     final campeonatoDoc = await _campeonato(campeonatoId).get();
 
     if (!campeonatoDoc.exists || campeonatoDoc.data() == null) {
@@ -482,6 +492,7 @@ class PartidoService {
     required int jornada,
     required bool idaYVuelta,
     String? grupoId,
+    bool privilegio = false,
   }) async {
     if (equipoLocal.id == equipoVisitante.id) {
       throw Exception('Un equipo no puede jugar contra sí mismo.');
@@ -514,6 +525,7 @@ class PartidoService {
       equipoLocal: equipoLocal,
       equipoVisitante: equipoVisitante,
       grupoIdSolicitado: grupoId,
+      privilegio: privilegio,
     );
 
     final batch = _db.batch();
@@ -529,6 +541,7 @@ class PartidoService {
         local: equipoLocal,
         visitante: equipoVisitante,
         generadoPorSistema: false,
+        privilegio: privilegio,
       ),
     );
 
@@ -554,6 +567,145 @@ class PartidoService {
     // (o es el primer partido del campeonato), la tabla pública necesita
     // recalcularse para reflejarlo sin esperar al primer resultado.
     await _resultadoService.recalcularTablaYRanking(campeonatoId);
+  }
+
+  /// Partidos que forman la llave eliminatoria: los que no tienen grupo
+  /// y no son partidos de privilegio (esos quedan fuera a propósito).
+  List<PartidoModel> soloDeLlave(List<PartidoModel> partidos) {
+    return partidos
+        .where(
+          (p) => (p.grupoId == null || p.grupoId!.isEmpty) && !p.privilegio,
+        )
+        .toList();
+  }
+
+  /// Genera la primera ronda de la llave eliminatoria cruzando a los
+  /// clasificados por siembra: 1° vs último, 2° vs anteúltimo, etc. Es el
+  /// cruce clásico, el que premia al que terminó mejor la fase de grupos.
+  ///
+  /// [clasificados] tiene que venir ya ordenado de mejor a peor. Los
+  /// cruces quedan sin grupo (son fase final) y el admin los puede
+  /// retocar después desde la pantalla de llaves.
+  Future<void> generarLlavesEliminatorias({
+    required String campeonatoId,
+    required List<EquipoModel> clasificados,
+    int jornada = 1,
+  }) async {
+    if (clasificados.length < 2) {
+      throw Exception(
+        'Hacen falta al menos 2 equipos clasificados para armar la llave.',
+      );
+    }
+
+    if (clasificados.length.isOdd) {
+      throw Exception(
+        'Los clasificados son ${clasificados.length} (impar): la llave necesita un número par para que nadie quede sin cruce. Ajusta "clasifican por grupo" o los mejores terceros.',
+      );
+    }
+
+    final existentesSnap = await _partidos(campeonatoId).get();
+    final existentes = existentesSnap.docs
+        .map((doc) => PartidoModel.fromMap(doc.id, doc.data()))
+        .toList();
+
+    final deLlave = soloDeLlave(existentes);
+
+    // No se pisa una llave que ya se empezó a jugar.
+    final conResultado = deLlave.where((p) => p.resultadoRegistrado).toList();
+
+    if (conResultado.isNotEmpty) {
+      throw Exception(
+        'La llave ya tiene ${conResultado.length} partido(s) con resultado cargado. Borra esos resultados antes de volver a generarla.',
+      );
+    }
+
+    final batch = _db.batch();
+
+    // Se limpia la llave anterior (sin tocar la fase de grupos ni los
+    // partidos de privilegio) para no duplicar cruces.
+    for (final partido in deLlave) {
+      batch.delete(_partidos(campeonatoId).doc(partido.id));
+    }
+
+    final total = clasificados.length;
+
+    for (var i = 0; i < total / 2; i++) {
+      final local = clasificados[i];
+      final visitante = clasificados[total - 1 - i];
+
+      batch.set(
+        _partidos(campeonatoId).doc(),
+        _partidoBase(
+          jornada: jornada,
+          vuelta: 1,
+          grupoId: null,
+          local: local,
+          visitante: visitante,
+          generadoPorSistema: true,
+        ),
+      );
+    }
+
+    await batch.commit();
+  }
+
+  /// Cambia los equipos de un cruce ya creado (para retocar la llave a
+  /// mano). No se permite si el partido ya tiene resultado: primero hay
+  /// que borrar el resultado.
+  Future<void> cambiarEquiposPartido({
+    required String campeonatoId,
+    required String partidoId,
+    required EquipoModel local,
+    required EquipoModel visitante,
+  }) async {
+    if (local.id == visitante.id) {
+      throw Exception('Un equipo no puede jugar contra sí mismo.');
+    }
+
+    final doc = await _partidos(campeonatoId).doc(partidoId).get();
+
+    if (!doc.exists || doc.data() == null) {
+      throw Exception('El partido no existe.');
+    }
+
+    final partido = PartidoModel.fromMap(doc.id, doc.data()!);
+
+    if (partido.resultadoRegistrado) {
+      throw Exception(
+        'Ese partido ya tiene resultado cargado. Borra el resultado antes de cambiar los equipos.',
+      );
+    }
+
+    await _partidos(campeonatoId).doc(partidoId).update({
+      'equipoLocalId': local.id,
+      'equipoLocalNombre': local.nombre,
+      'equipoVisitanteId': visitante.id,
+      'equipoVisitanteNombre': visitante.nombre,
+      'fechaActualizacion': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Borra un partido. Pensado para sacar un cruce de la llave que ya no
+  /// va; no se permite si tiene resultado cargado.
+  Future<void> eliminarPartido({
+    required String campeonatoId,
+    required String partidoId,
+  }) async {
+    final doc = await _partidos(campeonatoId).doc(partidoId).get();
+
+    if (!doc.exists || doc.data() == null) {
+      throw Exception('El partido no existe.');
+    }
+
+    final partido = PartidoModel.fromMap(doc.id, doc.data()!);
+
+    if (partido.resultadoRegistrado) {
+      throw Exception(
+        'Ese partido ya tiene resultado cargado. Borra el resultado antes de eliminarlo.',
+      );
+    }
+
+    await _partidos(campeonatoId).doc(partidoId).delete();
   }
 
   Future<void> programarPartido({

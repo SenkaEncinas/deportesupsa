@@ -35,6 +35,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   final AuthService _authService = AuthService();
   final PublicHomeService _publicHomeService = PublicHomeService();
 
+  // Los streams se crean una sola vez y no dentro de build(): si se
+  // reconstruyen en cada build, cada setState (una tecla en un
+  // buscador, por ejemplo) genera una suscripción nueva, el
+  // StreamBuilder vuelve a "waiting" y la pantalla entera se
+  // reemplaza por el loading, perdiendo el foco del campo.
+  late final Stream<List<CampeonatoModel>> _campeonatosStream =
+      _publicHomeService.streamCampeonatosPublicos();
+
   Future<AdminModel?>? _adminFuture;
 
   @override
@@ -115,7 +123,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   adminSnapshot.connectionState == ConnectionState.waiting;
 
               return StreamBuilder<List<CampeonatoModel>>(
-                stream: _publicHomeService.streamCampeonatosPublicos(),
+                stream: _campeonatosStream,
                 builder: (context, campeonatoSnapshot) {
                   final campeonatos = campeonatoSnapshot.data ?? [];
 

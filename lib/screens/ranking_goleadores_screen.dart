@@ -35,20 +35,30 @@ class _RankingGoleadoresScreenState extends State<RankingGoleadoresScreen> {
     super.dispose();
   }
 
+  // Los streams se crean una sola vez y no dentro de build(): si se
+  // reconstruyen en cada build, cada setState (una tecla en un
+  // buscador, por ejemplo) genera una suscripción nueva, el
+  // StreamBuilder vuelve a "waiting" y la pantalla entera se
+  // reemplaza por el loading, perdiendo el foco del campo.
+  late final CampeonatoService _campeonatoService = CampeonatoService();
+  late final PublicHomeService _publicService = PublicHomeService();
+  late final Stream<CampeonatoModel?> _campeonatoStream = _campeonatoService
+      .streamCampeonato(widget.campeonatoId);
+  late final Stream<List<RankingGoleadorModel>> _rankingStream =
+      _publicService.streamRankingGoleadores(widget.campeonatoId);
+
   @override
   Widget build(BuildContext context) {
     final campeonatoId = widget.campeonatoId;
-    final campeonatoService = CampeonatoService();
-    final publicService = PublicHomeService();
 
     return Scaffold(
       body: StreamBuilder<CampeonatoModel?>(
-        stream: campeonatoService.streamCampeonato(campeonatoId),
+        stream: _campeonatoStream,
         builder: (context, campeonatoSnapshot) {
           final campeonato = campeonatoSnapshot.data;
 
           return StreamBuilder<List<RankingGoleadorModel>>(
-            stream: publicService.streamRankingGoleadores(campeonatoId),
+            stream: _rankingStream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const AppLoading(message: 'Cargando goleadores...');
