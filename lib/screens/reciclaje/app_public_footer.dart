@@ -1,9 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../utils/patrocinadores_assets.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 import 'responsive.dart';
+
+/// Sitio de quien desarrolló la app, al que lleva el crédito del footer.
+const String _kSitio57Nations = 'https://nations-2b049.web.app';
+
+/// Abre [url] en el navegador. Si el sistema no puede abrirla, no pasa
+/// nada: es un enlace de cortesía, no vale romper el footer por eso.
+Future<void> _abrir(String url) async {
+  final uri = Uri.parse(url);
+
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+/// Envuelve un logo para que se pueda tocar cuando tiene sitio web, y lo
+/// deja tal cual cuando no. Así el footer no tiene que preguntar dos
+/// veces por el mismo caso.
+class _EnlaceOpcional extends StatelessWidget {
+  final String? url;
+  final String? tooltip;
+  final Widget child;
+
+  const _EnlaceOpcional({
+    required this.url,
+    required this.child,
+    this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (url == null) return child;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Tooltip(
+        message: tooltip ?? url!,
+        child: InkWell(
+          onTap: () => _abrir(url!),
+          borderRadius: BorderRadius.circular(8),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
 
 /// Pie de página de las pantallas públicas.
 ///
@@ -79,14 +125,17 @@ class _FranjaAuspiciantes extends StatelessWidget {
                 runSpacing: isMobile ? 14 : 20,
                 children: _ordenados(logos)
                     .map(
-                      (logo) => _TileLogo(
-                        ruta: logo.ruta,
-                        ancho: logo.destacado
-                            ? (isMobile ? 120 : 160)
-                            : (isMobile ? 92 : 124),
-                        alto: logo.destacado
-                            ? (isMobile ? 48 : 60)
-                            : (isMobile ? 38 : 46),
+                      (logo) => _EnlaceOpcional(
+                        url: PatrocinadoresAssets.sitioDe(logo.ruta),
+                        child: _TileLogo(
+                          ruta: logo.ruta,
+                          ancho: logo.destacado
+                              ? (isMobile ? 120 : 160)
+                              : (isMobile ? 92 : 124),
+                          alto: logo.destacado
+                              ? (isMobile ? 48 : 60)
+                              : (isMobile ? 38 : 46),
+                        ),
                       ),
                     )
                     .toList(),
@@ -260,28 +309,42 @@ class _CreditoCreador extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Opacity(
-          opacity: 0.9,
-          child: Image.asset(
-            'assets/images/logo_57nations_blanco.png',
-            height: 17,
-            fit: BoxFit.contain,
-            filterQuality: FilterQuality.medium,
-            errorBuilder: (_, _, _) => Text(
-              '57 Nations',
-              style: AppTextStyles.small.copyWith(
-                color: AppColors.white,
-                fontWeight: FontWeight.w800,
-              ),
+        // El logo y el nombre son un solo botón: tocar cualquiera de
+        // los dos lleva al sitio de 57 Nations.
+        _EnlaceOpcional(
+          url: _kSitio57Nations,
+          tooltip: 'Ir al sitio de 57 Nations',
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Opacity(
+                  opacity: 0.9,
+                  child: Image.asset(
+                    'assets/images/logo_57nations_blanco.png',
+                    height: 17,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.medium,
+                    errorBuilder: (_, _, _) => Text(
+                      '57 Nations',
+                      style: AppTextStyles.small.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Nations',
+                  style: AppTextStyles.small.copyWith(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          'Nations',
-          style: AppTextStyles.small.copyWith(
-            color: Colors.white.withValues(alpha: 0.9),
-            fontWeight: FontWeight.w700,
           ),
         ),
       ],

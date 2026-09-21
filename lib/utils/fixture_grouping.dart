@@ -1,5 +1,6 @@
 import '../models/campeonato_model.dart';
 import '../models/partido_model.dart';
+import 'llaves.dart';
 
 /// Agrupa y nombra las secciones del fixture según el formato del
 /// campeonato (liga, grupos, eliminación, grupos + eliminación...). Se
@@ -138,6 +139,38 @@ class FixtureGrouping {
   static List<MapEntry<String, List<PartidoModel>>> rondasEliminatorias(
     List<PartidoModel> partidos,
   ) {
+    if (partidos.isEmpty) return const [];
+
+    // Cuadro generado por la app: la ronda y la posición de cada cruce
+    // están guardadas en el partido, así que no hay nada que adivinar.
+    if (partidos.every((partido) => partido.esDeLlave)) {
+      final porRonda = <String, List<PartidoModel>>{};
+
+      for (final partido in partidos) {
+        porRonda.putIfAbsent(partido.rondaLlave!, () => []).add(partido);
+      }
+
+      final claves = porRonda.keys.toList()
+        ..sort((a, b) => RondaLlave.orden(a).compareTo(RondaLlave.orden(b)));
+
+      return claves.map((clave) {
+        // `ordenLlave` es la posición de arriba hacia abajo en el
+        // dibujo: ordenada así, cada par de cruces consecutivos es
+        // justo el que alimenta al mismo cruce de la ronda siguiente,
+        // y los conectores salen derechos.
+        final lista = porRonda[clave]!
+          ..sort((a, b) {
+            final orden = (a.ordenLlave ?? 0).compareTo(b.ordenLlave ?? 0);
+            if (orden != 0) return orden;
+            return (a.llave ?? 0).compareTo(b.llave ?? 0);
+          });
+
+        return MapEntry(RondaLlave.nombre(clave), lista);
+      }).toList();
+    }
+
+    // Cruces viejos o armados a mano: no tienen ronda guardada, así que
+    // se agrupan por jornada y la ronda se deduce de cuántos son.
     final porJornada = <int, List<PartidoModel>>{};
 
     for (final partido in partidos) {

@@ -8,6 +8,7 @@ import '../models/partido_model.dart';
 import '../models/ranking_goleador_model.dart';
 import '../models/tabla_posicion_model.dart';
 import '../models/tarjeta_model.dart';
+import '../utils/llaves.dart';
 import 'auditoria_service.dart';
 
 class GolJugadorInput {
@@ -182,6 +183,16 @@ class ResultadoService {
     }
 
     final partido = PartidoModel.fromMap(partidoDoc.id, partidoDoc.data()!);
+
+    // Cruces del cuadro que todavía esperan al ganador de la ronda
+    // anterior, o que son un pase directo: no hay partido que jugar.
+    if (partido.esDeLlave && !partido.admiteResultado) {
+      throw Exception(
+        partido.esBye
+            ? 'Esa llave no se juega: ${partido.equipoLocalNombre.isEmpty ? partido.equipoVisitanteNombre : partido.equipoLocalNombre} pasa directo a la ronda siguiente.'
+            : 'Esa llave todavía no tiene definidos a sus dos equipos: primero hay que jugar la ronda anterior.',
+      );
+    }
 
     final esAdministrativo =
         tipoResultado == TipoResultado.walkover ||
@@ -473,6 +484,12 @@ class ResultadoService {
 
     await recalcularTablaYRanking(campeonatoId);
 
+    // Si el partido era un cruce de la llave, el ganador pasa solo al
+    // cruce de la ronda siguiente que le corresponde.
+    if (partido.esDeLlave) {
+      await avanzarGanadoresDeLlave(campeonatoId);
+    }
+
     final esEdicion = partido.resultadoRegistrado;
 
     await _auditoriaService.registrar(
@@ -492,17 +509,120 @@ class ResultadoService {
 
   /// En formatos de dos fases (grupos+eliminación, liga+final,
   /// liga+playoffs) la fase de grupos/liga permite empate, pero la fase
-  /// final no debería. Esos partidos de fase final siempre se crean con
-  /// "cruce manual" (no hay generador automático de llaves todavía), así
-  /// que `generadoPorSistema == false` es la señal confiable de que un
-  /// partido pertenece a la fase final y no a la fase de grupos/liga.
+  /// final no: de un cruce eliminatorio tiene que salir un ganador.
+  ///
+  /// Un cruce generado por el cuadro se reconoce por su ronda de llave.
+  /// Los que se arman a mano no la tienen, y ahí sigue valiendo la
+  /// señal vieja: los de la fase de grupos los genera el sistema, los
+  /// de fase final los carga el admin con "cruce manual".
   bool _esFaseFinalSinEmpate(CampeonatoModel campeonato, PartidoModel partido) {
     final formatoDosFases =
         campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion ||
         campeonato.tipoCampeonato == TipoCampeonato.ligaFinal ||
         campeonato.tipoCampeonato == TipoCampeonato.ligaPlayoffs;
 
-    return formatoDosFases && !partido.generadoPorSistema;
+    if (!formatoDosFases) return false;
+
+    return partido.esDeLlave || !partido.generadoPorSistema;
+  }
+
+  /// Lleva a los ganadores de cada ronda de la llave al cruce que les
+  /// toca en la ronda siguiente, y vuelve a dejar el hueco en "Ganador
+  /// llave N" si el resultado que lo definía se editó o se borró.
+  ///
+  /// Se dispara sola después de cargar un resultado, así que el cuadro
+  /// se va completando a medida que se juega, sin que el admin tenga
+  /// que copiar los nombres a mano.
+  ///
+  /// Vive acá y no en `PartidoService` para no tener que depender de
+  /// ese servicio desde el registro de resultados (sería un círculo).
+  Future<void> avanzarGanadoresDeLlave(String campeonatoId) async {
+    final snap = await _partidos(campeonatoId).get();
+
+    final partidos = snap.docs
+        .map((doc) => PartidoModel.fromMap(doc.id, doc.data()))
+        .where((partido) => partido.esDeLlave)
+        .toList();
+
+    if (partidos.isEmpty) return;
+
+    // Los cruces agrupados por ronda, de la primera a la final.
+    final porRonda = <int, List<PartidoModel>>{};
+
+    for (final partido in partidos) {
+      final orden = RondaLlave.orden(partido.rondaLlave!);
+      porRonda.putIfAbsent(orden, () => []).add(partido);
+    }
+
+    final ordenes = porRonda.keys.toList()..sort();
+
+    final batch = _db.batch();
+    var cambios = 0;
+
+    // Ronda por ronda: de cada una sale, por número de llave, quién
+    // pasa, y eso se vuelca en los cruces de la ronda siguiente.
+    for (var i = 0; i + 1 < ordenes.length; i++) {
+      final pasan = <int, ({String id, String nombre})>{};
+
+      for (final partido in porRonda[ordenes[i]]!) {
+        // Un "libre" no se juega: pasa el único equipo que tiene.
+        final ganadorId = partido.esBye
+            ? (partido.equipoLocalId.isNotEmpty
+                  ? partido.equipoLocalId
+                  : partido.equipoVisitanteId)
+            : (partido.resultadoRegistrado ? partido.ganadorId : null);
+
+        if (ganadorId == null || ganadorId.isEmpty) continue;
+
+        pasan[partido.llave!] = (
+          id: ganadorId,
+          nombre: ganadorId == partido.equipoLocalId
+              ? partido.equipoLocalNombre
+              : partido.equipoVisitanteNombre,
+        );
+      }
+
+      for (final partido in porRonda[ordenes[i + 1]]!) {
+        // Un cruce que ya se jugó no se toca: para corregirlo hay que
+        // rehacer su resultado primero.
+        if (partido.resultadoRegistrado) continue;
+
+        final local = _ocupanteDeSlot(pasan, partido.vieneDeLocal);
+        final visitante = _ocupanteDeSlot(pasan, partido.vieneDeVisitante);
+
+        final cambio = <String, dynamic>{};
+
+        if (local != null && local.id != partido.equipoLocalId) {
+          cambio['equipoLocalId'] = local.id;
+          cambio['equipoLocalNombre'] = local.nombre;
+        }
+
+        if (visitante != null && visitante.id != partido.equipoVisitanteId) {
+          cambio['equipoVisitanteId'] = visitante.id;
+          cambio['equipoVisitanteNombre'] = visitante.nombre;
+        }
+
+        if (cambio.isEmpty) continue;
+
+        cambio['fechaActualizacion'] = FieldValue.serverTimestamp();
+        batch.update(_partidos(campeonatoId).doc(partido.id), cambio);
+        cambios++;
+      }
+    }
+
+    if (cambios > 0) await batch.commit();
+  }
+
+  /// Quién ocupa el lugar que alimenta la llave [vieneDe]: el ganador si
+  /// ya está definido, o el hueco vacío con su texto provisorio si esa
+  /// llave todavía no se resolvió.
+  ({String id, String nombre})? _ocupanteDeSlot(
+    Map<int, ({String id, String nombre})> pasan,
+    int? vieneDe,
+  ) {
+    if (vieneDe == null) return null;
+
+    return pasan[vieneDe] ?? (id: '', nombre: Llaves.pendiente(vieneDe));
   }
 
   Future<void> recalcularTablaYRanking(String campeonatoId) async {

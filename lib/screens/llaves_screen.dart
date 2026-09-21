@@ -80,8 +80,12 @@ class _LlavesScreenState extends State<LlavesScreen> {
       context: context,
       title: 'Generar llaves',
       message:
-          'Se van a cruzar los ${clasificados.length} clasificados por siembra: el 1° contra el último, el 2° contra el anteúltimo, y así. '
-          'Si ya había llaves armadas sin resultados, se reemplazan. Después podés cambiar cualquier cruce a mano.',
+          'Se arma el cuadro completo con los ${clasificados.length} clasificados: '
+          '${FixtureGrouping.rondaSegunEquipos(clasificados.length).toLowerCase()} y todas las rondas siguientes hasta la final, '
+          'esperando al ganador de cada llave.\n\n'
+          'La siembra es la del cuadro oficial: el 1° contra el último, el 2° contra el anteúltimo, y en cada ronda la llave 1 contra la última. '
+          'Así el 1° y el 2° de la tabla solo se pueden cruzar en la final.\n\n'
+          'Si ya había llaves armadas sin resultados, se reemplazan.',
       confirmText: 'Generar',
     );
 
@@ -253,7 +257,7 @@ class _LlavesScreenState extends State<LlavesScreen> {
                               icon: Icons.account_tree_outlined,
                               text: 'Todavía no hay llaves armadas.',
                               subtitle:
-                                  'Usá "Generar llaves" para cruzar a los clasificados, o creá los cruces a mano desde Fixture.',
+                                  'Usá "Generar llaves" para armar el cuadro completo con los clasificados, o creá los cruces a mano desde Fixture.',
                             )
                           else
                             ...rondas.map(
@@ -317,13 +321,13 @@ class _AyudaCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             faseActivada
-                ? 'Las llaves se generan cruzando a los clasificados por siembra: el 1° contra el último, el 2° contra el anteúltimo. Podés cambiar cualquier cruce con el lápiz, o borrarlo.'
+                ? 'Se arma el cuadro completo, de la primera ronda hasta la final. La llave 1 se cruza con la última, la 2 con la anteúltima, y así en todas las rondas: por eso el 1° y el 2° de la tabla recién se pueden encontrar en la final.'
                 : 'Podés dejar las llaves preparadas, pero recién cuando actives la fase eliminatoria en Fixture los usuarios van a ver solo las llaves.',
             style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
           Text(
-            'Un cruce con resultado cargado no se puede cambiar ni borrar: primero hay que borrar el resultado.',
+            'Los cruces de las rondas siguientes se completan solos al cargar cada resultado. Un cruce con resultado cargado no se puede cambiar: primero hay que rehacer el resultado.',
             style: AppTextStyles.small.copyWith(color: AppColors.textMuted),
           ),
         ],
@@ -385,36 +389,81 @@ class _CruceFila extends StatelessWidget {
     final bloqueado = partido.resultadoRegistrado;
     final isMobile = Responsive.isMobile(context);
 
+    // Un cruce que todavía espera al ganador de la ronda anterior no se
+    // edita a mano: lo llena solo la app al cargar ese resultado.
+    final esperaGanador =
+        partido.esDeLlave && !partido.tieneEquiposDefinidos && !partido.esBye;
+
     final equipos = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (partido.llave != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              'Llave ${partido.llave}',
+              style: AppTextStyles.small.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: AppColors.textMuted,
+              ),
+            ),
+          ),
         Text(
           '${partido.equipoLocalNombre}  vs  ${partido.equipoVisitanteNombre}',
-          style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700),
+          style: AppTextStyles.bodyMedium.copyWith(
+            fontWeight: FontWeight.w700,
+            fontStyle: esperaGanador ? FontStyle.italic : FontStyle.normal,
+            color: esperaGanador ? AppColors.textSecondary : null,
+          ),
         ),
         const SizedBox(height: 4),
         Row(
           children: [
             AppBadge(
-              text: bloqueado ? partido.marcadorTexto : 'Sin jugar',
-              type: bloqueado ? AppBadgeType.success : AppBadgeType.neutral,
+              text: partido.esBye
+                  ? 'Pasa directo'
+                  : esperaGanador
+                  ? 'Espera la ronda anterior'
+                  : bloqueado
+                  ? partido.marcadorTexto
+                  : 'Sin jugar',
+              type: partido.esBye
+                  ? AppBadgeType.info
+                  : esperaGanador
+                  ? AppBadgeType.neutral
+                  : bloqueado
+                  ? AppBadgeType.success
+                  : AppBadgeType.neutral,
             ),
           ],
         ),
       ],
     );
 
+    final noEditable = bloqueado || esperaGanador || partido.esBye;
+
     final acciones = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          tooltip: bloqueado ? 'Tiene resultado cargado' : 'Cambiar equipos',
-          onPressed: bloqueado ? null : onEditar,
+          tooltip: bloqueado
+              ? 'Tiene resultado cargado'
+              : esperaGanador
+              ? 'Se llena solo con el ganador de la ronda anterior'
+              : partido.esBye
+              ? 'Es un pase directo, no se juega'
+              : 'Cambiar equipos',
+          onPressed: noEditable ? null : onEditar,
           icon: const Icon(Icons.edit_outlined),
         ),
         IconButton(
-          tooltip: bloqueado ? 'Tiene resultado cargado' : 'Eliminar cruce',
-          onPressed: bloqueado ? null : onEliminar,
+          tooltip: bloqueado
+              ? 'Tiene resultado cargado'
+              : partido.esDeLlave
+              ? 'Forma parte del cuadro: usá "Regenerar llaves"'
+              : 'Eliminar cruce',
+          onPressed: bloqueado || partido.esDeLlave ? null : onEliminar,
           icon: const Icon(Icons.delete_outline),
           color: AppColors.danger,
         ),

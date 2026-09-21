@@ -6,6 +6,7 @@ import '../models/campeonato_model.dart';
 import '../models/equipo_model.dart';
 import '../models/grupo_model.dart';
 import '../models/partido_model.dart';
+import '../utils/llaves.dart';
 import 'grupo_service.dart';
 import 'resultado_service.dart';
 
@@ -69,23 +70,43 @@ class PartidoService {
 
   /// Datos base de un partido nuevo. Incluye los campos nuevos con
   /// valores neutros para que todos los documentos queden completos.
+  ///
+  /// [local] y [visitante] pueden venir en null en los cruces de la
+  /// llave que todavía esperan al ganador de la ronda anterior: en ese
+  /// caso el id queda vacío y el nombre guarda el texto provisorio
+  /// ("Ganador llave 8"), que es lo que se ve en el cuadro.
   Map<String, dynamic> _partidoBase({
     required int jornada,
     required int vuelta,
     String? grupoId,
-    required EquipoModel local,
-    required EquipoModel visitante,
+    required EquipoModel? local,
+    required EquipoModel? visitante,
     required bool generadoPorSistema,
     bool privilegio = false,
+    String? localPendienteTexto,
+    String? visitantePendienteTexto,
+    String? rondaLlave,
+    int? llave,
+    int? ordenLlave,
+    int? vieneDeLocal,
+    int? vieneDeVisitante,
+    bool esBye = false,
   }) {
     return {
       'jornada': jornada,
       'vuelta': vuelta,
       'grupoId': grupoId,
-      'equipoLocalId': local.id,
-      'equipoLocalNombre': local.nombre,
-      'equipoVisitanteId': visitante.id,
-      'equipoVisitanteNombre': visitante.nombre,
+      'equipoLocalId': local?.id ?? '',
+      'equipoLocalNombre': local?.nombre ?? localPendienteTexto ?? 'Por definir',
+      'equipoVisitanteId': visitante?.id ?? '',
+      'equipoVisitanteNombre':
+          visitante?.nombre ?? visitantePendienteTexto ?? 'Por definir',
+      'rondaLlave': rondaLlave,
+      'llave': llave,
+      'ordenLlave': ordenLlave,
+      'vieneDeLocal': vieneDeLocal,
+      'vieneDeVisitante': vieneDeVisitante,
+      'esBye': esBye,
       'fechaHora': null,
       'estado': PartidoEstado.pendienteProgramacion,
       'golesLocal': null,
@@ -369,42 +390,25 @@ class PartidoService {
   /// Eliminación directa: primera ronda con cruces aleatorios.
   /// Las rondas siguientes se agregan con cruce manual cuando existan
   /// ganadores (preparado para generación automática en una fase futura).
+  /// Eliminación directa desde el arranque: se arma el mismo cuadro
+  /// completo que en grupos+eliminación, solo que la "siembra" es el
+  /// orden de los equipos (sorteado si el campeonato es aleatorio) en
+  /// vez de la tabla de clasificados.
   Future<void> _generarEliminacionDirecta({
     required String campeonatoId,
     required List<EquipoModel> equipos,
     required bool aleatorio,
   }) async {
-    if (equipos.length.isOdd) {
-      throw Exception(
-        'La eliminación directa necesita una cantidad par de equipos (hay ${equipos.length}). Ajusta los equipos activos o crea los cruces manualmente.',
-      );
-    }
-
     final lista = [...equipos];
 
     if (aleatorio) {
       lista.shuffle(Random());
     }
 
-    final batch = _db.batch();
-
-    for (int i = 0; i < lista.length; i += 2) {
-      final doc = _partidos(campeonatoId).doc();
-
-      batch.set(
-        doc,
-        _partidoBase(
-          jornada: 1,
-          vuelta: 1,
-          grupoId: null,
-          local: lista[i],
-          visitante: lista[i + 1],
-          generadoPorSistema: true,
-        ),
-      );
-    }
-
-    await batch.commit();
+    await generarLlavesEliminatorias(
+      campeonatoId: campeonatoId,
+      clasificados: lista,
+    );
   }
 
   /// Generador histórico (ida y vuelta). Se mantiene por compatibilidad;
@@ -579,27 +583,33 @@ class PartidoService {
         .toList();
   }
 
-  /// Genera la primera ronda de la llave eliminatoria cruzando a los
-  /// clasificados por siembra: 1° vs último, 2° vs anteúltimo, etc. Es el
-  /// cruce clásico, el que premia al que terminó mejor la fase de grupos.
+  /// Genera el **cuadro completo** de la fase eliminatoria: la primera
+  /// ronda con los clasificados sembrados y todas las rondas siguientes
+  /// ya creadas, esperando al ganador de cada llave.
   ///
-  /// [clasificados] tiene que venir ya ordenado de mejor a peor. Los
-  /// cruces quedan sin grupo (son fase final) y el admin los puede
+  /// La siembra es la del cuadro de la Copa UPSA (ver `Llaves`): la
+  /// llave `i` se cruza con la llave `n + 1 - i` en **todas** las
+  /// rondas. Con 16 clasificados queda:
+  ///
+  ///     Octavos:   1-16, 2-15, 3-14, 4-13, 5-12, 6-11, 7-10, 8-9
+  ///     Cuartos:   L1-L8, L2-L7, L3-L6, L4-L5
+  ///     Semis:     L1-L4, L2-L3
+  ///     Final:     L1-L2
+  ///
+  /// [clasificados] tiene que venir ya ordenado de mejor a peor. Si no
+  /// son potencia de 2, el cuadro se completa hasta la potencia
+  /// siguiente y los mejores sembrados quedan libres en la primera
+  /// ronda (pasan directo).
+  ///
+  /// Los cruces quedan sin grupo (son fase final) y el admin los puede
   /// retocar después desde la pantalla de llaves.
   Future<void> generarLlavesEliminatorias({
     required String campeonatoId,
     required List<EquipoModel> clasificados,
-    int jornada = 1,
   }) async {
     if (clasificados.length < 2) {
       throw Exception(
         'Hacen falta al menos 2 equipos clasificados para armar la llave.',
-      );
-    }
-
-    if (clasificados.length.isOdd) {
-      throw Exception(
-        'Los clasificados son ${clasificados.length} (impar): la llave necesita un número par para que nadie quede sin cruce. Ajusta "clasifican por grupo" o los mejores terceros.',
       );
     }
 
@@ -621,32 +631,134 @@ class PartidoService {
 
     final batch = _db.batch();
 
-    // Se limpia la llave anterior (sin tocar la fase de grupos ni los
-    // partidos de privilegio) para no duplicar cruces.
+    // Los cruces que ya existían se reaprovechan en vez de borrarlos y
+    // volverlos a crear: así no se pierde la programación (fecha, hora
+    // y estado) que el admin ya hubiera cargado. Se buscan por el par
+    // de equipos, que es lo que identifica al cruce más allá del
+    // documento donde esté guardado.
+    final porPar = <String, PartidoModel>{};
+    final porLlave = <String, PartidoModel>{};
+
     for (final partido in deLlave) {
+      porPar[_clavePar(partido.equipoLocalId, partido.equipoVisitanteId)] =
+          partido;
+
+      if (partido.esDeLlave) {
+        porLlave['${partido.rondaLlave}_${partido.llave}'] = partido;
+      }
+    }
+
+    final reutilizados = <String>{};
+
+    for (final cruce in Llaves.estructura(clasificados.length)) {
+      // La jornada guarda el número de ronda (1 = la primera que se
+      // juega) para que el fixture las ordene solo.
+      final jornada = cruce.rondaIndice + 1;
+
+      EquipoModel? local;
+      EquipoModel? visitante;
+      PartidoModel? previo;
+
+      if (cruce.esPrimeraRonda) {
+        // Las siembras van de 1 a n; la lista, de 0 a n-1. Una siembra
+        // más alta que la cantidad de clasificados es un lugar vacío del
+        // cuadro, o sea que el rival queda libre.
+        local = _porSiembra(clasificados, cruce.siembraLocal);
+        visitante = _porSiembra(clasificados, cruce.siembraVisitante);
+
+        if (local == null && visitante == null) continue;
+
+        previo = porPar[_clavePar(local?.id ?? '', visitante?.id ?? '')];
+      }
+
+      // Las rondas siguientes no tienen equipos con los que buscar, así
+      // que se reconocen por su lugar en el cuadro.
+      previo ??= porLlave['${cruce.ronda}_${cruce.llave}'];
+
+      final datos = _partidoBase(
+        jornada: jornada,
+        vuelta: 1,
+        grupoId: null,
+        local: local,
+        visitante: visitante,
+        generadoPorSistema: true,
+        localPendienteTexto: cruce.esPrimeraRonda
+            ? 'Libre'
+            : Llaves.pendiente(cruce.vieneDeLocal),
+        visitantePendienteTexto: cruce.esPrimeraRonda
+            ? 'Libre'
+            : Llaves.pendiente(cruce.vieneDeVisitante),
+        rondaLlave: cruce.ronda,
+        llave: cruce.llave,
+        ordenLlave: cruce.ordenVisual,
+        vieneDeLocal: cruce.vieneDeLocal,
+        vieneDeVisitante: cruce.vieneDeVisitante,
+        esBye: cruce.esPrimeraRonda && (local == null || visitante == null),
+      );
+
+      if (previo == null) {
+        batch.set(_partidos(campeonatoId).doc(), datos);
+        continue;
+      }
+
+      reutilizados.add(previo.id);
+
+      // Se reescribe el cruce pero se respeta lo que ya había cargado el
+      // admin: la fecha, el estado y la observación no los define el
+      // cuadro.
+      batch.update(_partidos(campeonatoId).doc(previo.id), {
+        ...datos,
+        'fechaHora': previo.fechaHora == null
+            ? null
+            : Timestamp.fromDate(previo.fechaHora!),
+        'estado': previo.estado,
+        'observacionResultado': previo.observacionResultado,
+        'fechaCreacion': previo.fechaCreacion == null
+            ? FieldValue.serverTimestamp()
+            : Timestamp.fromDate(previo.fechaCreacion!),
+      });
+    }
+
+    // Lo que quedó de una llave anterior y ya no entra en el cuadro
+    // nuevo (por ejemplo si cambió la cantidad de clasificados).
+    for (final partido in deLlave) {
+      if (reutilizados.contains(partido.id)) continue;
       batch.delete(_partidos(campeonatoId).doc(partido.id));
     }
 
-    final total = clasificados.length;
+    await batch.commit();
 
-    for (var i = 0; i < total / 2; i++) {
-      final local = clasificados[i];
-      final visitante = clasificados[total - 1 - i];
+    // Los "libres" ya tienen ganador desde el momento en que se arma el
+    // cuadro: se propagan enseguida para que la ronda siguiente no
+    // quede diciendo "Ganador llave 3" cuando esa llave no se juega.
+    await avanzarGanadores(campeonatoId);
+  }
 
-      batch.set(
-        _partidos(campeonatoId).doc(),
-        _partidoBase(
-          jornada: jornada,
-          vuelta: 1,
-          grupoId: null,
-          local: local,
-          visitante: visitante,
-          generadoPorSistema: true,
-        ),
-      );
+  /// Identifica un cruce por sus dos equipos, sin importar quién figura
+  /// como local: es lo que permite reconocer un cruce ya cargado cuando
+  /// se vuelve a generar el cuadro.
+  String _clavePar(String unoId, String otroId) {
+    final ids = [unoId, otroId]..sort();
+    return ids.join('|');
+  }
+
+  /// Equipo que ocupa el puesto [siembra] (1 = mejor clasificado), o
+  /// `null` si ese puesto no existe porque el cuadro es más grande que
+  /// la cantidad de clasificados.
+  EquipoModel? _porSiembra(List<EquipoModel> clasificados, int? siembra) {
+    if (siembra == null || siembra < 1 || siembra > clasificados.length) {
+      return null;
     }
 
-    await batch.commit();
+    return clasificados[siembra - 1];
+  }
+
+  /// Lleva a los ganadores de cada ronda al cruce que les toca en la
+  /// ronda siguiente. La implementación vive en `ResultadoService`
+  /// porque también hay que dispararla al cargar un resultado, y desde
+  /// ahí no se puede depender de este servicio sin hacer un círculo.
+  Future<void> avanzarGanadores(String campeonatoId) {
+    return _resultadoService.avanzarGanadoresDeLlave(campeonatoId);
   }
 
   /// Cambia los equipos de un cruce ya creado (para retocar la llave a
