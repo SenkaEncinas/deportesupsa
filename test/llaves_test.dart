@@ -115,8 +115,25 @@ void main() {
   });
 
   group('Orden de dibujo', () {
+    test('coincide con el cuadro dibujado a mano', () {
+      // Tal cual el cuadro de referencia, de arriba hacia abajo:
+      //   1-16, 8-9, 4-13, 5-12, 3-14, 6-11, 7-10, 2-15
+      expect(Llaves.ordenVisual(8), [1, 8, 4, 5, 3, 6, 7, 2]);
+      expect(Llaves.ordenVisual(4), [1, 4, 3, 2]);
+      expect(Llaves.ordenVisual(2), [1, 2]);
+    });
+
+    test('el 1 arranca arriba de todo y el 2 abajo de todo', () {
+      for (final cantidad in [2, 4, 8, 16, 32]) {
+        final orden = Llaves.ordenVisual(cantidad);
+
+        expect(orden.first, 1, reason: 'la llave del 1° va primera');
+        expect(orden.last, 2, reason: 'la llave del 2° va última');
+      }
+    });
+
     test('los cruces vecinos del dibujo alimentan la misma llave', () {
-      for (final cantidad in [2, 4, 8, 16]) {
+      for (final cantidad in [2, 4, 8, 16, 32]) {
         final orden = Llaves.ordenVisual(cantidad);
 
         expect(orden.length, cantidad);
@@ -129,6 +146,32 @@ void main() {
             reason:
                 'en un cuadro de $cantidad llaves, las llaves '
                 '${orden[i]} y ${orden[i + 1]} tienen que cruzarse',
+          );
+        }
+      }
+    });
+
+    test('cada columna queda alineada con la siguiente', () {
+      // El cruce que sale de los dos vecinos de una columna tiene que
+      // ocupar, en la columna siguiente, la posición de ese par. Si no,
+      // los conectores del dibujo salen cruzados.
+      for (final cantidad in [4, 8, 16, 32]) {
+        final actual = Llaves.ordenVisual(cantidad);
+        final siguiente = Llaves.ordenVisual(cantidad ~/ 2);
+
+        for (var i = 0; i < siguiente.length; i++) {
+          final destino = Llaves.llaveSiguiente(
+            llave: actual[i * 2],
+            cantidadLlaves: cantidad,
+          );
+
+          expect(
+            destino,
+            siguiente[i],
+            reason:
+                'con $cantidad llaves, el par de la posición $i alimenta '
+                'a la llave $destino, pero ahí está dibujada la '
+                '${siguiente[i]}',
           );
         }
       }

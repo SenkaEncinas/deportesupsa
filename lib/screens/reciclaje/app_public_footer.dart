@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../utils/patrocinadores_assets.dart';
+import '../../utils/version_build.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 import 'responsive.dart';
@@ -248,6 +249,9 @@ class _BandaMarca extends StatelessWidget {
               const SizedBox(height: 22),
               const Divider(height: 1, color: Colors.white24),
               const SizedBox(height: 14),
+              // TEMPORAL: ver `version_build.dart`.
+              const _NumeroActualizacion(),
+              const SizedBox(height: 12),
               // Copyright y crédito de autoría en la misma línea cuando
               // hay ancho; apilados y centrados en celular.
               isMobile
@@ -267,6 +271,38 @@ class _BandaMarca extends StatelessWidget {
                       ],
                     ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// TEMPORAL — sacar junto con `version_build.dart`.
+///
+/// Muestra el número de actualización bien visible para poder confirmar
+/// de un vistazo si el sitio ya está sirviendo el último deploy.
+class _NumeroActualizacion extends StatelessWidget {
+  const _NumeroActualizacion();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Text(
+          'Actualización #$kNumeroActualizacion · $kFechaActualizacion · '
+          '$kNotaActualizacion',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.small.copyWith(
+            color: AppColors.white,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.4,
           ),
         ),
       ),

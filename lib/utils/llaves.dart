@@ -166,20 +166,43 @@ class Llaves {
   /// Orden de dibujo de las llaves de una ronda de [cantidadLlaves]
   /// cruces, de arriba hacia abajo.
   ///
-  /// Se arma en espejo para que cada par de llaves consecutivas del
-  /// dibujo sea justo el par que alimenta al mismo cruce de la ronda
-  /// siguiente. Con 8 llaves queda `[1, 8, 4, 5, 2, 7, 3, 6]`: los pares
-  /// son (1,8), (4,5), (2,7) y (3,6), que es exactamente la regla
-  /// `i` contra `n + 1 - i`.
+  /// Cada llave de una ronda se abre en las dos que la alimentan, de
+  /// modo que dos cruces vecinos del dibujo son siempre los que se
+  /// juntan en la ronda siguiente y las líneas no se cruzan.
+  ///
+  /// La última llave de cada columna se abre al revés a propósito: así
+  /// la llave 2 queda siempre al pie del cuadro y el 1° y el 2° de la
+  /// tabla arrancan en extremos opuestos, como en el cuadro dibujado a
+  /// mano. Con 8 llaves el orden es `[1, 8, 4, 5, 3, 6, 7, 2]`:
+  ///
+  ///     llave 1 (1-16)  ┐
+  ///     llave 8 (8-9)   ┴─ cuartos 1
+  ///     llave 4 (4-13)  ┐
+  ///     llave 5 (5-12)  ┴─ cuartos 4
+  ///     llave 3 (3-14)  ┐
+  ///     llave 6 (6-11)  ┴─ cuartos 3
+  ///     llave 7 (7-10)  ┐
+  ///     llave 2 (2-15)  ┴─ cuartos 2
   static List<int> ordenVisual(int cantidadLlaves) {
     if (cantidadLlaves <= 1) return const [1];
+    if (cantidadLlaves == 2) return const [1, 2];
 
     final anterior = ordenVisual(cantidadLlaves ~/ 2);
     final orden = <int>[];
 
-    for (final llave in anterior) {
-      orden.add(llave);
-      orden.add(cantidadLlaves + 1 - llave);
+    for (var i = 0; i < anterior.length; i++) {
+      final llave = anterior[i];
+      final espejo = cantidadLlaves + 1 - llave;
+
+      // La de más abajo va invertida para que el 2 siga siendo el
+      // último de la columna ronda tras ronda.
+      if (i == anterior.length - 1) {
+        orden.add(espejo);
+        orden.add(llave);
+      } else {
+        orden.add(llave);
+        orden.add(espejo);
+      }
     }
 
     return orden;
