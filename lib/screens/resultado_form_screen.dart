@@ -61,6 +61,11 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
   final List<_GolInputState> _goles = [];
   final List<_TarjetaInputState> _tarjetas = [];
   final List<_SetInputState> _sets = [];
+
+  /// Equipo que gana un walkover/sanción en vóley. Ahí no se cargan sets
+  /// a mano: el resultado es siempre 25-0 en cada set para el que se
+  /// presentó, así que solo hace falta saber quién fue.
+  String? _ganadorAdministrativo;
   final List<_SancionInputState> _sanciones = [];
 
   @override
@@ -80,6 +85,12 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
 
     for (final set in widget.partido.sets) {
       _sets.add(_SetInputState(local: set.local, visitante: set.visitante));
+    }
+
+    // Al editar un walkover/sanción ya cargado, se deja marcado el equipo
+    // que había ganado para no tener que elegirlo otra vez.
+    if (_tipoResultado != TipoResultado.normal) {
+      _ganadorAdministrativo = widget.partido.ganadorId;
     }
 
     // Los campos de goles disparan rebuild para mostrar/ocultar penales.
@@ -321,7 +332,22 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
       int? penalesLocal;
       int? penalesVisitante;
 
-      if (_esVolley(campeonato)) {
+      if (_esAdministrativoConGanador(campeonato)) {
+        // Walkover/sanción en vóley y básquet: no se carga marcador, solo
+        // se elige al equipo que se presentó. El servicio arma el 25-0 por
+        // set (vóley) o el 20-0 (básquet).
+        if (_ganadorAdministrativo == null) {
+          throw Exception('Elegí qué equipo gana por walkover o sanción.');
+        }
+
+        final ganaLocal =
+            _ganadorAdministrativo == widget.partido.equipoLocalId;
+
+        golesLocal = ganaLocal ? 1 : 0;
+        golesVisitante = ganaLocal ? 0 : 1;
+        penalesLocal = null;
+        penalesVisitante = null;
+      } else if (_esVolley(campeonato)) {
         // Vóley: el marcador son los sets ganados calculados del detalle.
         if (_sets.isEmpty) {
           throw Exception('Agrega al menos un set con su puntaje.');
@@ -477,6 +503,29 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
     return null;
   }
 
+  /// En vóley y básquet, un walkover/sanción no se carga con marcador:
+  /// el resultado lo fija el reglamento y solo hace falta saber qué
+  /// equipo se presentó.
+  bool _esAdministrativoConGanador(CampeonatoModel? campeonato) {
+    if (_tipoResultado == TipoResultado.normal) return false;
+    return _esVolley(campeonato) || _esBasket(campeonato);
+  }
+
+  /// Qué marcador se va a guardar, para mostrárselo al admin antes.
+  String _detalleResultadoAdministrativo(CampeonatoModel? campeonato) {
+    if (_esBasket(campeonato)) {
+      return 'Se va a guardar $kPuntosWalkoverBasket-0 a favor suyo '
+          '($kPuntosWalkoverBasket puntos a favor y 0 en contra).';
+    }
+
+    final sets = campeonato?.configuracion.setsParaGanar ?? 2;
+    final puntos = campeonato?.configuracion.puntosSetNormal ?? 25;
+    final marcador = List.filled(sets, '$puntos-0').join(' · ');
+
+    return 'Se va a guardar $marcador a favor suyo '
+        '(${sets * puntos} puntos a favor y 0 en contra).';
+  }
+
   String _marcadorLabel(CampeonatoModel? campeonato) {
     if (_esBasket(campeonato)) return 'Puntos';
     return 'Goles';
@@ -525,7 +574,7 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
                     children: [
-                      if (!esVolley)
+                      if (!esVolley && !_esAdministrativoConGanador(campeonato))
                         Row(
                           children: [
                             Expanded(
@@ -555,7 +604,18 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
                             ),
                           ],
                         ),
-                      if (esVolley) ...[
+                      if (_esAdministrativoConGanador(campeonato)) ...[
+                        _GanadorAdministrativoSelector(
+                          partido: widget.partido,
+                          ganadorId: _ganadorAdministrativo,
+                          detalle: _detalleResultadoAdministrativo(campeonato),
+                          onChanged: (value) =>
+                              setState(() => _ganadorAdministrativo = value),
+                        ),
+                        const SizedBox(height: 6),
+                      ],
+                      if (esVolley &&
+                          _tipoResultado == TipoResultado.normal) ...[
                         _SetsSection(
                           sets: _sets,
                           localNombre: widget.partido.equipoLocalNombre,
@@ -783,6 +843,55 @@ class _PenalesSection extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Selector del equipo que gana por walkover o sanción en vóley/básquet,
+/// con el marcador que se va a guardar bien a la vista: no es solo
+/// "ganó" (25-0 por set en vóley, 20-0 en básquet) y eso pesa en la
+/// diferencia de puntos de la tabla.
+class _GanadorAdministrativoSelector extends StatelessWidget {
+  final PartidoModel partido;
+  final String? ganadorId;
+  final String detalle;
+  final ValueChanged<String?> onChanged;
+
+  const _GanadorAdministrativoSelector({
+    required this.partido,
+    required this.ganadorId,
+    required this.detalle,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Equipo que se presentó', style: AppTextStyles.heading3),
+        const SizedBox(height: 6),
+        Text(
+          detalle,
+          style: AppTextStyles.small.copyWith(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 12),
+        _DropdownField<String>(
+          label: 'Gana el partido',
+          value: ganadorId,
+          items: [
+            DropdownMenuItem(
+              value: partido.equipoLocalId,
+              child: Text(partido.equipoLocalNombre),
+            ),
+            DropdownMenuItem(
+              value: partido.equipoVisitanteId,
+              child: Text(partido.equipoVisitanteNombre),
+            ),
+          ],
+          onChanged: onChanged,
         ),
       ],
     );
@@ -1216,7 +1325,10 @@ class _SancionesSection extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: Text('Sanciones a jugadores', style: AppTextStyles.heading3),
+              child: Text(
+                'Sanciones a jugadores',
+                style: AppTextStyles.heading3,
+              ),
             ),
             AppButton.secondary(
               text: 'Agregar sanción',

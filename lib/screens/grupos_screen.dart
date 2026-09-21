@@ -315,9 +315,7 @@ class _GruposScreenState extends State<GruposScreen> {
                               children: [
                                 if (sinGrupo.isNotEmpty)
                                   Padding(
-                                    padding: const EdgeInsets.only(
-                                      bottom: 18,
-                                    ),
+                                    padding: const EdgeInsets.only(bottom: 18),
                                     child: _SinGrupoBox(
                                       equipos: sinGrupo,
                                       grupos: grupos,
@@ -537,7 +535,8 @@ class _ClasificadosPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final config = campeonato.configuracion;
-    final total = config.cantidadGrupos * config.clasificanPorGrupo +
+    final total =
+        config.cantidadGrupos * config.clasificanPorGrupo +
         config.mejoresTerceros;
 
     return StreamBuilder<List<TablaPosicionModel>>(
@@ -586,10 +585,9 @@ class _EditarClasificacionDialogState
       TextEditingController(
         text: '${widget.campeonato.configuracion.clasificanPorGrupo}',
       );
-  late final TextEditingController _tercerosController =
-      TextEditingController(
-        text: '${widget.campeonato.configuracion.mejoresTerceros}',
-      );
+  late final TextEditingController _tercerosController = TextEditingController(
+    text: '${widget.campeonato.configuracion.mejoresTerceros}',
+  );
 
   @override
   void dispose() {
@@ -687,8 +685,7 @@ class _EditarClasificacionDialogState
           onPressed: () {
             final clasifican =
                 int.tryParse(_clasificanController.text.trim()) ?? 0;
-            final terceros =
-                int.tryParse(_tercerosController.text.trim()) ?? 0;
+            final terceros = int.tryParse(_tercerosController.text.trim()) ?? 0;
 
             Navigator.pop(
               context,

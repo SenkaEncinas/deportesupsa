@@ -44,13 +44,11 @@ class _RankingGoleadoresScreenState extends State<RankingGoleadoresScreen> {
   late final PublicHomeService _publicService = PublicHomeService();
   late final Stream<CampeonatoModel?> _campeonatoStream = _campeonatoService
       .streamCampeonato(widget.campeonatoId);
-  late final Stream<List<RankingGoleadorModel>> _rankingStream =
-      _publicService.streamRankingGoleadores(widget.campeonatoId);
+  late final Stream<List<RankingGoleadorModel>> _rankingStream = _publicService
+      .streamRankingGoleadores(widget.campeonatoId);
 
   @override
   Widget build(BuildContext context) {
-    final campeonatoId = widget.campeonatoId;
-
     return Scaffold(
       body: StreamBuilder<CampeonatoModel?>(
         stream: _campeonatoStream,

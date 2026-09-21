@@ -283,9 +283,8 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
                         onIgualacion: () => _goTo(
                           IgualacionScreen(campeonatoId: campeonato.id),
                         ),
-                        onLlaves: () => _goTo(
-                          LlavesScreen(campeonatoId: campeonato.id),
-                        ),
+                        onLlaves: () =>
+                            _goTo(LlavesScreen(campeonatoId: campeonato.id)),
                         onPdfs: () =>
                             _goTo(PdfsScreen(campeonatoId: campeonato.id)),
                         onAuditoria: () =>
@@ -460,8 +459,7 @@ class _ModulesGrid extends StatelessWidget {
       if (campeonato.tieneFasesSeparadas)
         _ModuleItem(
           title: 'Llaves',
-          description:
-              'Generar y retocar los cruces de la fase eliminatoria.',
+          description: 'Generar y retocar los cruces de la fase eliminatoria.',
           icon: Icons.account_tree_outlined,
           enabled: campeonato.estado != CampeonatoEstado.inscripcion,
           tag: 'Competencia',

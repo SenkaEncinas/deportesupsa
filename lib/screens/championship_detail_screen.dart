@@ -108,9 +108,9 @@ class _ChampionshipContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final estadoTexto = ChampionshipPublicCard.estadoTexto(campeonato.estado);
 
-    // En fase eliminatoria la vista pública se reduce a la llave (y a
-    // los goleadores en fútbol): la tabla, los próximos partidos y las
-    // estadísticas son de la fase de grupos y ya no aportan nada.
+    // En fase eliminatoria la vista pública se reduce a la llave, la
+    // tabla de la fase de grupos y, en fútbol, los goleadores: los
+    // próximos partidos y las estadísticas ya no aportan nada.
     if (campeonato.estaEnFaseEliminatoria) {
       return _ContenidoEliminatoria(service: service, campeonato: campeonato);
     }
@@ -190,11 +190,13 @@ class _ChampionshipContent extends StatelessWidget {
   }
 }
 
-/// Contenido público cuando el campeonato está en fase eliminatoria:
-/// solo las llaves y, en fútbol, el ranking de goleadores. Vóley y
-/// básquet no registran goleadores, así que ahí queda únicamente la
-/// llave. Lo usan tanto escritorio como móvil, así que la regla es una
-/// sola y no se puede desincronizar entre las dos vistas.
+/// Contenido público cuando el campeonato está en fase eliminatoria: la
+/// llave, la tabla de cómo terminó la fase de grupos y, en fútbol, el
+/// ranking de goleadores (vóley y básquet no registran goleadores).
+///
+/// Los partidos de la fase final no modifican esa tabla: no tienen
+/// grupo y el cálculo los ignora. Lo usan tanto escritorio como móvil,
+/// así que la regla es una sola y no se puede desincronizar.
 class _ContenidoEliminatoria extends StatelessWidget {
   final PublicHomeService service;
   final CampeonatoModel campeonato;
@@ -210,6 +212,12 @@ class _ContenidoEliminatoria extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _FixtureSection(service: service, campeonato: campeonato),
+        const SizedBox(height: 24),
+        // La tabla de la fase de grupos se sigue mostrando: sirve para
+        // ver cómo quedó cada grupo. Los partidos de la fase final no la
+        // tocan, porque no tienen grupo y el cálculo de la tabla los
+        // ignora (ver `_recalcularTabla`).
+        _TableSection(service: service, campeonato: campeonato),
         if (campeonato.esFutbol) ...[
           const SizedBox(height: 24),
           _ScorersSection(service: service, campeonato: campeonato),
@@ -421,11 +429,11 @@ class _MobileGruposViewState extends State<_MobileGruposView> {
 }
 
 /// Toda la pantalla una vez que el campeonato entra en fase eliminatoria:
-/// nada de la info de la fase de grupos (resumen, próximos partidos,
-/// tabla, estadísticas) tiene sentido ya, así que se reemplaza por
-/// completo. Queda la llave y, solo en fútbol, el ranking de goleadores
-/// (ver [_ContenidoEliminatoria], que es el mismo que usa escritorio).
-/// Sin sidebar: no hay ninguna otra sección a la que saltar.
+/// el resumen y los próximos partidos de la fase de grupos ya no tienen
+/// sentido, así que se reemplazan por la llave, la tabla final de grupos
+/// y, en fútbol, el ranking de goleadores (ver [_ContenidoEliminatoria],
+/// el mismo que usa escritorio). Sin sidebar: no hay ninguna otra
+/// sección a la que saltar.
 class _MobileEliminationView extends StatelessWidget {
   final PublicHomeService service;
   final CampeonatoModel campeonato;
