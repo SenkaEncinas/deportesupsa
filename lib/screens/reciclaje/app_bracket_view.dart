@@ -14,9 +14,35 @@ const double _kHeaderHeight = 40;
 const double _kConnectorWidth = 34;
 const double _kCampeonWidth = 150;
 
+/// A partir de este ancho se intenta que el árbol entero entre en
+/// pantalla encogiéndolo. Más angosto que esto (celulares) encogerlo
+/// dejaría los nombres ilegibles, así que se deja a tamaño normal y se
+/// recorre con el dedo, que es como se venía usando.
+const double _kAnchoParaEncoger = 720;
+
+/// Hasta cuánto se permite encoger. Más chico que esto los nombres
+/// dejan de leerse, y conviene volver al scroll horizontal.
+const double _kEscalaMinima = 0.6;
+
 double _slotDeRonda(int ronda) => (_kCardHeight + _kBaseGap) * (1 << ronda);
 
 double _offsetDeRonda(int ronda) => (_slotDeRonda(ronda) - _kCardHeight) / 2;
+
+/// Texto de un casillero todavia vacio: el ganador del cruce que lo
+/// alimenta, o su nombre ya resuelto si ese cruce se jugo.
+String _origenDeSlot(
+  List<_Slot> slotsPrevios,
+  String tituloPrevio,
+  int indiceSlot,
+  int lado,
+) {
+  final indicePrevio = indiceSlot * 2 + lado;
+
+  if (indicePrevio >= slotsPrevios.length) return 'Por definir';
+
+  final previo = slotsPrevios[indicePrevio];
+  return previo.ganador ?? 'Ganador · $tituloPrevio ${indicePrevio + 1}';
+}
 
 /// Una posición de la llave. Puede estar vacía: mientras no se sepa quién
 /// pasa, el cruce todavía no existe como partido.
@@ -88,6 +114,13 @@ class AppBracketView extends StatelessWidget {
     return arbol;
   }
 
+  /// Nombre de la ronda [r], tomando el de los partidos reales cuando
+  /// existen y deduciendolo del tamaño de la ronda cuando no.
+  String _tituloDeRonda(int r, List<List<_Slot>> arbol) {
+    if (r < rondas.length) return rondas[r].key;
+    return FixtureGrouping.nombreRondaEliminatoria(arbol[r].length);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (rondas.isEmpty) return const SizedBox.shrink();
@@ -95,54 +128,126 @@ class AppBracketView extends StatelessWidget {
     final arbol = _armarArbol();
     if (arbol.isEmpty) return const SizedBox.shrink();
 
-    final totalHeight = _slotDeRonda(0) * arbol.first.length;
+    final titulos = [
+      for (var r = 0; r < arbol.length; r++) _tituloDeRonda(r, arbol),
+    ];
+
+    // Las tarjetas se angostan en pantallas chicas para que entren más
+    // cruces a la vista sin tener que arrastrar tanto.
     final anchoCard = MediaQuery.of(context).size.width < 700 ? 186.0 : 224.0;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (int r = 0; r < arbol.length; r++) ...[
-            _RoundColumn(
-              titulo: r < rondas.length
-                  ? rondas[r].key
-                  : FixtureGrouping.nombreRondaEliminatoria(arbol[r].length),
-              slots: arbol[r],
-              // La ronda anterior alimenta los casilleros a definir.
-              slotsPrevios: r == 0 ? const [] : arbol[r - 1],
-              tituloPrevio: r == 0
-                  ? ''
-                  : (r - 1 < rondas.length
-                        ? rondas[r - 1].key
-                        : FixtureGrouping.nombreRondaEliminatoria(
-                            arbol[r - 1].length,
-                          )),
-              ronda: r,
-              totalHeight: totalHeight,
-              anchoCard: anchoCard,
-              deporte: deporte,
+    final altoTotal = _kHeaderHeight + _slotDeRonda(0) * arbol.first.length;
+
+    // Ancho que ocuparía el árbol sin encoger: una columna y un conector
+    // por ronda, más el cierre con el campeón.
+    final anchoNatural =
+        arbol.length * (anchoCard + _kConnectorWidth) + _kCampeonWidth;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final disponible = constraints.maxWidth;
+
+        // Se encoge lo justo para entrar, nunca se agranda: un cuadro de
+        // pocas rondas no tiene por qué verse gigante. En celular no se
+        // encoge nada y se recorre con el dedo, como siempre.
+        final escala =
+            disponible < _kAnchoParaEncoger || anchoNatural <= disponible
+            ? 1.0
+            : (disponible / anchoNatural).clamp(_kEscalaMinima, 1.0);
+
+        final arbolDibujado = SizedBox(
+          width: anchoNatural,
+          height: altoTotal,
+          child: _ArbolCompleto(
+            arbol: arbol,
+            titulos: titulos,
+            anchoCard: anchoCard,
+            totalHeight: _slotDeRonda(0) * arbol.first.length,
+            deporte: deporte,
+          ),
+        );
+
+        if (escala >= 1) {
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: 6),
+            child: arbolDibujado,
+          );
+        }
+
+        // Si aun encogido al mínimo no entra, queda el scroll horizontal
+        // como salida.
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.only(bottom: 6),
+          child: SizedBox(
+            width: anchoNatural * escala,
+            height: altoTotal * escala,
+            child: FittedBox(
+              fit: BoxFit.contain,
+              alignment: Alignment.topLeft,
+              child: arbolDibujado,
             ),
-            if (r < arbol.length - 1)
-              _ConnectorZone(
-                ronda: r,
-                cantidadOrigen: arbol[r].length,
-                totalHeight: totalHeight,
-              ),
-          ],
-          // Cierre de la llave: el campeón.
-          _ConnectorZone(
-            ronda: arbol.length - 1,
-            cantidadOrigen: 1,
-            totalHeight: totalHeight,
           ),
-          _CampeonColumn(
-            campeon: arbol.last.isEmpty ? null : arbol.last.first.ganador,
+        );
+      },
+    );
+  }
+}
+
+/// El árbol en si: una columna por ronda, unidas por conectores, y el
+/// campeón como cierre. Sale del `build` de [AppBracketView] para poder
+/// dibujarlo a tamaño natural y encogerlo despues de una sola pieza.
+class _ArbolCompleto extends StatelessWidget {
+  final List<List<_Slot>> arbol;
+  final List<String> titulos;
+  final double anchoCard;
+  final double totalHeight;
+  final String deporte;
+
+  const _ArbolCompleto({
+    required this.arbol,
+    required this.titulos,
+    required this.anchoCard,
+    required this.totalHeight,
+    required this.deporte,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (int r = 0; r < arbol.length; r++) ...[
+          _RoundColumn(
+            titulo: titulos[r],
+            slots: arbol[r],
+            // La ronda anterior alimenta los casilleros a definir.
+            slotsPrevios: r == 0 ? const [] : arbol[r - 1],
+            tituloPrevio: r == 0 ? '' : titulos[r - 1],
+            ronda: r,
             totalHeight: totalHeight,
+            anchoCard: anchoCard,
+            deporte: deporte,
           ),
+          if (r < arbol.length - 1)
+            _ConnectorZone(
+              ronda: r,
+              cantidadOrigen: arbol[r].length,
+              totalHeight: totalHeight,
+            ),
         ],
-      ),
+        // Cierre de la llave: el campeón.
+        _ConnectorZone(
+          ronda: arbol.length - 1,
+          cantidadOrigen: 1,
+          totalHeight: totalHeight,
+        ),
+        _CampeonColumn(
+          campeon: arbol.last.isEmpty ? null : arbol.last.first.ganador,
+          totalHeight: totalHeight,
+        ),
+      ],
     );
   }
 }
@@ -168,15 +273,8 @@ class _RoundColumn extends StatelessWidget {
     required this.deporte,
   });
 
-  /// Texto del casillero vacío: el ganador del cruce que lo alimenta, o
-  /// su nombre ya resuelto si ese cruce se jugó.
   String _origen(int indiceSlot, int lado) {
-    final indicePrevio = indiceSlot * 2 + lado;
-
-    if (indicePrevio >= slotsPrevios.length) return 'Por definir';
-
-    final previo = slotsPrevios[indicePrevio];
-    return previo.ganador ?? 'Ganador · $tituloPrevio ${indicePrevio + 1}';
+    return _origenDeSlot(slotsPrevios, tituloPrevio, indiceSlot, lado);
   }
 
   @override
@@ -657,3 +755,4 @@ class _BracketTeamRow extends StatelessWidget {
     );
   }
 }
+

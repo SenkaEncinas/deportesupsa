@@ -10,13 +10,25 @@ import 'responsive.dart';
 /// Sitio de quien desarrolló la app, al que lleva el crédito del footer.
 const String _kSitio57Nations = 'https://nations-2b049.web.app';
 
-/// Abre [url] en el navegador. Si el sistema no puede abrirla, no pasa
-/// nada: es un enlace de cortesía, no vale romper el footer por eso.
+/// Abre [url] en una pestaña nueva.
+///
+/// Se lanza derecho, sin consultar antes `canLaunchUrl`: en web, esperar
+/// cualquier cosa antes de abrir hace que el navegador deje de tratarlo
+/// como una acción del usuario y bloquee la pestaña, así que el click no
+/// hacía nada. En Windows, además, `canLaunchUrl` devuelve `false` para
+/// `https` salvo que el esquema esté declarado.
+///
+/// Si igual falla, se ignora: es un enlace de cortesía, no vale romper
+/// el footer por eso.
 Future<void> _abrir(String url) async {
-  final uri = Uri.parse(url);
-
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  try {
+    await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.platformDefault,
+      webOnlyWindowName: '_blank',
+    );
+  } catch (_) {
+    // Sin navegador disponible no hay nada que hacer.
   }
 }
 
@@ -28,11 +40,7 @@ class _EnlaceOpcional extends StatelessWidget {
   final String? tooltip;
   final Widget child;
 
-  const _EnlaceOpcional({
-    required this.url,
-    required this.child,
-    this.tooltip,
-  });
+  const _EnlaceOpcional({required this.url, required this.child, this.tooltip});
 
   @override
   Widget build(BuildContext context) {
@@ -249,9 +257,6 @@ class _BandaMarca extends StatelessWidget {
               const SizedBox(height: 22),
               const Divider(height: 1, color: Colors.white24),
               const SizedBox(height: 14),
-              // TEMPORAL: ver `version_build.dart`.
-              const _NumeroActualizacion(),
-              const SizedBox(height: 12),
               // Copyright y crédito de autoría en la misma línea cuando
               // hay ancho; apilados y centrados en celular.
               isMobile
@@ -270,6 +275,8 @@ class _BandaMarca extends StatelessWidget {
                         const _CreditoCreador(),
                       ],
                     ),
+              // TEMPORAL: ver `version_build.dart`.
+              const _VersionDiscreta(),
             ],
           ),
         ),
@@ -280,29 +287,27 @@ class _BandaMarca extends StatelessWidget {
 
 /// TEMPORAL — sacar junto con `version_build.dart`.
 ///
-/// Muestra el número de actualización bien visible para poder confirmar
-/// de un vistazo si el sitio ya está sirviendo el último deploy.
-class _NumeroActualizacion extends StatelessWidget {
-  const _NumeroActualizacion();
+/// Número de versión en la esquina inferior derecha del pie. Va chico y
+/// muy tenue a propósito: no le dice nada a quien viene a mirar el
+/// campeonato, pero alcanza para confirmar de un vistazo qué build está
+/// publicada.
+class _VersionDiscreta extends StatelessWidget {
+  const _VersionDiscreta();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white24),
-        ),
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 10),
         child: Text(
-          'Actualización #$kNumeroActualizacion · $kFechaActualizacion · '
-          '$kNotaActualizacion',
-          textAlign: TextAlign.center,
+          kVersionApp,
           style: AppTextStyles.small.copyWith(
-            color: AppColors.white,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.4,
+            fontSize: 9,
+            height: 1,
+            letterSpacing: 0.3,
+            fontWeight: FontWeight.w400,
+            color: Colors.white.withValues(alpha: 0.28),
           ),
         ),
       ),
@@ -335,55 +340,61 @@ class _CreditoCreador extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          'Desarrollado por',
-          style: AppTextStyles.small.copyWith(
-            color: Colors.white.withValues(alpha: 0.55),
+    // En celular la banda deja poco más de 300px de ancho y el crédito
+    // completo no entra: se encoge en bloque antes que recortarse.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerRight,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Desarrollado por',
+            style: AppTextStyles.small.copyWith(
+              color: Colors.white.withValues(alpha: 0.55),
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        // El logo y el nombre son un solo botón: tocar cualquiera de
-        // los dos lleva al sitio de 57 Nations.
-        _EnlaceOpcional(
-          url: _kSitio57Nations,
-          tooltip: 'Ir al sitio de 57 Nations',
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Opacity(
-                  opacity: 0.9,
-                  child: Image.asset(
-                    'assets/images/logo_57nations_blanco.png',
-                    height: 17,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.medium,
-                    errorBuilder: (_, _, _) => Text(
-                      '57 Nations',
-                      style: AppTextStyles.small.copyWith(
-                        color: AppColors.white,
-                        fontWeight: FontWeight.w800,
+          const SizedBox(width: 8),
+          // El logo y el nombre son un solo botón: tocar cualquiera de
+          // los dos lleva al sitio de 57 Nations.
+          _EnlaceOpcional(
+            url: _kSitio57Nations,
+            tooltip: 'Ir al sitio de 57 Nations',
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Opacity(
+                    opacity: 0.9,
+                    child: Image.asset(
+                      'assets/images/logo_57nations_blanco.png',
+                      height: 17,
+                      fit: BoxFit.contain,
+                      filterQuality: FilterQuality.medium,
+                      errorBuilder: (_, _, _) => Text(
+                        '57 Nations',
+                        style: AppTextStyles.small.copyWith(
+                          color: AppColors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Nations',
-                  style: AppTextStyles.small.copyWith(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    fontWeight: FontWeight.w700,
+                  const SizedBox(width: 6),
+                  Text(
+                    'Nations',
+                    style: AppTextStyles.small.copyWith(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

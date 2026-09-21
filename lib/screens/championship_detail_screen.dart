@@ -35,11 +35,19 @@ import 'reciclaje/stat_card.dart';
 class ChampionshipDetailScreen extends StatelessWidget {
   final CampeonatoModel campeonato;
 
-  const ChampionshipDetailScreen({super.key, required this.campeonato});
+  /// Solo para los tests, que necesitan apuntar a un Firestore de
+  /// mentira. En la app queda en null y se usa el de siempre.
+  final PublicHomeService? service;
+
+  const ChampionshipDetailScreen({
+    super.key,
+    required this.campeonato,
+    this.service,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final service = PublicHomeService();
+    final service = this.service ?? PublicHomeService();
     final isMobile = Responsive.isMobile(context);
 
     return Scaffold(
@@ -228,21 +236,25 @@ class _ContenidoEliminatoria extends StatelessWidget {
   }
 }
 
-/// Qué se muestra en el cuerpo de la vista móvil (fuera de la fase
-/// eliminatoria, ver [_MobileEliminationView]). "Resumen" (la home: info
-/// del campeonato + próximos partidos + últimos resultados) es lo único
-/// que se ve al entrar; el resto se abre desde el sidebar
+/// Qué se muestra en el cuerpo de la vista móvil. "Resumen" (próximos
+/// partidos + últimos resultados) es lo que se ve al entrar mientras se
+/// juegan los grupos; el resto se abre desde el sidebar
 /// ([_MobileDrawer]) en vez de pestañas arriba, para no gastar espacio
 /// vertical en pantallas chicas.
-enum _MobileSeccion { resumen, tabla, clasificados }
+///
+/// "Llaves" aparece recién cuando el campeonato tiene fase eliminatoria,
+/// y pasa a ser la sección con la que se abre la pantalla.
+enum _MobileSeccion { resumen, llaves, tabla, clasificados }
 
-/// Versión móvil. Mientras el campeonato está en fase de grupos (o no
-/// tiene fases separadas) se ve el encabezado compacto de siempre con un
-/// sidebar para saltar a tabla/clasificados. Apenas entra en fase
-/// eliminatoria, [_MobileEliminationView] toma toda la pantalla: ya no
-/// hay nada de la fase de grupos que valga la pena mostrar, solo la
-/// llave (y, en fútbol, goleadores + clasificados).
-class _MobileChampionshipView extends StatelessWidget {
+/// Versión móvil: encabezado compacto y un sidebar para moverse entre
+/// secciones.
+///
+/// Es la misma pantalla durante todo el campeonato. Al activarse la fase
+/// eliminatoria no cambia la navegación: solo se suma "Llaves" al menú y
+/// la pantalla abre ahí, que es lo que el usuario viene a mirar. Antes,
+/// en cambio, la eliminatoria reemplazaba toda la vista y el sidebar
+/// desaparecía, así que de un día para el otro se navegaba distinto.
+class _MobileChampionshipView extends StatefulWidget {
   final PublicHomeService service;
   final CampeonatoModel campeonato;
 
@@ -252,27 +264,15 @@ class _MobileChampionshipView extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    if (campeonato.estaEnFaseEliminatoria) {
-      return _MobileEliminationView(service: service, campeonato: campeonato);
-    }
-
-    return _MobileGruposView(service: service, campeonato: campeonato);
-  }
+  State<_MobileChampionshipView> createState() =>
+      _MobileChampionshipViewState();
 }
 
-class _MobileGruposView extends StatefulWidget {
-  final PublicHomeService service;
-  final CampeonatoModel campeonato;
+class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
+  late _MobileSeccion _seccion = widget.campeonato.estaEnFaseEliminatoria
+      ? _MobileSeccion.llaves
+      : _MobileSeccion.resumen;
 
-  const _MobileGruposView({required this.service, required this.campeonato});
-
-  @override
-  State<_MobileGruposView> createState() => _MobileGruposViewState();
-}
-
-class _MobileGruposViewState extends State<_MobileGruposView> {
-  _MobileSeccion _seccion = _MobileSeccion.resumen;
   _VistaTabla _vistaTablaInicial = _VistaTabla.general;
 
   CampeonatoModel get campeonato => widget.campeonato;
@@ -289,6 +289,8 @@ class _MobileGruposViewState extends State<_MobileGruposView> {
     switch (_seccion) {
       case _MobileSeccion.resumen:
         return campeonato.nombre;
+      case _MobileSeccion.llaves:
+        return 'Llaves eliminatorias';
       case _MobileSeccion.tabla:
         return 'Tabla de posiciones';
       case _MobileSeccion.clasificados:
@@ -370,8 +372,13 @@ class _MobileGruposViewState extends State<_MobileGruposView> {
                 ],
               ),
               const SizedBox(height: 10),
-              _MobileTopStats(service: service, campeonato: campeonato),
-              const SizedBox(height: 18),
+              // Los chips de partidos/goles son de la fase de grupos: en
+              // eliminatoria la llave ya cuenta esa historia mejor.
+              if (!campeonato.estaEnFaseEliminatoria) ...[
+                _MobileTopStats(service: service, campeonato: campeonato),
+                const SizedBox(height: 18),
+              ] else
+                const SizedBox(height: 8),
               switch (_seccion) {
                 _MobileSeccion.resumen => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -388,6 +395,13 @@ class _MobileGruposViewState extends State<_MobileGruposView> {
                       deporte: campeonato.deporteEfectivo,
                     ),
                   ],
+                ),
+                // La llave ocupa la sección entera: es lo que se
+                // viene a mirar y necesita todo el ancho para recorrerla.
+                _MobileSeccion.llaves => _FixtureSection(
+                  service: service,
+                  campeonato: campeonato,
+                  conEncabezado: false,
                 ),
                 _MobileSeccion.tabla => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,69 +434,6 @@ class _MobileGruposViewState extends State<_MobileGruposView> {
                 padding: EdgeInsets.only(top: 24),
                 child: AppPublicFooter(),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Toda la pantalla una vez que el campeonato entra en fase eliminatoria:
-/// el resumen y los próximos partidos de la fase de grupos ya no tienen
-/// sentido, así que se reemplazan por la llave, la tabla final de grupos
-/// y, en fútbol, el ranking de goleadores (ver [_ContenidoEliminatoria],
-/// el mismo que usa escritorio). Sin sidebar: no hay ninguna otra
-/// sección a la que saltar.
-class _MobileEliminationView extends StatelessWidget {
-  final PublicHomeService service;
-  final CampeonatoModel campeonato;
-
-  const _MobileEliminationView({
-    required this.service,
-    required this.campeonato,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back_rounded),
-                    tooltip: 'Volver',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                  const SizedBox(width: 6),
-                  const AppLogoMark(compact: true),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      campeonato.nombre,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.heading3,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              const AppBadge(
-                text: 'Fase eliminatoria',
-                type: AppBadgeType.warning,
-                icon: Icons.bolt_outlined,
-              ),
-              const SizedBox(height: 18),
-              _ContenidoEliminatoria(service: service, campeonato: campeonato),
             ],
           ),
         ),
@@ -637,6 +588,13 @@ class _MobileDrawer extends StatelessWidget {
       campeonato.tipoCampeonato == TipoCampeonato.faseGrupos ||
       campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
 
+  /// La llave solo se ofrece cuando hay algo que mostrar: o el
+  /// campeonato ya entró en fase eliminatoria, o es de eliminación
+  /// directa y la llave es todo el torneo.
+  bool get _tieneLlave =>
+      campeonato.estaEnFaseEliminatoria ||
+      campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -664,6 +622,16 @@ class _MobileDrawer extends StatelessWidget {
             ),
             const Divider(height: 1, color: AppColors.border),
             const SizedBox(height: 8),
+            if (_tieneLlave)
+              _DrawerItem(
+                icon: Icons.account_tree_outlined,
+                label: 'Llaves eliminatorias',
+                selected: seccionActual == _MobileSeccion.llaves,
+                onTap: () {
+                  Navigator.pop(context);
+                  onSelect(_MobileSeccion.llaves);
+                },
+              ),
             _DrawerItem(
               icon: Icons.home_outlined,
               label: 'Resumen',
@@ -995,7 +963,16 @@ class _FixtureSection extends StatelessWidget {
   final PublicHomeService service;
   final CampeonatoModel campeonato;
 
-  const _FixtureSection({required this.service, required this.campeonato});
+  /// En móvil la sección ya viene titulada por la pantalla (el nombre
+  /// de la sección del sidebar), así que el encabezado propio sobra y
+  /// solo repetiría el mismo texto dos veces seguidas.
+  final bool conEncabezado;
+
+  const _FixtureSection({
+    required this.service,
+    required this.campeonato,
+    this.conEncabezado = true,
+  });
 
   bool get _esEliminacionPura =>
       campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
@@ -1015,11 +992,13 @@ class _FixtureSection extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const AppSectionHeader(
-                  title: 'Llaves eliminatorias',
-                  subtitle: 'De la ronda inicial hasta la gran final.',
-                ),
-                const SizedBox(height: 16),
+                if (conEncabezado) ...[
+                  const AppSectionHeader(
+                    title: 'Llaves eliminatorias',
+                    subtitle: 'De la ronda inicial hasta la gran final.',
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 const _MatchSkeletonColumn(),
               ],
             ),
@@ -1056,11 +1035,13 @@ class _FixtureSection extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const AppSectionHeader(
-                title: 'Llaves eliminatorias',
-                subtitle: 'De la ronda inicial hasta la gran final.',
-              ),
-              const SizedBox(height: 16),
+              if (conEncabezado) ...[
+                const AppSectionHeader(
+                  title: 'Llaves eliminatorias',
+                  subtitle: 'De la ronda inicial hasta la gran final.',
+                ),
+                const SizedBox(height: 16),
+              ],
               const AppInlineEmptyState(
                 icon: Icons.account_tree_outlined,
                 text: 'Todavía no hay llaves eliminatorias generadas.',
@@ -1072,11 +1053,13 @@ class _FixtureSection extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const AppSectionHeader(
-              title: 'Llaves eliminatorias',
-              subtitle: 'De la ronda inicial hasta la gran final.',
-            ),
-            const SizedBox(height: 16),
+            if (conEncabezado) ...[
+              const AppSectionHeader(
+                title: 'Llaves eliminatorias',
+                subtitle: 'De la ronda inicial hasta la gran final.',
+              ),
+              const SizedBox(height: 16),
+            ],
             AppBracketView(
               rondas: rondasLlave,
               deporte: campeonato.deporteEfectivo,
