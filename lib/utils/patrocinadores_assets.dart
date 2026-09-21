@@ -54,6 +54,23 @@ class PatrocinadoresAssets {
         minuscula.endsWith('.jpg') ||
         minuscula.endsWith('.jpeg');
   }
+
+  /// Sitio web de cada auspiciador, para que el logo del footer sea
+  /// clicable. La clave es el nombre del archivo sin extensión, así
+  /// sumar un enlace no obliga a tocar el footer: alcanza con que el
+  /// archivo se llame igual que la clave.
+  static const Map<String, String> _sitios = {
+    'em_business_group': 'https://www.embusinessgroup.com',
+  };
+
+  /// Sitio del logo que está en [ruta], o `null` si ese auspiciador no
+  /// tiene enlace cargado.
+  static String? sitioDe(String ruta) {
+    final archivo = ruta.split('/').last;
+    final punto = archivo.lastIndexOf('.');
+
+    return _sitios[punto < 0 ? archivo : archivo.substring(0, punto)];
+  }
 }
 
 class PatrocinadoresLogos {

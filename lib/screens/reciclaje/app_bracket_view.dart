@@ -6,8 +6,9 @@ import 'app_badge.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 
-// Alcanza para los dos equipos y el renglón de fecha/hora del cruce.
-const double _kCardHeight = 104;
+// Alcanza para el número de llave, los dos equipos y el renglón de
+// fecha/hora del cruce.
+const double _kCardHeight = 116;
 const double _kBaseGap = 22;
 const double _kHeaderHeight = 40;
 const double _kConnectorWidth = 34;
@@ -464,6 +465,8 @@ class _BracketMatchCard extends StatelessWidget {
 
     final colorEstado = jugado
         ? AppColors.success
+        : partido.esBye
+        ? AppColors.secondaryDark
         : partido.estaProgramado
         ? AppColors.info
         : AppColors.border;
@@ -496,10 +499,28 @@ class _BracketMatchCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // El número de llave es el que figura en el cuadro
+                    // oficial: sirve para seguir de dónde sale cada
+                    // equipo ("Ganador llave 8") sin contar posiciones.
+                    if (partido.llave != null) ...[
+                      Text(
+                        partido.esBye
+                            ? 'Llave ${partido.llave} · pasa directo'
+                            : 'Llave ${partido.llave}',
+                        style: AppTextStyles.small.copyWith(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.6,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                    ],
                     _BracketTeamRow(
                       nombre: partido.equipoLocalNombre,
                       marcador: jugado ? '${partido.golesLocal ?? 0}' : null,
                       ganador: ganaLocal,
+                      pendiente: partido.equipoLocalId.isEmpty,
                     ),
                     const SizedBox(height: 5),
                     _BracketTeamRow(
@@ -508,6 +529,7 @@ class _BracketMatchCard extends StatelessWidget {
                           ? '${partido.golesVisitante ?? 0}'
                           : null,
                       ganador: ganaVisitante,
+                      pendiente: partido.equipoVisitanteId.isEmpty,
                     ),
                     const SizedBox(height: 7),
                     _FechaCruce(fecha: partido.fechaHora),
@@ -581,10 +603,15 @@ class _BracketTeamRow extends StatelessWidget {
   final String? marcador;
   final bool ganador;
 
+  /// El lugar todavía espera al ganador de una llave anterior: se
+  /// muestra en gris y en cursiva para que se note que no es un equipo.
+  final bool pendiente;
+
   const _BracketTeamRow({
     required this.nombre,
     required this.marcador,
     required this.ganador,
+    this.pendiente = false,
   });
 
   @override
@@ -598,7 +625,12 @@ class _BracketTeamRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: AppTextStyles.small.copyWith(
               fontWeight: ganador ? FontWeight.w900 : FontWeight.w600,
-              color: ganador ? AppColors.primaryDark : AppColors.textPrimary,
+              fontStyle: pendiente ? FontStyle.italic : FontStyle.normal,
+              color: pendiente
+                  ? AppColors.textMuted
+                  : ganador
+                  ? AppColors.primaryDark
+                  : AppColors.textPrimary,
             ),
           ),
         ),

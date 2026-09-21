@@ -87,6 +87,36 @@ class PartidoModel {
   /// llave eliminatoria, aunque comparta con ella el no tener grupo.
   final bool privilegio;
 
+  // ---- Ubicación dentro de la llave eliminatoria ----
+  //
+  // Los partidos de grupos y los de privilegio no los tienen (quedan en
+  // null). Los cruces viejos, creados a mano antes de que existiera el
+  // generador de llaves, tampoco: para esos se sigue deduciendo la
+  // ronda contando cuántos partidos hay en la jornada.
+
+  /// Ronda de la llave: 'octavos', 'cuartos', 'semifinal', 'final'...
+  /// (ver `RondaLlave`). `null` si el partido no es de la llave.
+  final String? rondaLlave;
+
+  /// Número de llave dentro de la ronda (1..n), igual que en el cuadro:
+  /// en octavos la llave 1 es 1° vs 16°, la llave 8 es 8° vs 9°.
+  final int? llave;
+
+  /// Posición de arriba hacia abajo al dibujar la ronda. No es lo mismo
+  /// que [llave]: el dibujo se reordena para que los conectores no se
+  /// crucen.
+  final int? ordenLlave;
+
+  /// Número de llave de la ronda anterior de donde sale cada equipo.
+  /// Solo en rondas posteriores a la primera.
+  final int? vieneDeLocal;
+  final int? vieneDeVisitante;
+
+  /// Cruce sin rival porque el cuadro no se llenó (12 clasificados en un
+  /// cuadro de 16, por ejemplo): el equipo pasa directo a la siguiente
+  /// ronda y este partido no se juega.
+  final bool esBye;
+
   const PartidoModel({
     required this.id,
     required this.jornada,
@@ -115,6 +145,12 @@ class PartidoModel {
     this.tipoDefinicion = TipoDefinicion.normal,
     this.sets = const [],
     this.privilegio = false,
+    this.rondaLlave,
+    this.llave,
+    this.ordenLlave,
+    this.vieneDeLocal,
+    this.vieneDeVisitante,
+    this.esBye = false,
   });
 
   factory PartidoModel.fromMap(String id, Map<String, dynamic> map) {
@@ -177,6 +213,20 @@ class PartidoModel {
       ),
       sets: _setsFromJson(map['sets']),
       privilegio: boolFromJson(map['privilegio']),
+      rondaLlave: map['rondaLlave'] == null
+          ? null
+          : stringFromJson(map['rondaLlave']),
+      llave: map['llave'] == null ? null : intFromJson(map['llave']),
+      ordenLlave: map['ordenLlave'] == null
+          ? null
+          : intFromJson(map['ordenLlave']),
+      vieneDeLocal: map['vieneDeLocal'] == null
+          ? null
+          : intFromJson(map['vieneDeLocal']),
+      vieneDeVisitante: map['vieneDeVisitante'] == null
+          ? null
+          : intFromJson(map['vieneDeVisitante']),
+      esBye: boolFromJson(map['esBye']),
     );
   }
 
@@ -208,8 +258,27 @@ class PartidoModel {
       'tipoDefinicion': tipoDefinicion,
       'sets': sets.map((set) => set.toMap()).toList(),
       'privilegio': privilegio,
+      'rondaLlave': rondaLlave,
+      'llave': llave,
+      'ordenLlave': ordenLlave,
+      'vieneDeLocal': vieneDeLocal,
+      'vieneDeVisitante': vieneDeVisitante,
+      'esBye': esBye,
     };
   }
+
+  /// El partido forma parte del cuadro eliminatorio generado por la app
+  /// (tiene ronda y número de llave asignados).
+  bool get esDeLlave => rondaLlave != null && llave != null;
+
+  /// Los dos equipos ya están definidos: no es un cruce esperando al
+  /// ganador de la ronda anterior ni un "libre".
+  bool get tieneEquiposDefinidos =>
+      equipoLocalId.isNotEmpty && equipoVisitanteId.isNotEmpty;
+
+  /// Se puede cargar un resultado: hace falta que haya dos equipos y que
+  /// no sea un pase directo.
+  bool get admiteResultado => tieneEquiposDefinidos && !esBye;
 
   bool get estaPendienteProgramacion =>
       estado == PartidoEstado.pendienteProgramacion;
