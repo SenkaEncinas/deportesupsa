@@ -8,7 +8,6 @@ import '../services/campeonato_service.dart';
 import '../services/equipo_service.dart';
 import '../services/partido_service.dart';
 import '../services/public_home_service.dart';
-import '../services/resultado_service.dart';
 import '../utils/clasificacion.dart';
 import '../utils/fixture_grouping.dart';
 import 'reciclaje/app_badge.dart';
@@ -44,7 +43,6 @@ class _LlavesScreenState extends State<LlavesScreen> {
   final PartidoService _partidoService = PartidoService();
   final EquipoService _equipoService = EquipoService();
   final PublicHomeService _tablaService = PublicHomeService();
-  final ResultadoService _resultadoService = ResultadoService();
 
   // Los streams se crean una sola vez y no dentro de build(): si se
   // reconstruyen en cada build, cada setState (una tecla en un
@@ -63,22 +61,19 @@ class _LlavesScreenState extends State<LlavesScreen> {
   Future<void> _generar(CampeonatoModel campeonato) async {
     setState(() => _loading = true);
 
-    // La tabla guardada es una foto: se calculó la última vez que se
-    // cargó un resultado, y puede venir de antes de un cambio de reglas
-    // (los puntos de vóley, por ejemplo). Como es la que define la
-    // siembra, se recalcula primero: sembrar con números viejos manda a
-    // los equipos a la llave equivocada.
+    // Se pide la tabla en el momento y no la que tenga la pantalla
+    // dibujada: `streamTabla` la calcula desde los resultados, así que
+    // esto siembra siempre con los números de ahora.
     final List<TablaPosicionModel> tabla;
 
     try {
-      await _resultadoService.recalcularTablaYRanking(widget.campeonatoId);
       tabla = await _tablaService.streamTabla(widget.campeonatoId).first;
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
       AppSnackbars.error(
         context,
-        'No se pudo actualizar la tabla antes de sembrar: '
+        'No se pudo leer la tabla para sembrar: '
         '${e.toString().replaceAll('Exception:', '').trim()}',
       );
       return;

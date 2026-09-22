@@ -6,9 +6,9 @@ import '../models/gol_model.dart';
 import '../models/jugador_model.dart';
 import '../models/partido_model.dart';
 import '../models/ranking_goleador_model.dart';
-import '../models/tabla_posicion_model.dart';
 import '../models/tarjeta_model.dart';
 import '../utils/llaves.dart';
+import '../utils/tabla_calculo.dart';
 import 'auditoria_service.dart';
 
 class GolJugadorInput {
@@ -685,243 +685,36 @@ class ResultadoService {
     await _recalcularRanking(campeonatoId);
   }
 
-  /// Puntos a favor y en contra de un partido ganado por no presentación
-  /// (walkover) o por sanción, según el reglamento del deporte:
+  /// Recalcula la tabla y la guarda.
   ///
-  /// - Vóley: se da por ganado cada set por el máximo (25-0 con la
-  ///   configuración habitual), o sea 50 a 0 con dos sets para ganar.
-  /// - Básquet: 20-0.
-  /// - Fútbol/futsal: el marcador que haya cargado el admin, así que
-  ///   devuelve `null` y se usa el del partido.
-  ({int local, int visitante})? _puntosPorNoPresentarse(
-    CampeonatoModel campeonato,
-    PartidoModel partido,
-  ) {
-    if (partido.tipoResultado == TipoResultado.normal) return null;
-    if (partido.golesLocal == null || partido.golesVisitante == null) {
-      return null;
-    }
-
-    final ganaLocal = partido.golesLocal! > partido.golesVisitante!;
-    final sistema = campeonato.sistemaResultadoEfectivo;
-
-    final total = switch (sistema) {
-      SistemaResultado.sets =>
-        campeonato.configuracion.setsParaGanar *
-            campeonato.configuracion.puntosSetNormal,
-      SistemaResultado.puntos => kPuntosWalkoverBasket,
-      _ => null,
-    };
-
-    if (total == null) return null;
-
-    return (local: ganaLocal ? total : 0, visitante: ganaLocal ? 0 : total);
-  }
-
+  /// El cálculo en sí vive en [TablaCalculo], que es una función pura y
+  /// la misma que usa la pantalla para mostrar la tabla en vivo. Acá
+  /// solo se leen los datos, se calcula y se guarda el resultado como
+  /// registro.
   Future<void> _recalcularTabla(String campeonatoId) async {
-    final campeonato = await _campeonato(campeonatoId).get();
+    final campeonatoDoc = await _campeonato(campeonatoId).get();
 
-    if (!campeonato.exists || campeonato.data() == null) {
+    if (!campeonatoDoc.exists || campeonatoDoc.data() == null) {
       throw Exception('El campeonato no existe.');
     }
 
-    final campeonatoModel = CampeonatoModel.fromMap(
-      campeonato.id,
-      campeonato.data()!,
+    final campeonato = CampeonatoModel.fromMap(
+      campeonatoDoc.id,
+      campeonatoDoc.data()!,
     );
 
-    // Fase de grupos / grupos + eliminación: cada grupo maneja su propia
-    // tabla (posición 1..N dentro del grupo), así que la fase final
-    // (partidos sin grupoId) no debe mezclarse en el cálculo.
-    final usaGrupos =
-        campeonatoModel.tipoCampeonato == TipoCampeonato.faseGrupos ||
-        campeonatoModel.tipoCampeonato == TipoCampeonato.gruposEliminacion;
-
     final equiposSnap = await _equipos(campeonatoId).get();
-    final todosPartidosSnap = await _partidos(campeonatoId).get();
+    final partidosSnap = await _partidos(campeonatoId).get();
 
-    final todosPartidos = todosPartidosSnap.docs.map((doc) {
-      return PartidoModel.fromMap(doc.id, doc.data());
-    }).toList();
-
-    // Grupo de cada equipo: se deduce de cualquier partido (jugado o no)
-    // que tenga grupoId, para que el equipo aparezca en su grupo desde
-    // que se inscribe, no recién cuando juega su primer partido.
-    final equipoGrupo = <String, String>{};
-
-    for (final partido in todosPartidos) {
-      if (partido.grupoId == null || partido.grupoId!.isEmpty) continue;
-      equipoGrupo[partido.equipoLocalId] = partido.grupoId!;
-      equipoGrupo[partido.equipoVisitanteId] = partido.grupoId!;
-    }
-
-    final acumulados = <String, _TablaAcumulada>{};
-
-    for (final doc in equiposSnap.docs) {
-      final equipo = EquipoModel.fromMap(doc.id, doc.data());
-
-      acumulados[equipo.id] = _TablaAcumulada(
-        equipoId: equipo.id,
-        equipoNombre: equipo.nombre,
-        grupoId: usaGrupos ? equipoGrupo[equipo.id] : null,
-      );
-    }
-
-    final partidosFinalizados = todosPartidos.where((partido) {
-      if (partido.estado != PartidoEstado.finalizado ||
-          !partido.resultadoRegistrado) {
-        return false;
-      }
-      // En formatos de grupos, la fase final (sin grupoId) no cuenta
-      // para la tabla: es eliminatoria, no de puntos.
-      if (usaGrupos && (partido.grupoId == null || partido.grupoId!.isEmpty)) {
-        return false;
-      }
-      return true;
-    });
-
-    for (final partido in partidosFinalizados) {
-      if (partido.golesLocal == null || partido.golesVisitante == null) {
-        continue;
-      }
-
-      final local = acumulados[partido.equipoLocalId];
-      final visitante = acumulados[partido.equipoVisitanteId];
-
-      if (local == null || visitante == null) continue;
-
-      local.partidosJugados++;
-      visitante.partidosJugados++;
-
-      local.golesFavor += partido.golesLocal!;
-      local.golesContra += partido.golesVisitante!;
-
-      visitante.golesFavor += partido.golesVisitante!;
-      visitante.golesContra += partido.golesLocal!;
-
-      // Puntos favor/contra: en vóley se suman los puntos de cada set;
-      // en fútbol/básquet coinciden con el marcador del partido.
-      //
-      // Los walkover y las sanciones se calculan con la regla, no con lo
-      // que haya guardado el partido: los cargados antes de que la app
-      // armara el detalle de sets quedaron sin él, y si se leyera el
-      // documento tal cual aportarían 2 de diferencia (los sets) en vez
-      // de los 50 puntos que corresponden.
-      final puntosAdministrativos = _puntosPorNoPresentarse(
-        campeonatoModel,
-        partido,
-      );
-
-      if (puntosAdministrativos != null) {
-        local.puntosFavor += puntosAdministrativos.local;
-        local.puntosContra += puntosAdministrativos.visitante;
-        visitante.puntosFavor += puntosAdministrativos.visitante;
-        visitante.puntosContra += puntosAdministrativos.local;
-      } else if (partido.sets.isNotEmpty) {
-        for (final set in partido.sets) {
-          local.puntosFavor += set.local;
-          local.puntosContra += set.visitante;
-          visitante.puntosFavor += set.visitante;
-          visitante.puntosContra += set.local;
-        }
-      } else {
-        local.puntosFavor += partido.golesLocal!;
-        local.puntosContra += partido.golesVisitante!;
-        visitante.puntosFavor += partido.golesVisitante!;
-        visitante.puntosContra += partido.golesLocal!;
-      }
-
-      final reglas = campeonatoModel.reglasPuntuacionEfectivas;
-
-      // El punto por perder (vóley: 1) es por presentarse y jugar, así
-      // que un walkover no lo paga: el que no se presentó suma 0.
-      final puntosPerdedor = partido.tipoResultado == TipoResultado.walkover
-          ? 0
-          : reglas.derrota;
-
-      if (partido.golesLocal! > partido.golesVisitante!) {
-        local.partidosGanados++;
-        visitante.partidosPerdidos++;
-        local.puntos += reglas.victoria;
-        visitante.puntos += puntosPerdedor;
-      } else if (partido.golesLocal! < partido.golesVisitante!) {
-        visitante.partidosGanados++;
-        local.partidosPerdidos++;
-        visitante.puntos += reglas.victoria;
-        local.puntos += puntosPerdedor;
-      } else {
-        local.partidosEmpatados++;
-        visitante.partidosEmpatados++;
-        local.puntos += reglas.empate;
-        visitante.puntos += reglas.empate;
-      }
-    }
-
-    for (final item in acumulados.values) {
-      item.diferenciaGoles = item.golesFavor - item.golesContra;
-      item.diferenciaPuntos = item.puntosFavor - item.puntosContra;
-
-      // Igualación: puntos cargados a mano por el admin para compensar a
-      // los grupos con menos equipos. Se suman al final, ya con todos los
-      // partidos contados, y entran en el orden de la tabla como
-      // cualquier otro punto.
-      item.puntosIgualacion = campeonatoModel.igualacionDe(item.equipoId);
-      item.puntos += item.puntosIgualacion;
-    }
-
-    int compararTabla(_TablaAcumulada a, _TablaAcumulada b) {
-      var compare = b.puntos.compareTo(a.puntos);
-      if (compare != 0) return compare;
-
-      compare = b.diferenciaGoles.compareTo(a.diferenciaGoles);
-      if (compare != 0) return compare;
-
-      compare = b.golesFavor.compareTo(a.golesFavor);
-      if (compare != 0) return compare;
-
-      compare = a.golesContra.compareTo(b.golesContra);
-      if (compare != 0) return compare;
-
-      return a.equipoNombre.compareTo(b.equipoNombre);
-    }
-
-    final tablaOrdenada = <_TablaAcumulada>[];
-
-    if (usaGrupos) {
-      // Una tabla independiente por grupo: la posición 1..N se calcula
-      // dentro de cada grupo, no contra todo el campeonato.
-      final porGrupo = <String?, List<_TablaAcumulada>>{};
-
-      for (final item in acumulados.values) {
-        porGrupo.putIfAbsent(item.grupoId, () => []).add(item);
-      }
-
-      final clavesOrdenadas = porGrupo.keys.toList()
-        ..sort((a, b) {
-          if (a == null && b == null) return 0;
-          if (a == null) return 1;
-          if (b == null) return -1;
-          return a.compareTo(b);
-        });
-
-      for (final clave in clavesOrdenadas) {
-        final lista = porGrupo[clave]!..sort(compararTabla);
-
-        for (int i = 0; i < lista.length; i++) {
-          lista[i].posicion = i + 1;
-        }
-
-        tablaOrdenada.addAll(lista);
-      }
-    } else {
-      final lista = acumulados.values.toList()..sort(compararTabla);
-
-      for (int i = 0; i < lista.length; i++) {
-        lista[i].posicion = i + 1;
-      }
-
-      tablaOrdenada.addAll(lista);
-    }
+    final tabla = TablaCalculo.calcular(
+      campeonato: campeonato,
+      equipos: equiposSnap.docs
+          .map((doc) => EquipoModel.fromMap(doc.id, doc.data()))
+          .toList(),
+      partidos: partidosSnap.docs
+          .map((doc) => PartidoModel.fromMap(doc.id, doc.data()))
+          .toList(),
+    );
 
     final tablaAnterior = await _tabla(campeonatoId).get();
 
@@ -931,28 +724,8 @@ class ResultadoService {
       batch.delete(doc.reference);
     }
 
-    for (final item in tablaOrdenada) {
-      final tablaModel = TablaPosicionModel(
-        equipoId: item.equipoId,
-        equipoNombre: item.equipoNombre,
-        grupoId: item.grupoId,
-        partidosJugados: item.partidosJugados,
-        partidosGanados: item.partidosGanados,
-        partidosEmpatados: item.partidosEmpatados,
-        partidosPerdidos: item.partidosPerdidos,
-        golesFavor: item.golesFavor,
-        golesContra: item.golesContra,
-        diferenciaGoles: item.diferenciaGoles,
-        puntos: item.puntos,
-        posicion: item.posicion,
-        fechaActualizacion: DateTime.now(),
-        puntosFavor: item.puntosFavor,
-        puntosContra: item.puntosContra,
-        diferenciaPuntos: item.diferenciaPuntos,
-        puntosIgualacion: item.puntosIgualacion,
-      );
-
-      batch.set(_tabla(campeonatoId).doc(item.equipoId), tablaModel.toMap());
+    for (final fila in tabla) {
+      batch.set(_tabla(campeonatoId).doc(fila.equipoId), fila.toMap());
     }
 
     await batch.commit();
@@ -1025,31 +798,6 @@ class ResultadoService {
 
     await batch.commit();
   }
-}
-
-class _TablaAcumulada {
-  final String equipoId;
-  final String equipoNombre;
-  final String? grupoId;
-  int posicion = 0;
-  int partidosJugados = 0;
-  int partidosGanados = 0;
-  int partidosEmpatados = 0;
-  int partidosPerdidos = 0;
-  int golesFavor = 0;
-  int golesContra = 0;
-  int diferenciaGoles = 0;
-  int puntos = 0;
-  int puntosFavor = 0;
-  int puntosContra = 0;
-  int diferenciaPuntos = 0;
-  int puntosIgualacion = 0;
-
-  _TablaAcumulada({
-    required this.equipoId,
-    required this.equipoNombre,
-    this.grupoId,
-  });
 }
 
 class _RankingAcumulado {

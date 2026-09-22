@@ -287,4 +287,54 @@ void main() {
       expect(doc.data()!['golesVisitante'], 0);
     });
   });
+
+  group('Tabla vieja', () {
+    test('recalcular corrige los puntos guardados con las reglas de fútbol',
+        () async {
+      // Es lo que pasó con los campeonatos de vóley: la tabla se calculó
+      // con 3/1/0 antes de que existieran las reglas por deporte y quedó
+      // congelada ahí, mostrando 9 y 6 puntos donde correspondían 6 y 4.
+      final db = await _baseVolley();
+
+      await db
+          .collection('campeonatos')
+          .doc(kCampeonato)
+          .collection('partidos')
+          .doc('p1')
+          .update({
+            'estado': PartidoEstado.finalizado,
+            'resultadoRegistrado': true,
+            'tipoResultado': TipoResultado.normal,
+            'golesLocal': 2,
+            'golesVisitante': 0,
+            'ganadorId': 'casa',
+            'empate': false,
+            'sets': const [
+              {'local': 25, 'visitante': 20},
+              {'local': 25, 'visitante': 18},
+            ],
+          });
+
+      // Tabla guardada con los números viejos, en una fila suelta como
+      // las que dejaban las versiones anteriores.
+      await db
+          .collection('campeonatos')
+          .doc(kCampeonato)
+          .collection('tabla_posiciones')
+          .doc('fila-vieja')
+          .set({'equipoId': 'casa', 'equipoNombre': 'casa', 'puntos': 9});
+
+      await ResultadoService(firestore: db).recalcularTablaYRanking(kCampeonato);
+
+      final tabla = await _tabla(db);
+
+      expect(tabla['casa']!.puntos, 2, reason: 'ganar en vóley son 2 puntos');
+      expect(tabla['visita']!.puntos, 1, reason: 'perder son 1');
+      expect(
+        tabla.containsKey('fila-vieja'),
+        isFalse,
+        reason: 'la fila vieja no puede quedar dando vueltas',
+      );
+    });
+  });
 }

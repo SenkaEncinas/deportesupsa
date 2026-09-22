@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/campeonato_model.dart';
@@ -5,6 +7,7 @@ import '../models/equipo_model.dart';
 import '../models/partido_model.dart';
 import '../models/ranking_goleador_model.dart';
 import '../models/tabla_posicion_model.dart';
+import '../utils/tabla_calculo.dart';
 
 class PublicHomeService {
   PublicHomeService({FirebaseFirestore? firestore})
@@ -148,17 +151,97 @@ class PublicHomeService {
         });
   }
 
+  /// La tabla de posiciones, calculada en vivo.
+  ///
+  /// No se lee de `tabla_posiciones`: se arma con [TablaCalculo] a
+  /// partir del campeonato, los equipos y los partidos, y se rehace sola
+  /// cada vez que cambia cualquiera de los tres. Así un resultado nuevo,
+  /// una igualación o un cambio de reglas se ven en el momento.
+  ///
+  /// Leerla de la colección guardada era el origen de un problema feo:
+  /// esa copia solo se reescribía al registrar un resultado, así que
+  /// quedaba mostrando números viejos indefinidamente. La colección
+  /// sigue existiendo, pero como registro, no como fuente de verdad.
   Stream<List<TablaPosicionModel>> streamTabla(String campeonatoId) {
-    return _campeonatos
-        .doc(campeonatoId)
-        .collection('tabla_posiciones')
-        .orderBy('posicion')
-        .snapshots()
-        .map((snap) {
-          return snap.docs.map((doc) {
-            return TablaPosicionModel.fromMap(doc.id, doc.data());
-          }).toList();
-        });
+    return _combinar3(
+      _campeonatos.doc(campeonatoId).snapshots().map((doc) {
+        final data = doc.data();
+        return data == null ? null : CampeonatoModel.fromMap(doc.id, data);
+      }),
+      streamEquipos(campeonatoId),
+      streamPartidos(campeonatoId),
+      (campeonato, equipos, partidos) {
+        if (campeonato == null) return <TablaPosicionModel>[];
+
+        return TablaCalculo.calcular(
+          campeonato: campeonato,
+          equipos: equipos,
+          partidos: partidos,
+        );
+      },
+    );
+  }
+
+  /// Combina tres streams: emite cada vez que cambia cualquiera de
+  /// ellos, una vez que los tres dieron al menos un valor.
+  ///
+  /// Dart no trae un `combineLatest` y no vale la pena sumar una
+  /// dependencia por esto.
+  static Stream<R> _combinar3<A, B, C, R>(
+    Stream<A> a,
+    Stream<B> b,
+    Stream<C> c,
+    R Function(A, B, C) combinar,
+  ) {
+    late final StreamController<R> control;
+    final subs = <StreamSubscription<dynamic>>[];
+
+    late A ultimoA;
+    late B ultimoB;
+    late C ultimoC;
+    var hayA = false;
+    var hayB = false;
+    var hayC = false;
+
+    void emitir() {
+      if (hayA && hayB && hayC) {
+        control.add(combinar(ultimoA, ultimoB, ultimoC));
+      }
+    }
+
+    control = StreamController<R>(
+      onListen: () {
+        subs.add(
+          a.listen((valor) {
+            ultimoA = valor;
+            hayA = true;
+            emitir();
+          }, onError: control.addError),
+        );
+        subs.add(
+          b.listen((valor) {
+            ultimoB = valor;
+            hayB = true;
+            emitir();
+          }, onError: control.addError),
+        );
+        subs.add(
+          c.listen((valor) {
+            ultimoC = valor;
+            hayC = true;
+            emitir();
+          }, onError: control.addError),
+        );
+      },
+      onCancel: () async {
+        for (final sub in subs) {
+          await sub.cancel();
+        }
+        subs.clear();
+      },
+    );
+
+    return control.stream;
   }
 
   Stream<List<RankingGoleadorModel>> streamRankingGoleadores(

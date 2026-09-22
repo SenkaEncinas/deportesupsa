@@ -326,11 +326,20 @@ class ReglasPuntuacion {
     return const ReglasPuntuacion(victoria: 2, empate: 0, derrota: 1);
   }
 
+  /// Básquet: mismo criterio que el vóley y que la FIBA, porque tampoco
+  /// hay empates (se juega prórroga hasta que haya ganador): 2 al que
+  /// gana y 1 al que pierde por haberse presentado.
+  factory ReglasPuntuacion.basket() {
+    return const ReglasPuntuacion(victoria: 2, empate: 0, derrota: 1);
+  }
+
   /// Reglas que corresponden al deporte de un campeonato nuevo.
   factory ReglasPuntuacion.porDeporte(String deporte) {
-    return deporte == DeporteTipo.volley
-        ? ReglasPuntuacion.voley()
-        : ReglasPuntuacion.defaultRules();
+    return switch (deporte) {
+      DeporteTipo.volley => ReglasPuntuacion.voley(),
+      DeporteTipo.basket => ReglasPuntuacion.basket(),
+      _ => ReglasPuntuacion.defaultRules(),
+    };
   }
 
   factory ReglasPuntuacion.fromMap(Map<String, dynamic>? map) {
@@ -470,8 +479,17 @@ class CampeonatoModel {
   /// aunque el documento guardado traiga las de fútbol: los campeonatos
   /// creados antes de esta corrección quedaron con 3/1/0 guardado y no
   /// habría forma de arreglarles la tabla sin tocar la base.
-  ReglasPuntuacion get reglasPuntuacionEfectivas =>
-      esVolley ? ReglasPuntuacion.voley() : reglasPuntuacion;
+  /// Reglas que mandan de verdad al armar la tabla.
+  ///
+  /// En vóley y básquet las fija el deporte y no se toman de lo guardado
+  /// en el campeonato: los creados antes de que existieran las reglas
+  /// por deporte quedaron con las de fútbol (3/1/0) y mostraban 9 puntos
+  /// donde correspondían 6.
+  ReglasPuntuacion get reglasPuntuacionEfectivas {
+    if (esVolley) return ReglasPuntuacion.voley();
+    if (esBasket) return ReglasPuntuacion.basket();
+    return reglasPuntuacion;
+  }
 
   bool get esFutbol => deporteEfectivo == DeporteTipo.futbol;
   bool get esVolley => deporteEfectivo == DeporteTipo.volley;
