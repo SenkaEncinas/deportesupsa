@@ -8,6 +8,7 @@ import '../services/campeonato_service.dart';
 import '../services/equipo_service.dart';
 import '../services/partido_service.dart';
 import '../services/public_home_service.dart';
+import '../services/resultado_service.dart';
 import '../utils/clasificacion.dart';
 import '../utils/fixture_grouping.dart';
 import 'reciclaje/app_badge.dart';
@@ -43,6 +44,7 @@ class _LlavesScreenState extends State<LlavesScreen> {
   final PartidoService _partidoService = PartidoService();
   final EquipoService _equipoService = EquipoService();
   final PublicHomeService _tablaService = PublicHomeService();
+  final ResultadoService _resultadoService = ResultadoService();
 
   // Los streams se crean una sola vez y no dentro de build(): si se
   // reconstruyen en cada build, cada setState (una tecla en un
@@ -58,10 +60,33 @@ class _LlavesScreenState extends State<LlavesScreen> {
 
   bool _loading = false;
 
-  Future<void> _generar(
-    CampeonatoModel campeonato,
-    List<TablaPosicionModel> tabla,
-  ) async {
+  Future<void> _generar(CampeonatoModel campeonato) async {
+    setState(() => _loading = true);
+
+    // La tabla guardada es una foto: se calculó la última vez que se
+    // cargó un resultado, y puede venir de antes de un cambio de reglas
+    // (los puntos de vóley, por ejemplo). Como es la que define la
+    // siembra, se recalcula primero: sembrar con números viejos manda a
+    // los equipos a la llave equivocada.
+    final List<TablaPosicionModel> tabla;
+
+    try {
+      await _resultadoService.recalcularTablaYRanking(widget.campeonatoId);
+      tabla = await _tablaService.streamTabla(widget.campeonatoId).first;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      AppSnackbars.error(
+        context,
+        'No se pudo actualizar la tabla antes de sembrar: '
+        '${e.toString().replaceAll('Exception:', '').trim()}',
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
     final clasificados = Clasificacion.calcular(
       tabla: tabla,
       clasificanPorGrupo: campeonato.configuracion.clasificanPorGrupo,
@@ -218,7 +243,6 @@ class _LlavesScreenState extends State<LlavesScreen> {
                   }
 
                   final partidos = partidosSnapshot.data ?? [];
-                  final tabla = tablaSnapshot.data ?? [];
 
                   final deLlave = _partidoService.soloDeLlave(partidos);
                   final rondas = FixtureGrouping.rondasEliminatorias(deLlave);
@@ -242,7 +266,7 @@ class _LlavesScreenState extends State<LlavesScreen> {
                               : 'Regenerar llaves',
                           icon: Icons.account_tree_outlined,
                           loading: _loading,
-                          onPressed: () => _generar(campeonato, tabla),
+                          onPressed: () => _generar(campeonato),
                         ),
                       ],
                       child: Column(

@@ -685,6 +685,39 @@ class ResultadoService {
     await _recalcularRanking(campeonatoId);
   }
 
+  /// Puntos a favor y en contra de un partido ganado por no presentación
+  /// (walkover) o por sanción, según el reglamento del deporte:
+  ///
+  /// - Vóley: se da por ganado cada set por el máximo (25-0 con la
+  ///   configuración habitual), o sea 50 a 0 con dos sets para ganar.
+  /// - Básquet: 20-0.
+  /// - Fútbol/futsal: el marcador que haya cargado el admin, así que
+  ///   devuelve `null` y se usa el del partido.
+  ({int local, int visitante})? _puntosPorNoPresentarse(
+    CampeonatoModel campeonato,
+    PartidoModel partido,
+  ) {
+    if (partido.tipoResultado == TipoResultado.normal) return null;
+    if (partido.golesLocal == null || partido.golesVisitante == null) {
+      return null;
+    }
+
+    final ganaLocal = partido.golesLocal! > partido.golesVisitante!;
+    final sistema = campeonato.sistemaResultadoEfectivo;
+
+    final total = switch (sistema) {
+      SistemaResultado.sets =>
+        campeonato.configuracion.setsParaGanar *
+            campeonato.configuracion.puntosSetNormal,
+      SistemaResultado.puntos => kPuntosWalkoverBasket,
+      _ => null,
+    };
+
+    if (total == null) return null;
+
+    return (local: ganaLocal ? total : 0, visitante: ganaLocal ? 0 : total);
+  }
+
   Future<void> _recalcularTabla(String campeonatoId) async {
     final campeonato = await _campeonato(campeonatoId).get();
 
@@ -768,7 +801,23 @@ class ResultadoService {
 
       // Puntos favor/contra: en vóley se suman los puntos de cada set;
       // en fútbol/básquet coinciden con el marcador del partido.
-      if (partido.sets.isNotEmpty) {
+      //
+      // Los walkover y las sanciones se calculan con la regla, no con lo
+      // que haya guardado el partido: los cargados antes de que la app
+      // armara el detalle de sets quedaron sin él, y si se leyera el
+      // documento tal cual aportarían 2 de diferencia (los sets) en vez
+      // de los 50 puntos que corresponden.
+      final puntosAdministrativos = _puntosPorNoPresentarse(
+        campeonatoModel,
+        partido,
+      );
+
+      if (puntosAdministrativos != null) {
+        local.puntosFavor += puntosAdministrativos.local;
+        local.puntosContra += puntosAdministrativos.visitante;
+        visitante.puntosFavor += puntosAdministrativos.visitante;
+        visitante.puntosContra += puntosAdministrativos.local;
+      } else if (partido.sets.isNotEmpty) {
         for (final set in partido.sets) {
           local.puntosFavor += set.local;
           local.puntosContra += set.visitante;

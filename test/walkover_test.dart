@@ -1,111 +1,290 @@
+// Puntos de vóley y walkover, ejercitando el servicio de verdad contra
+// un Firestore de mentira.
+//
+// La versión anterior de este archivo repetía la regla dentro del propio
+// test, así que pasaba aunque el servicio hiciera otra cosa — y de hecho
+// la hacía: la tabla se guardaba con 3/1/0 y los walkover viejos
+// aportaban 2 de diferencia en vez de 50.
+//
+// Reglas que se fijan acá:
+//
+// - Vóley: victoria 2 puntos, derrota 1 punto, sin empates.
+// - Walkover: 25-0 por set (50 a 0 con dos sets para ganar) y el que no
+//   se presentó no cobra el punto por perder.
+
+import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:futsal/models/campeonato_model.dart';
+import 'package:futsal/models/equipo_model.dart';
 import 'package:futsal/models/partido_model.dart';
+import 'package:futsal/models/tabla_posicion_model.dart';
 import 'package:futsal/services/resultado_service.dart';
 
-/// Reglas del walkover en vóley, tal como las aplica
-/// `ResultadoService.registrarResultado`:
+const String kCampeonato = 'camp-volley';
+
+/// Arma un campeonato de vóley con dos equipos y un partido entre ellos.
 ///
-/// - Se da por ganado 25-0 en cada set al equipo que se presentó.
-/// - Eso son 50 puntos a favor y 0 en contra (con 2 sets para ganar),
-///   que es lo que después usa la tabla para la diferencia de puntos.
-/// - En la tabla, el que no se presentó no suma el punto por perder.
-void main() {
-  const config = CampeonatoConfig(
-    formato: 'grupos',
-    cantidadVueltas: 1,
-    idaYVuelta: false,
-    generaCrucesAleatorios: false,
-    generaGruposAleatorios: false,
-    permiteEmpate: false,
-    generaTablaPosiciones: true,
-    cantidadJugadoresEnCancha: 6,
-    cantidadMinimaJugadoresPorEquipo: 6,
-    cantidadMaximaJugadoresPorEquipo: 12,
-    deporte: DeporteTipo.volley,
-    modalidad: ModalidadDeporte.volleySala,
-    sistemaResultado: SistemaResultado.sets,
-  );
+/// [reglasViejas] guarda a propósito la puntuación de fútbol (3/1/0),
+/// que es lo que tienen los campeonatos creados antes de que existieran
+/// las reglas por deporte: la tabla igual tiene que salir 2/0/1.
+Future<FakeFirebaseFirestore> _baseVolley({bool reglasViejas = true}) async {
+  final db = FakeFirebaseFirestore();
 
-  /// Copia de la regla del servicio, para fijarla con un test.
-  ({List<SetPartido> sets, int setsLocal, int setsVisitante}) armarWalkover({
-    required bool ganaLocal,
-  }) {
-    final sets = List.generate(
-      config.setsParaGanar,
-      (_) => SetPartido(
-        local: ganaLocal ? config.puntosSetNormal : 0,
-        visitante: ganaLocal ? 0 : config.puntosSetNormal,
-      ),
-    );
+  await db.collection('campeonatos').doc(kCampeonato).set({
+    'nombre': 'CopaUpsa Voleibol',
+    'deporte': DeporteTipo.volley,
+    'modalidad': ModalidadDeporte.volleySala,
+    'tipoCampeonato': TipoCampeonato.gruposEliminacion,
+    'estado': CampeonatoEstado.activo,
+    if (reglasViejas)
+      'reglasPuntuacion': {'victoria': 3, 'empate': 1, 'derrota': 0},
+    'configuracion': {
+      'formato': TipoCampeonato.gruposEliminacion,
+      'deporte': DeporteTipo.volley,
+      'sistemaResultado': SistemaResultado.sets,
+      'setsParaGanar': 2,
+      'puntosSetNormal': 25,
+      'puntosSetDecisivo': 15,
+    },
+  });
 
-    return (
-      sets: sets,
-      setsLocal: ganaLocal ? config.setsParaGanar : 0,
-      setsVisitante: ganaLocal ? 0 : config.setsParaGanar,
-    );
+  for (final id in ['casa', 'visita']) {
+    await db
+        .collection('campeonatos')
+        .doc(kCampeonato)
+        .collection('equipos')
+        .doc(id)
+        .set({'nombre': id, 'estado': EquipoEstado.activo});
   }
 
-  test('el walkover da 25-0 por set y 50 puntos al que se presentó', () {
-    final resultado = armarWalkover(ganaLocal: true);
+  await db
+      .collection('campeonatos')
+      .doc(kCampeonato)
+      .collection('partidos')
+      .doc('p1')
+      .set({
+        'jornada': 1,
+        'vuelta': 1,
+        'grupoId': 'Grupo A',
+        'equipoLocalId': 'casa',
+        'equipoLocalNombre': 'casa',
+        'equipoVisitanteId': 'visita',
+        'equipoVisitanteNombre': 'visita',
+        'estado': PartidoEstado.programado,
+        'resultadoRegistrado': false,
+      });
 
-    expect(resultado.setsLocal, 2);
-    expect(resultado.setsVisitante, 0);
-    expect(resultado.sets.length, 2);
+  return db;
+}
 
-    final puntosFavor = resultado.sets.fold<int>(0, (t, s) => t + s.local);
-    final puntosContra = resultado.sets.fold<int>(0, (t, s) => t + s.visitante);
+Future<Map<String, TablaPosicionModel>> _tabla(FakeFirebaseFirestore db) async {
+  final snap = await db
+      .collection('campeonatos')
+      .doc(kCampeonato)
+      .collection('tabla_posiciones')
+      .get();
 
-    expect(puntosFavor, 50);
-    expect(puntosContra, 0);
-  });
+  return {
+    for (final d in snap.docs)
+      d.id: TablaPosicionModel.fromMap(d.id, d.data()),
+  };
+}
 
-  test('si gana el visitante, los 50 puntos van para su lado', () {
-    final resultado = armarWalkover(ganaLocal: false);
+void main() {
+  group('Puntos de vóley', () {
+    test('ganar da 2 puntos y perder da 1, aunque el campeonato tenga '
+        'guardadas las reglas de fútbol', () async {
+      final db = await _baseVolley();
 
-    expect(resultado.setsLocal, 0);
-    expect(resultado.setsVisitante, 2);
-
-    final puntosVisitante = resultado.sets.fold<int>(
-      0,
-      (t, s) => t + s.visitante,
-    );
-
-    expect(puntosVisitante, 50);
-  });
-
-  test('en básquet el walkover se guarda 20-0', () {
-    // Mismo criterio que en vóley, pero el marcador lo fija el
-    // reglamento en vez de la configuración del campeonato.
-    ({int local, int visitante}) armarBasket({required bool ganaLocal}) {
-      return (
-        local: ganaLocal ? kPuntosWalkoverBasket : 0,
-        visitante: ganaLocal ? 0 : kPuntosWalkoverBasket,
+      await ResultadoService(firestore: db).registrarResultado(
+        campeonatoId: kCampeonato,
+        partidoId: 'p1',
+        golesLocal: 2,
+        golesVisitante: 1,
+        golesJugadores: const [],
+        usuarioId: 'admin',
+        usuarioNombre: 'Admin',
+        sets: const [
+          SetPartido(local: 25, visitante: 20),
+          SetPartido(local: 22, visitante: 25),
+          SetPartido(local: 15, visitante: 10),
+        ],
       );
+
+      final tabla = await _tabla(db);
+
+      expect(tabla['casa']!.puntos, 2, reason: 'el que gana suma 2');
+      expect(tabla['visita']!.puntos, 1, reason: 'el que pierde suma 1');
+    });
+
+    test('las reglas de vóley no dependen de lo guardado', () {
+      final reglas = ReglasPuntuacion.voley();
+
+      expect(reglas.victoria, 2);
+      expect(reglas.derrota, 1);
+      expect(reglas.empate, 0);
+    });
+  });
+
+  group('Walkover en vóley', () {
+    Future<FakeFirebaseFirestore> conWalkover() async {
+      final db = await _baseVolley();
+
+      await ResultadoService(firestore: db).registrarResultado(
+        campeonatoId: kCampeonato,
+        partidoId: 'p1',
+        golesLocal: 1,
+        golesVisitante: 0,
+        golesJugadores: const [],
+        tipoResultado: TipoResultado.walkover,
+        observacionResultado: 'La visita no se presentó.',
+        usuarioId: 'admin',
+        usuarioNombre: 'Admin',
+      );
+
+      return db;
     }
 
-    expect(kPuntosWalkoverBasket, 20);
+    test('se guarda 25-0 en cada set', () async {
+      final db = await conWalkover();
 
-    final local = armarBasket(ganaLocal: true);
-    expect(local.local, 20);
-    expect(local.visitante, 0);
+      final doc = await db
+          .collection('campeonatos')
+          .doc(kCampeonato)
+          .collection('partidos')
+          .doc('p1')
+          .get();
 
-    final visitante = armarBasket(ganaLocal: false);
-    expect(visitante.local, 0);
-    expect(visitante.visitante, 20);
+      final partido = PartidoModel.fromMap('p1', doc.data()!);
+
+      expect(partido.golesLocal, 2, reason: 'se gana por 2 sets a 0');
+      expect(partido.golesVisitante, 0);
+      expect(partido.sets.length, 2);
+      expect(partido.sets.every((s) => s.local == 25 && s.visitante == 0), isTrue);
+    });
+
+    test('da 50 puntos de diferencia al que se presentó', () async {
+      final db = await conWalkover();
+      final tabla = await _tabla(db);
+
+      expect(tabla['casa']!.puntosFavor, 50);
+      expect(tabla['casa']!.puntosContra, 0);
+      expect(tabla['casa']!.diferenciaPuntos, 50);
+
+      expect(tabla['visita']!.puntosFavor, 0);
+      expect(tabla['visita']!.puntosContra, 50);
+      expect(tabla['visita']!.diferenciaPuntos, -50);
+    });
+
+    test('el que no se presentó suma 0, no el punto por perder', () async {
+      final db = await conWalkover();
+      final tabla = await _tabla(db);
+
+      expect(tabla['casa']!.puntos, 2);
+      expect(
+        tabla['visita']!.puntos,
+        0,
+        reason: 'el punto de consuelo es por presentarse y jugar',
+      );
+    });
+
+    test('un walkover viejo, sin sets guardados, igual cuenta 50', () async {
+      // Reproduce los partidos cargados antes de que la app armara el
+      // detalle de sets: quedaron con el marcador 2-0 y `sets` vacío.
+      // La tabla tiene que aplicar la regla igual, sin obligar a
+      // recargar el resultado a mano.
+      final db = await _baseVolley();
+
+      await db
+          .collection('campeonatos')
+          .doc(kCampeonato)
+          .collection('partidos')
+          .doc('p1')
+          .update({
+            'estado': PartidoEstado.finalizado,
+            'resultadoRegistrado': true,
+            'tipoResultado': TipoResultado.walkover,
+            'golesLocal': 2,
+            'golesVisitante': 0,
+            'ganadorId': 'casa',
+            'empate': false,
+            'sets': const [],
+          });
+
+      await ResultadoService(firestore: db).recalcularTablaYRanking(kCampeonato);
+
+      final tabla = await _tabla(db);
+
+      expect(tabla['casa']!.diferenciaPuntos, 50);
+      expect(tabla['visita']!.diferenciaPuntos, -50);
+      expect(tabla['visita']!.puntos, 0);
+    });
   });
 
-  test('en vóley el perdedor suma 1 punto, salvo en walkover que suma 0', () {
-    final reglas = ReglasPuntuacion.voley();
+  group('Walkover en básquet', () {
+    test('se guarda 20-0', () async {
+      final db = FakeFirebaseFirestore();
 
-    expect(reglas.victoria, 2);
-    expect(reglas.derrota, 1);
+      await db.collection('campeonatos').doc(kCampeonato).set({
+        'nombre': 'Copa básquet',
+        'deporte': DeporteTipo.basket,
+        'tipoCampeonato': TipoCampeonato.faseGrupos,
+        'estado': CampeonatoEstado.activo,
+        'configuracion': {
+          'formato': TipoCampeonato.faseGrupos,
+          'deporte': DeporteTipo.basket,
+          'sistemaResultado': SistemaResultado.puntos,
+        },
+      });
 
-    // La tabla no le paga el punto de consuelo al que no se presentó.
-    int puntosPerdedor(String tipoResultado) =>
-        tipoResultado == TipoResultado.walkover ? 0 : reglas.derrota;
+      for (final id in ['casa', 'visita']) {
+        await db
+            .collection('campeonatos')
+            .doc(kCampeonato)
+            .collection('equipos')
+            .doc(id)
+            .set({'nombre': id, 'estado': EquipoEstado.activo});
+      }
 
-    expect(puntosPerdedor(TipoResultado.normal), 1);
-    expect(puntosPerdedor(TipoResultado.walkover), 0);
+      await db
+          .collection('campeonatos')
+          .doc(kCampeonato)
+          .collection('partidos')
+          .doc('p1')
+          .set({
+            'jornada': 1,
+            'vuelta': 1,
+            'grupoId': 'Grupo A',
+            'equipoLocalId': 'casa',
+            'equipoLocalNombre': 'casa',
+            'equipoVisitanteId': 'visita',
+            'equipoVisitanteNombre': 'visita',
+            'estado': PartidoEstado.programado,
+            'resultadoRegistrado': false,
+          });
+
+      await ResultadoService(firestore: db).registrarResultado(
+        campeonatoId: kCampeonato,
+        partidoId: 'p1',
+        golesLocal: 1,
+        golesVisitante: 0,
+        golesJugadores: const [],
+        tipoResultado: TipoResultado.walkover,
+        observacionResultado: 'No se presentaron.',
+        usuarioId: 'admin',
+        usuarioNombre: 'Admin',
+      );
+
+      final doc = await db
+          .collection('campeonatos')
+          .doc(kCampeonato)
+          .collection('partidos')
+          .doc('p1')
+          .get();
+
+      expect(kPuntosWalkoverBasket, 20);
+      expect(doc.data()!['golesLocal'], 20);
+      expect(doc.data()!['golesVisitante'], 0);
+    });
   });
 }
