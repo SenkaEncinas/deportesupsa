@@ -21,6 +21,11 @@ TablaPosicionModel _fila({
     golesFavor: gf,
     golesContra: gf - dif,
     diferenciaGoles: dif,
+    // En fútbol los puntos a favor son los goles: se llenan igual que en
+    // la tabla real, porque el desempate mira la diferencia de puntos.
+    puntosFavor: gf,
+    puntosContra: gf - dif,
+    diferenciaPuntos: dif,
     puntos: puntos,
     posicion: posicion,
   );

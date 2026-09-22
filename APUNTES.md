@@ -78,6 +78,21 @@ El orden de dibujo no es el mismo que el número de llave: se reordena
 para que los conectores no se crucen y para que el 1 quede arriba de
 todo y el 2 abajo de todo.
 
+## Desempate
+
+Cuando dos equipos empatan en puntos, el orden lo define la **diferencia
+de puntos**, después los puntos a favor y después los puntos en contra.
+
+En fútbol y básquet da igual: los puntos a favor son el marcador. En
+vóley no, y ahí está el detalle — `golesFavor` son los **sets** ganados
+y `puntosFavor` los **puntos** de cada set. El desempate mira los
+puntos, que es lo que hace que un walkover (50-0) pese de verdad; si
+mirara sets, valdría +2 y los 50 no servirían para nada.
+
+Esto se equivocó una vez: los dos comparadores (el de la tabla y el de
+la siembra) usaban diferencia de sets, y en vóley damas eso movía 8 de
+las 12 posiciones de la llave.
+
 ## Orden de los clasificados
 
 `Clasificacion.calcular()` ordena por bloques: primero todos los 1ros de

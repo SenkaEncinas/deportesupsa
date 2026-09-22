@@ -411,4 +411,93 @@ void main() {
       await sub.cancel();
     });
   });
+
+  group('Desempate', () {
+    test('en vóley manda la diferencia de PUNTOS, no la de sets', () {
+      // Dos equipos con los mismos puntos de tabla. El que ganó más
+      // sets pierde el desempate porque le sacó menos puntos: es lo que
+      // hace que un walkover (50-0) valga de verdad.
+      final tabla = TablaCalculo.calcular(
+        campeonato: _campeonato(deporte: DeporteTipo.volley),
+        equipos: [_equipo('a'), _equipo('b'), _equipo('c'), _equipo('d')],
+        partidos: [
+          // 'a' gana 2-0 apenas: +6 puntos de diferencia.
+          _partido(
+            local: 'a',
+            visitante: 'c',
+            golesLocal: 2,
+            golesVisitante: 0,
+            sets: [
+              {'local': 25, 'visitante': 23},
+              {'local': 25, 'visitante': 21},
+            ],
+          ),
+          // 'b' gana 2-1, un set menos, pero le saca 20 de diferencia.
+          _partido(
+            local: 'b',
+            visitante: 'd',
+            golesLocal: 2,
+            golesVisitante: 1,
+            sets: [
+              {'local': 25, 'visitante': 5},
+              {'local': 10, 'visitante': 25},
+              {'local': 25, 'visitante': 10},
+            ],
+          ),
+        ],
+      );
+
+      final porEquipo = _porEquipo(tabla);
+
+      expect(porEquipo['a']!.puntos, 2);
+      expect(porEquipo['b']!.puntos, 2);
+      expect(porEquipo['a']!.diferenciaGoles, 2, reason: 'a ganó 2 sets más');
+      expect(porEquipo['b']!.diferenciaGoles, 1, reason: 'b ganó 1 set más');
+      expect(porEquipo['a']!.diferenciaPuntos, 6);
+      expect(porEquipo['b']!.diferenciaPuntos, 20);
+
+      expect(
+        porEquipo['b']!.posicion,
+        lessThan(porEquipo['a']!.posicion),
+        reason: 'b va arriba por diferencia de puntos, aunque tenga menos sets',
+      );
+    });
+
+    test('un walkover empuja al ganador arriba en el desempate', () {
+      final tabla = _porEquipo(
+        TablaCalculo.calcular(
+          campeonato: _campeonato(deporte: DeporteTipo.volley),
+          equipos: [_equipo('a'), _equipo('b'), _equipo('c'), _equipo('d')],
+          partidos: [
+            _partido(
+              local: 'a',
+              visitante: 'c',
+              golesLocal: 2,
+              golesVisitante: 0,
+              tipoResultado: TipoResultado.walkover,
+            ),
+            _partido(
+              local: 'b',
+              visitante: 'd',
+              golesLocal: 2,
+              golesVisitante: 0,
+              sets: [
+                {'local': 25, 'visitante': 20},
+                {'local': 25, 'visitante': 22},
+              ],
+            ),
+          ],
+        ),
+      );
+
+      expect(tabla['a']!.puntos, tabla['b']!.puntos);
+      expect(tabla['a']!.diferenciaPuntos, 50);
+      expect(tabla['b']!.diferenciaPuntos, 8);
+      expect(
+        tabla['a']!.posicion,
+        lessThan(tabla['b']!.posicion),
+        reason: 'los 50 puntos del walkover tienen que pesar',
+      );
+    });
+  });
 }

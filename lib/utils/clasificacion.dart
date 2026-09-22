@@ -27,8 +27,8 @@ class ClasificadoInfo {
 /// 3. Abajo, los **mejores terceros** que entran por repechaje.
 ///
 /// Dentro de cada bloque manda el puntaje, y si hay empate se mira la
-/// diferencia (de goles o de sets según el deporte), después los goles a
-/// favor, los goles en contra y por último el nombre. O sea: un segundo
+/// diferencia de puntos, después los puntos a favor, los puntos en
+/// contra y por último el nombre. O sea: un segundo
 /// nunca queda por encima de un primero aunque tenga más puntos, porque
 /// ganar el grupo vale; pero entre segundos, el que hizo más puntos va
 /// más arriba.
@@ -42,13 +42,21 @@ class Clasificacion {
     var compare = b.puntos.compareTo(a.puntos);
     if (compare != 0) return compare;
 
-    compare = b.diferenciaGoles.compareTo(a.diferenciaGoles);
+    // Diferencia de PUNTOS, no de goles/sets.
+    //
+    // En fútbol y básquet da lo mismo: los puntos a favor son el
+    // marcador del partido. En vóley no: `golesFavor` son los sets
+    // ganados y `puntosFavor` los puntos de cada set. El desempate mira
+    // los puntos, que es lo que hace que un walkover (50-0) pese de
+    // verdad; si mirara sets, un walkover valdría +2 y los 50 puntos no
+    // servirían para nada.
+    compare = b.diferenciaPuntos.compareTo(a.diferenciaPuntos);
     if (compare != 0) return compare;
 
-    compare = b.golesFavor.compareTo(a.golesFavor);
+    compare = b.puntosFavor.compareTo(a.puntosFavor);
     if (compare != 0) return compare;
 
-    compare = a.golesContra.compareTo(b.golesContra);
+    compare = a.puntosContra.compareTo(b.puntosContra);
     if (compare != 0) return compare;
 
     return a.equipoNombre.compareTo(b.equipoNombre);
