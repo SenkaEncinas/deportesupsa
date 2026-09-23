@@ -236,6 +236,11 @@ class _LlavesScreenState extends State<LlavesScreen> {
 
                   final deLlave = _partidoService.soloDeLlave(partidos);
                   final rondas = FixtureGrouping.rondasEliminatorias(deLlave);
+                  // Cruces de fase final cargados a mano que todavía no
+                  // entran en ningún cuadro. No se dibujan como llave
+                  // (ni acá ni en la vista pública), pero tienen que
+                  // estar a la vista para poder corregirlos o borrarlos.
+                  final sueltos = FixtureGrouping.crucesSueltos(deLlave);
                   final privilegios = partidos
                       .where((p) => p.privilegio)
                       .toList();
@@ -269,9 +274,9 @@ class _LlavesScreenState extends State<LlavesScreen> {
                           if (rondas.isEmpty)
                             const AppInlineEmptyState(
                               icon: Icons.account_tree_outlined,
-                              text: 'Todavía no hay llaves armadas.',
+                              text: 'Todavía no hay cuadro armado.',
                               subtitle:
-                                  'Usá "Generar llaves" para armar el cuadro completo con los clasificados, o creá los cruces a mano desde Fixture.',
+                                  'Hasta que uses "Generar llaves", los cruces que cargues desde Fixture se ven como partidos sueltos, no como llave.',
                             )
                           else
                             ...rondas.map(
@@ -285,6 +290,14 @@ class _LlavesScreenState extends State<LlavesScreen> {
                                 ),
                               ),
                             ),
+                          if (sueltos.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            _CrucesSueltosCard(
+                              partidos: sueltos,
+                              onEditar: _editarCruce,
+                              onEliminar: _eliminarCruce,
+                            ),
+                          ],
                           if (privilegios.isNotEmpty) ...[
                             const SizedBox(height: 6),
                             _PrivilegiosCard(partidos: privilegios),
@@ -515,6 +528,50 @@ class _CruceFila extends StatelessWidget {
                 acciones,
               ],
             ),
+    );
+  }
+}
+
+/// Cruces de fase final cargados a mano, todavía fuera del cuadro.
+///
+/// Se listan aparte a propósito: mientras no se generen las llaves no
+/// forman una ronda, y dibujarlos como tal confundía. Un cruce suelto en
+/// su propia jornada llegó a mostrarse al público como si fuera la
+/// final.
+class _CrucesSueltosCard extends StatelessWidget {
+  final List<PartidoModel> partidos;
+  final ValueChanged<PartidoModel> onEditar;
+  final ValueChanged<PartidoModel> onEliminar;
+
+  const _CrucesSueltosCard({
+    required this.partidos,
+    required this.onEditar,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppSectionHeader(
+            title: 'Cruces sueltos',
+            subtitle:
+                '${partidos.length} cruce(s) de fase final cargados a mano. '
+                'Todavía no forman parte del cuadro, así que el público los '
+                've como partidos, no como llave.',
+          ),
+          const SizedBox(height: 12),
+          ...partidos.map(
+            (partido) => _CruceFila(
+              partido: partido,
+              onEditar: () => onEditar(partido),
+              onEliminar: () => onEliminar(partido),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

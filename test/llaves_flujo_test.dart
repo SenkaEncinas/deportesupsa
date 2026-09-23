@@ -11,8 +11,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:futsal/models/campeonato_model.dart';
 import 'package:futsal/models/equipo_model.dart';
 import 'package:futsal/models/partido_model.dart';
+import 'package:futsal/services/campeonato_service.dart';
 import 'package:futsal/services/partido_service.dart';
 import 'package:futsal/services/resultado_service.dart';
+import 'package:futsal/utils/fixture_grouping.dart';
 import 'package:futsal/utils/llaves.dart';
 
 const String kCampeonato = 'camp-1';
@@ -42,6 +44,9 @@ Future<FakeFirebaseFirestore> _baseConCampeonato() async {
     'deporte': DeporteTipo.futbol,
     'tipoCampeonato': TipoCampeonato.gruposEliminacion,
     'estado': CampeonatoEstado.activo,
+    // Ya en fase eliminatoria: es cuando se arman las llaves, y es lo
+    // que habilita cruzar equipos de grupos distintos.
+    'faseActual': FaseCampeonato.eliminatoria,
     'configuracion': {
       'formato': TipoCampeonato.gruposEliminacion,
       'clasificanPorGrupo': 2,
@@ -587,6 +592,270 @@ void main() {
           rondaInicial: 'cuartos_y_medio',
         ),
         throwsA(isA<Exception>()),
+      );
+    });
+  });
+
+  group('Formato de 12 equipos (vóley damas)', () {
+    // El cuadro real: 12 clasificados -> 6 cruces -> 3 cuartos ->
+    // semifinal con un "mejor" que no viene de ninguna llave. Nada de
+    // eso se deduce solo, así que las dos primeras rondas se arman a
+    // mano y el cuadro automático arranca en semifinales.
+
+    Future<FakeFirebaseFirestore> armarADosManos() async {
+      final db = await _baseConCampeonato();
+      final servicio = PartidoService(firestore: db);
+
+      // Los 6 cruces: 1-12, 2-11, 3-10, 4-9, 5-8, 6-7.
+      for (var i = 1; i <= 6; i++) {
+        await servicio.crearCruceManual(
+          campeonatoId: kCampeonato,
+          equipoLocal: _equipo(i),
+          equipoVisitante: _equipo(13 - i),
+          jornada: 1,
+          idaYVuelta: false,
+        );
+      }
+
+      // Los 3 cuartos.
+      for (var i = 1; i <= 3; i++) {
+        await servicio.crearCruceManual(
+          campeonatoId: kCampeonato,
+          equipoLocal: _equipo(i),
+          equipoVisitante: _equipo(7 - i),
+          jornada: 2,
+          idaYVuelta: false,
+        );
+      }
+
+      await servicio.generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: const [],
+        rondaInicial: RondaLlave.semifinal,
+        sembrar: false,
+      );
+
+      return db;
+    }
+
+    test('generar el cuadro no borra los cruces cargados a mano', () async {
+      final db = await armarADosManos();
+      final partidos = await _partidos(db);
+
+      expect(
+        partidos.length,
+        12,
+        reason: '6 cruces + 3 cuartos a mano, más 2 semis y la final',
+      );
+      expect(partidos.where((p) => !p.generadoPorSistema).length, 9);
+    });
+
+    test('las semis quedan después de los cuartos en el orden', () async {
+      final db = await armarADosManos();
+      final partidos = await _partidos(db);
+
+      final cuartosAMano = partidos
+          .where((p) => !p.generadoPorSistema && p.jornada == 2)
+          .toList();
+      final semis = partidos
+          .where((p) => p.rondaLlave == RondaLlave.semifinal)
+          .toList();
+      final laFinal = _llave(partidos, RondaLlave.finalRonda, 1);
+
+      expect(cuartosAMano.length, 3);
+      for (final semi in semis) {
+        expect(
+          semi.jornada,
+          greaterThan(cuartosAMano.first.jornada),
+          reason: 'una semifinal no puede ordenarse antes que un cuarto',
+        );
+        expect(laFinal.jornada, greaterThan(semi.jornada));
+      }
+    });
+
+    test(
+      'el cuadro muestra solo lo generado; lo manual queda aparte',
+      () async {
+        final db = await armarADosManos();
+        final deLlave = PartidoService(
+          firestore: db,
+        ).soloDeLlave(await _partidos(db));
+
+        final rondas = FixtureGrouping.rondasEliminatorias(deLlave);
+
+        // Los 6 cruces y los 3 cuartos se cargaron a mano: son partidos,
+        // no rondas de un cuadro. El público los ve como tales.
+        expect(rondas.map((r) => r.key).toList(), ['Semifinales', 'Final']);
+        expect(rondas.map((r) => r.value.length).toList(), [2, 1]);
+
+        expect(
+          FixtureGrouping.crucesSueltos(deLlave).length,
+          9,
+          reason: 'los manuales siguen existiendo, fuera del cuadro',
+        );
+      },
+    );
+
+    test('regenerar el cuadro sigue sin tocar lo cargado a mano', () async {
+      final db = await armarADosManos();
+
+      await PartidoService(firestore: db).generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: const [],
+        rondaInicial: RondaLlave.semifinal,
+        sembrar: false,
+      );
+
+      final partidos = await _partidos(db);
+
+      expect(partidos.length, 12, reason: 'ni se borran ni se duplican');
+      expect(partidos.where((p) => !p.generadoPorSistema).length, 9);
+    });
+  });
+
+  group('El flujo de siempre no cambia', () {
+    // Lo que ya está capacitado: 16 clasificados, "Generar llaves" en
+    // automático. Tiene que dar exactamente lo mismo que antes de que
+    // existiera la opción de elegir la ronda.
+
+    test('en automático, las jornadas siguen siendo 1, 2, 3 y 4', () async {
+      final db = await _baseConCampeonato();
+
+      await PartidoService(firestore: db).generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: _clasificados(16),
+      );
+
+      final partidos = await _partidos(db);
+
+      expect(_llave(partidos, RondaLlave.octavos, 1).jornada, 1);
+      expect(_llave(partidos, RondaLlave.cuartos, 1).jornada, 2);
+      expect(_llave(partidos, RondaLlave.semifinal, 1).jornada, 3);
+      expect(_llave(partidos, RondaLlave.finalRonda, 1).jornada, 4);
+    });
+
+    test('en automático se siembra igual que siempre', () async {
+      final db = await _baseConCampeonato();
+
+      await PartidoService(firestore: db).generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: _clasificados(16),
+      );
+
+      final partidos = await _partidos(db);
+
+      expect(partidos.length, 15);
+      for (var llave = 1; llave <= 8; llave++) {
+        final cruce = _llave(partidos, RondaLlave.octavos, llave);
+        expect(cruce.equipoLocalNombre, 'Equipo $llave');
+        expect(cruce.equipoVisitanteNombre, 'Equipo ${17 - llave}');
+      }
+    });
+
+    test('activar la fase eliminatoria no crea ningún partido', () async {
+      final db = await _baseConCampeonato();
+
+      final campeonatoDoc = await db
+          .collection('campeonatos')
+          .doc(kCampeonato)
+          .get();
+
+      final campeonato = CampeonatoModel.fromMap(kCampeonato, {
+        ...campeonatoDoc.data()!,
+        'faseActual': FaseCampeonato.grupos,
+      });
+
+      await CampeonatoService(
+        firestore: db,
+      ).activarFaseEliminatoria(campeonato);
+
+      expect(
+        (await _partidos(db)).isEmpty,
+        isTrue,
+        reason: 'activar solo habilita; las llaves las decide el admin',
+      );
+
+      final despues = await db.collection('campeonatos').doc(kCampeonato).get();
+
+      expect(despues.data()!['faseActual'], FaseCampeonato.eliminatoria);
+    });
+  });
+
+  group('Un cruce suelto no es una llave', () {
+    // Paso real: se cargó un cruce a mano con jornada 5 y, como era el
+    // único de esa jornada, el público lo vio rotulado como "Final".
+    // El cuadro tiene que aparecer solo cuando el admin lo genera.
+
+    test('un cruce manual solo no se dibuja como cuadro', () async {
+      final db = await _baseConCampeonato();
+      final servicio = PartidoService(firestore: db);
+
+      await servicio.crearCruceManual(
+        campeonatoId: kCampeonato,
+        equipoLocal: _equipo(1),
+        equipoVisitante: _equipo(2),
+        jornada: 5,
+        idaYVuelta: false,
+      );
+
+      final deLlave = servicio.soloDeLlave(await _partidos(db));
+
+      expect(deLlave.length, 1);
+      expect(
+        FixtureGrouping.rondasEliminatorias(deLlave),
+        isEmpty,
+        reason: 'sin cuadro generado no hay llave que mostrar',
+      );
+      expect(FixtureGrouping.crucesSueltos(deLlave).length, 1);
+    });
+
+    test('ni aunque sean varios en jornadas distintas', () async {
+      final db = await _baseConCampeonato();
+      final servicio = PartidoService(firestore: db);
+
+      for (var i = 1; i <= 3; i++) {
+        await servicio.crearCruceManual(
+          campeonatoId: kCampeonato,
+          equipoLocal: _equipo(i),
+          equipoVisitante: _equipo(i + 8),
+          jornada: i,
+          idaYVuelta: false,
+        );
+      }
+
+      final deLlave = servicio.soloDeLlave(await _partidos(db));
+
+      expect(FixtureGrouping.rondasEliminatorias(deLlave), isEmpty);
+      expect(FixtureGrouping.crucesSueltos(deLlave).length, 3);
+    });
+
+    test('al generar el cuadro, recién ahí aparece la llave', () async {
+      final db = await _baseConCampeonato();
+      final servicio = PartidoService(firestore: db);
+
+      await servicio.crearCruceManual(
+        campeonatoId: kCampeonato,
+        equipoLocal: _equipo(1),
+        equipoVisitante: _equipo(2),
+        jornada: 1,
+        idaYVuelta: false,
+      );
+
+      await servicio.generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: const [],
+        rondaInicial: RondaLlave.semifinal,
+        sembrar: false,
+      );
+
+      final deLlave = servicio.soloDeLlave(await _partidos(db));
+      final rondas = FixtureGrouping.rondasEliminatorias(deLlave);
+
+      expect(rondas.map((r) => r.key).toList(), ['Semifinales', 'Final']);
+      expect(
+        FixtureGrouping.crucesSueltos(deLlave).length,
+        1,
+        reason: 'el cruce manual sigue existiendo, pero fuera del cuadro',
       );
     });
   });

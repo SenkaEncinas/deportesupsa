@@ -69,7 +69,11 @@ void main() {
       resultados: [
         for (var i = 1; i <= 4; i++)
           PdfResultadoPartidoItem(
-            partido: _partido(i, jugado: true, fecha: DateTime(2026, 10, 1, 18)),
+            partido: _partido(
+              i,
+              jugado: true,
+              fecha: DateTime(2026, 10, 1, 18),
+            ),
             goles: const [],
           ),
       ],

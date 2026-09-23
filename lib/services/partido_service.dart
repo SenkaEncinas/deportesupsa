@@ -653,10 +653,23 @@ class PartidoService {
       tamanoForzado: tamanoForzado,
     );
 
+    // La jornada más alta entre los cruces que cargó el admin: el cuadro
+    // generado empieza a contar desde ahí. Sin cruces manuales da 0 y la
+    // numeración queda igual que siempre.
+    final jornadaBase = deLlave
+        .where((partido) => !partido.generadoPorSistema)
+        .fold<int>(
+          0,
+          (mayor, partido) => partido.jornada > mayor ? partido.jornada : mayor,
+        );
+
     for (final cruce in estructura) {
-      // La jornada guarda el número de ronda (1 = la primera que se
-      // juega) para que el fixture las ordene solo.
-      final jornada = cruce.rondaIndice + 1;
+      // La jornada arranca después de lo que ya haya cargado el admin a
+      // mano. En un cuadro normal no hay nada antes y queda 1, 2, 3...
+      // como siempre; cuando las primeras rondas se armaron a mano (12
+      // equipos, por ejemplo), las generadas quedan después y el fixture
+      // no muestra una semifinal antes que un cuarto.
+      final jornada = jornadaBase + cruce.rondaIndice + 1;
 
       EquipoModel? local;
       EquipoModel? visitante;
@@ -725,10 +738,17 @@ class PartidoService {
       });
     }
 
-    // Lo que quedó de una llave anterior y ya no entra en el cuadro
-    // nuevo (por ejemplo si cambió la cantidad de clasificados).
+    // Lo que quedó de un cuadro anterior y ya no entra en el nuevo (por
+    // ejemplo si cambió la cantidad de clasificados).
+    //
+    // Los cruces cargados a mano no se tocan: son del admin, no de este
+    // generador. Hace falta para los formatos que se arman mezclando las
+    // dos cosas (12 equipos: las primeras rondas a mano y el cuadro
+    // desde semifinales). Si se borraran, generar el cuadro se llevaría
+    // puesto el trabajo ya cargado.
     for (final partido in deLlave) {
       if (reutilizados.contains(partido.id)) continue;
+      if (!partido.generadoPorSistema) continue;
       batch.delete(_partidos(campeonatoId).doc(partido.id));
     }
 

@@ -177,7 +177,14 @@ class _FixtureScreenState extends State<FixtureScreen> {
       context: context,
       title: 'Activar fase eliminatoria',
       message:
-          'A partir de ahora "Agregar cruce manual" va a dejar de limitarse a equipos del mismo grupo, para que puedas armar las llaves (octavos, cuartos...) con los equipos que clasificaron. Esta acción no se puede deshacer.',
+          'Activar no arma ninguna llave: solo habilita cruzar equipos de '
+          'grupos distintos con "Agregar cruce manual".\n\n'
+          'Los cruces los vas cargando vos, que es lo que hace falta cuando '
+          'los clasificados no son 8 ni 16 y el formato lo define el '
+          'reglamento. Cuando lleguen a una cantidad pareja (semifinales, '
+          'cuartos, octavos), desde "Llaves" generás el cuadro eligiendo por '
+          'qué ronda arranca.\n\n'
+          'Esta acción no se puede deshacer.',
       confirmText: 'Activar',
       danger: true,
     );
@@ -194,12 +201,13 @@ class _FixtureScreenState extends State<FixtureScreen> {
       if (!mounted) return;
       AppSnackbars.success(
         context,
-        'Fase eliminatoria activada: ahora armá las llaves.',
+        'Fase eliminatoria activada: ya podés cruzar equipos de distintos '
+        'grupos.',
       );
 
-      // Se abre directo la pantalla de llaves: activar la fase y armar
-      // los cruces es un mismo momento, no tiene sentido hacer que el
-      // admin vaya a buscarla.
+      // Se abre la pantalla de llaves, como siempre: activar la fase y
+      // decidir qué hacer con las llaves es un mismo momento. Ahí se
+      // elige entre armar los cruces a mano o generar el cuadro.
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -958,8 +966,15 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
                 controller: _jornadaController,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Jornada / fase',
+                  labelText: 'Jornada / ronda',
                   hintText: 'Ejemplo: 1, 2, 3...',
+                  // Es lo que agrupa las columnas del cuadro: si dos
+                  // cruces de la misma ronda llevan números distintos,
+                  // se dibujan como dos rondas separadas.
+                  helperText:
+                      'El mismo número para todos los cruces de la '
+                      'misma ronda',
+                  helperMaxLines: 2,
                   prefixIcon: Icon(Icons.calendar_today_outlined),
                 ),
               ),

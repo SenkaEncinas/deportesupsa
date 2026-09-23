@@ -104,65 +104,49 @@ class FixtureGrouping {
   /// libre en la primera ronda.
   static bool esPotenciaDeDos(int n) => Llaves.esPotenciaDeDos(n);
 
-  /// Arma la lista de rondas (nombre + partidos) de una llave eliminatoria
-  /// a partir de sus partidos, agrupando por jornada y ordenando de la
-  /// ronda con más partidos (la primera) a la final. Pensado para
-  /// alimentar directamente a `AppBracketView`.
+  /// Las rondas del cuadro eliminatorio, listas para `AppBracketView`.
+  ///
+  /// Solo entran los partidos que forman parte de un cuadro generado
+  /// (los que tienen ronda y número de llave). Un cruce suelto cargado a
+  /// mano **no** se dibuja como llave: antes se agrupaban por jornada, y
+  /// un único cruce en su jornada terminaba mostrándose al público como
+  /// "Final". El cuadro aparece recién cuando el admin lo arma desde la
+  /// pantalla de llaves.
   static List<MapEntry<String, List<PartidoModel>>> rondasEliminatorias(
     List<PartidoModel> partidos,
   ) {
-    if (partidos.isEmpty) return const [];
+    final delCuadro = partidos.where((partido) => partido.esDeLlave).toList();
+    if (delCuadro.isEmpty) return const [];
 
-    // Cuadro generado por la app: la ronda y la posición de cada cruce
-    // están guardadas en el partido, así que no hay nada que adivinar.
-    if (partidos.every((partido) => partido.esDeLlave)) {
-      final porRonda = <String, List<PartidoModel>>{};
+    final porRonda = <String, List<PartidoModel>>{};
 
-      for (final partido in partidos) {
-        porRonda.putIfAbsent(partido.rondaLlave!, () => []).add(partido);
-      }
-
-      final claves = porRonda.keys.toList()
-        ..sort((a, b) => RondaLlave.orden(a).compareTo(RondaLlave.orden(b)));
-
-      return claves.map((clave) {
-        // `ordenLlave` es la posición de arriba hacia abajo en el
-        // dibujo: ordenada así, cada par de cruces consecutivos es
-        // justo el que alimenta al mismo cruce de la ronda siguiente,
-        // y los conectores salen derechos.
-        final lista = porRonda[clave]!
-          ..sort((a, b) {
-            final orden = (a.ordenLlave ?? 0).compareTo(b.ordenLlave ?? 0);
-            if (orden != 0) return orden;
-            return (a.llave ?? 0).compareTo(b.llave ?? 0);
-          });
-
-        return MapEntry(RondaLlave.nombre(clave), lista);
-      }).toList();
+    for (final partido in delCuadro) {
+      porRonda.putIfAbsent(partido.rondaLlave!, () => []).add(partido);
     }
 
-    // Cruces viejos o armados a mano: no tienen ronda guardada, así que
-    // se agrupan por jornada y la ronda se deduce de cuántos son.
-    final porJornada = <int, List<PartidoModel>>{};
+    final claves = porRonda.keys.toList()
+      ..sort((a, b) => RondaLlave.orden(a).compareTo(RondaLlave.orden(b)));
 
-    for (final partido in partidos) {
-      porJornada.putIfAbsent(partido.jornada, () => []).add(partido);
-    }
-
-    final jornadas = porJornada.keys.toList()..sort();
-
-    return jornadas.map((jornada) {
-      // Se respeta el orden en que se crearon los cruces (no alfabético):
-      // ese orden es el que define qué ganador de una llave pasa a
-      // enfrentar a cuál en la siguiente ronda.
-      final lista = porJornada[jornada]!
+    return claves.map((clave) {
+      // `ordenLlave` es la posición de arriba hacia abajo en el dibujo:
+      // ordenada así, cada par de cruces consecutivos es justo el que
+      // alimenta al mismo cruce de la ronda siguiente, y los conectores
+      // salen derechos.
+      final lista = porRonda[clave]!
         ..sort((a, b) {
-          final fechaA = a.fechaCreacion ?? DateTime(1900);
-          final fechaB = b.fechaCreacion ?? DateTime(1900);
-          return fechaA.compareTo(fechaB);
+          final orden = (a.ordenLlave ?? 0).compareTo(b.ordenLlave ?? 0);
+          if (orden != 0) return orden;
+          return (a.llave ?? 0).compareTo(b.llave ?? 0);
         });
 
-      return MapEntry(nombreRondaEliminatoria(lista.length), lista);
+      return MapEntry(RondaLlave.nombre(clave), lista);
     }).toList();
+  }
+
+  /// Cruces de fase final cargados a mano, que todavía no forman parte
+  /// de ningún cuadro. No se dibujan como llave, pero el admin los tiene
+  /// que ver para editarlos o borrarlos.
+  static List<PartidoModel> crucesSueltos(List<PartidoModel> partidos) {
+    return partidos.where((partido) => !partido.esDeLlave).toList();
   }
 }
