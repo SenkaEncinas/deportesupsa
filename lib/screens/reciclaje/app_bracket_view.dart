@@ -755,4 +755,3 @@ class _BracketTeamRow extends StatelessWidget {
     );
   }
 }
-

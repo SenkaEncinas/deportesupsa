@@ -85,8 +85,18 @@ void main() {
           campeonato: _campeonato(deporte: DeporteTipo.futbol),
           equipos: [_equipo('a'), _equipo('b'), _equipo('c')],
           partidos: [
-            _partido(local: 'a', visitante: 'b', golesLocal: 2, golesVisitante: 0),
-            _partido(local: 'b', visitante: 'c', golesLocal: 1, golesVisitante: 1),
+            _partido(
+              local: 'a',
+              visitante: 'b',
+              golesLocal: 2,
+              golesVisitante: 0,
+            ),
+            _partido(
+              local: 'b',
+              visitante: 'c',
+              golesLocal: 1,
+              golesVisitante: 1,
+            ),
           ],
         ),
       );
@@ -133,7 +143,12 @@ void main() {
           ),
           equipos: [_equipo('a'), _equipo('b')],
           partidos: [
-            _partido(local: 'a', visitante: 'b', golesLocal: 78, golesVisitante: 65),
+            _partido(
+              local: 'a',
+              visitante: 'b',
+              golesLocal: 78,
+              golesVisitante: 65,
+            ),
           ],
         ),
       );
@@ -148,7 +163,12 @@ void main() {
           campeonato: _campeonato(deporte: DeporteTipo.basket),
           equipos: [_equipo('a'), _equipo('b')],
           partidos: [
-            _partido(local: 'a', visitante: 'b', golesLocal: 78, golesVisitante: 65),
+            _partido(
+              local: 'a',
+              visitante: 'b',
+              golesLocal: 78,
+              golesVisitante: 65,
+            ),
           ],
         ),
       );
@@ -219,7 +239,12 @@ void main() {
           ),
           equipos: [_equipo('a'), _equipo('b')],
           partidos: [
-            _partido(local: 'a', visitante: 'b', golesLocal: 2, golesVisitante: 0),
+            _partido(
+              local: 'a',
+              visitante: 'b',
+              golesLocal: 2,
+              golesVisitante: 0,
+            ),
           ],
         ),
       );
@@ -269,7 +294,12 @@ void main() {
           }),
           equipos: [_equipo('a'), _equipo('b')],
           partidos: [
-            _partido(local: 'a', visitante: 'b', golesLocal: 1, golesVisitante: 0),
+            _partido(
+              local: 'a',
+              visitante: 'b',
+              golesLocal: 1,
+              golesVisitante: 0,
+            ),
             // Cruce de llave: sin grupo.
             _partido(
               local: 'a',
@@ -335,9 +365,9 @@ void main() {
             'posicion': 1,
           });
 
-      final tabla = await PublicHomeService(firestore: db)
-          .streamTabla('camp-1')
-          .first;
+      final tabla = await PublicHomeService(
+        firestore: db,
+      ).streamTabla('camp-1').first;
 
       expect(tabla.length, 2);
       expect(
@@ -347,8 +377,7 @@ void main() {
       );
     });
 
-    test('al cargar un resultado, la tabla cambia sin recargar nada',
-        () async {
+    test('al cargar un resultado, la tabla cambia sin recargar nada', () async {
       final db = await base();
       final service = PublicHomeService(firestore: db);
 

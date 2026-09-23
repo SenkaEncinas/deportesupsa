@@ -102,17 +102,27 @@ List<MapEntry<String, List<PartidoModel>>> _rondasLlaveDePrueba() {
 
   return [
     MapEntry('Cuartos de final', [
-      partido('Ingeniería de Sistemas Computacionales', 'Derecho', jugado: true),
+      partido(
+        'Ingeniería de Sistemas Computacionales',
+        'Derecho',
+        jugado: true,
+      ),
       partido('Administración de Empresas y Negocios', 'Psicología'),
       partido('Arquitectura y Urbanismo', 'Comunicación Social', jugado: true),
       partido('Medicina', 'Ingeniería Industrial'),
     ]),
     MapEntry('Semifinales', [
-      partido('Ingeniería de Sistemas Computacionales', 'Administración de Empresas y Negocios'),
+      partido(
+        'Ingeniería de Sistemas Computacionales',
+        'Administración de Empresas y Negocios',
+      ),
       partido('Arquitectura y Urbanismo', 'Medicina'),
     ]),
     MapEntry('Final', [
-      partido('Ingeniería de Sistemas Computacionales', 'Arquitectura y Urbanismo'),
+      partido(
+        'Ingeniería de Sistemas Computacionales',
+        'Arquitectura y Urbanismo',
+      ),
     ]),
   ];
 }

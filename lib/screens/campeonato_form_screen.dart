@@ -480,7 +480,9 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
       }
 
       if (terceros < 0) {
-        throw Exception('La cantidad de mejores terceros no puede ser negativa.');
+        throw Exception(
+          'La cantidad de mejores terceros no puede ser negativa.',
+        );
       }
 
       if (terceros > grupos) {
@@ -1160,7 +1162,9 @@ class _DynamicFormatSection extends StatelessWidget {
                     prefixIcon: Icons.workspace_premium_outlined,
                     validator: (value) {
                       final number = int.tryParse(value ?? '');
-                      if (number == null || number < 0) return 'Valor inválido.';
+                      if (number == null || number < 0) {
+                        return 'Valor inválido.';
+                      }
                       return null;
                     },
                   ),
@@ -1195,9 +1199,11 @@ class _DynamicFormatSection extends StatelessWidget {
                   mejoresTercerosController,
                 ]),
                 calcularTotal: () {
-                  final grupos = int.tryParse(cantidadGruposController.text.trim()) ?? 0;
+                  final grupos =
+                      int.tryParse(cantidadGruposController.text.trim()) ?? 0;
                   final clasifican =
-                      int.tryParse(clasificanPorGrupoController.text.trim()) ?? 0;
+                      int.tryParse(clasificanPorGrupoController.text.trim()) ??
+                      0;
                   final terceros =
                       int.tryParse(mejoresTercerosController.text.trim()) ?? 0;
                   return grupos * clasifican + terceros;
@@ -1324,7 +1330,9 @@ class _RondaResumenBox extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
-                cuadra ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                cuadra
+                    ? Icons.check_circle_outline
+                    : Icons.warning_amber_rounded,
                 color: color,
                 size: 20,
               ),

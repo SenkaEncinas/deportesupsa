@@ -379,19 +379,18 @@ class PdfService {
     return (eyebrow: eyebrow.toUpperCase(), titulo: resto.toUpperCase());
   }
 
-  pw.Page _paginaFlyerJornada({
+  /// La hoja del flyer: fondo, patrón, encabezado y pie.
+  ///
+  /// Entre el flyer de programación y el de resultados solo cambian
+  /// el subtítulo y la tarjeta del medio; todo lo demás (el degradado
+  /// de tres paradas, el patrón de fondo, el pie anclado con los
+  /// auspiciadores) se arma una sola vez acá.
+  pw.Page _paginaFlyer({
     required CampeonatoModel campeonato,
-    required List<PartidoModel> partidos,
-    required String etiquetaFecha,
+    required String subtitulo,
     required _PdfLogos logos,
-    bool sinFecha = false,
+    required pw.Widget card,
   }) {
-    // Siempre "PROGRAMACIÓN SEMANAL" en vez del ordinal de la jornada
-    // ("2DA FECHA"): se pidió así para no tener que pensar qué número de
-    // fecha corresponde a cada hoja.
-    final subtitulo = sinFecha
-        ? 'PARTIDOS SIN PROGRAMAR'
-        : 'PROGRAMACIÓN SEMANAL';
     final titulo = _flyerTitulo(campeonato);
 
     return pw.Page(
@@ -480,12 +479,7 @@ class PdfService {
                     ),
                   ),
                   pw.SizedBox(height: 18),
-                  _flyerCard(
-                    campeonato: campeonato,
-                    partidos: partidos,
-                    etiquetaFecha: etiquetaFecha,
-                    logos: logos,
-                  ),
+                  card,
                   // Sin `Expanded` de relleno: con la franja de
                   // auspiciadores el contenido ya ocupa casi toda la
                   // hoja, y el espaciador dejaba al pie sin lugar, así
@@ -497,6 +491,29 @@ class PdfService {
           ],
         );
       },
+    );
+  }
+
+  pw.Page _paginaFlyerJornada({
+    required CampeonatoModel campeonato,
+    required List<PartidoModel> partidos,
+    required String etiquetaFecha,
+    required _PdfLogos logos,
+    bool sinFecha = false,
+  }) {
+    // Siempre "PROGRAMACIÓN SEMANAL" en vez del ordinal de la jornada
+    // ("2DA FECHA"): se pidió así para no tener que pensar qué número de
+    // fecha corresponde a cada hoja.
+    return _paginaFlyer(
+      campeonato: campeonato,
+      subtitulo: sinFecha ? 'PARTIDOS SIN PROGRAMAR' : 'PROGRAMACIÓN SEMANAL',
+      logos: logos,
+      card: _flyerCard(
+        campeonato: campeonato,
+        partidos: partidos,
+        etiquetaFecha: etiquetaFecha,
+        logos: logos,
+      ),
     );
   }
 
@@ -617,11 +634,18 @@ class PdfService {
     );
   }
 
-  pw.Widget _flyerCard({
+  /// La tarjeta blanca del flyer: sombra, recuadro, logo y píldora
+  /// de fecha, con una fila por cada cosa a listar.
+  ///
+  /// La usan el flyer de programación y el de resultados; lo único
+  /// que cambia entre los dos es qué fila se dibuja y qué decir
+  /// cuando no hay nada que mostrar.
+  pw.Widget _flyerCardBase({
     required CampeonatoModel campeonato,
-    required List<PartidoModel> partidos,
     required String etiquetaFecha,
     required _PdfLogos logos,
+    required String mensajeVacio,
+    required List<pw.Widget> filas,
   }) {
     // La sombra va con `CustomPaint` (se pinta antes que el hijo) y no
     // con `boxShadow`: el paquete `pdf` dibuja la sombra del decorado
@@ -666,25 +690,40 @@ class PdfService {
             pw.SizedBox(height: 8),
             _flyerPildoraFecha(etiquetaFecha),
             pw.SizedBox(height: 12),
-            if (partidos.isEmpty)
+            if (filas.isEmpty)
               pw.Padding(
                 padding: const pw.EdgeInsets.symmetric(vertical: 10),
                 child: pw.Text(
-                  'No hay partidos para mostrar.',
+                  mensajeVacio,
                   textAlign: pw.TextAlign.center,
                   style: pw.TextStyle(color: _grisMedio, fontSize: 10),
                 ),
               )
             else
-              ...partidos.map((partido) {
-                return pw.Padding(
+              ...filas.map(
+                (fila) => pw.Padding(
                   padding: const pw.EdgeInsets.only(bottom: 8),
-                  child: _flyerPartidoRow(partido),
-                );
-              }),
+                  child: fila,
+                ),
+              ),
           ],
         ),
       ),
+    );
+  }
+
+  pw.Widget _flyerCard({
+    required CampeonatoModel campeonato,
+    required List<PartidoModel> partidos,
+    required String etiquetaFecha,
+    required _PdfLogos logos,
+  }) {
+    return _flyerCardBase(
+      campeonato: campeonato,
+      etiquetaFecha: etiquetaFecha,
+      logos: logos,
+      mensajeVacio: 'No hay partidos para mostrar.',
+      filas: partidos.map(_flyerPartidoRow).toList(),
     );
   }
 
@@ -1167,112 +1206,16 @@ class PdfService {
     required String etiquetaFecha,
     required _PdfLogos logos,
   }) {
-    const subtitulo = 'RESULTADOS SEMANALES';
-    final titulo = _flyerTitulo(campeonato);
-
-    return pw.Page(
-      pageFormat: _flyerFormat,
-      margin: pw.EdgeInsets.zero,
-      build: (context) {
-        return pw.Stack(
-          children: [
-            pw.Positioned.fill(
-              child: pw.Container(
-                decoration: pw.BoxDecoration(
-                  gradient: pw.LinearGradient(
-                    begin: pw.Alignment.topCenter,
-                    end: pw.Alignment.bottomCenter,
-                    // Tres paradas como en la plantilla: se mantiene
-                    // verde oscuro casi toda la hoja y recién abajo abre
-                    // al verde claro.
-                    colors: [
-                      _flyerFondoOscuro,
-                      _flyerFondoMedio,
-                      _flyerFondoClaro,
-                    ],
-                    stops: const [0.0, 0.62, 1.0],
-                  ),
-                ),
-              ),
-            ),
-            pw.Positioned.fill(child: _flyerPatronFondo()),
-            // El pie (coordinador + auspiciadores) va anclado con
-            // `Positioned` y no dentro de la columna: en el flujo normal,
-            // cuando la card crecía (muchos partidos o muchos
-            // goleadores) empujaba el pie fuera de la hoja y el paquete
-            // `pdf` lo descartaba sin avisar. Anclado siempre sale, y la
-            // columna de arriba reserva su alto.
-            pw.Positioned(
-              left: 26,
-              right: 26,
-              bottom: 18,
-              child: _flyerPie(logos),
-            ),
-            pw.Padding(
-              padding: pw.EdgeInsets.fromLTRB(26, 30, 26, _altoReservadoPie),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.center,
-                children: [
-                  if (titulo.eyebrow.isNotEmpty) ...[
-                    pw.Text(
-                      titulo.eyebrow,
-                      style: pw.TextStyle(
-                        color: PdfColors.white,
-                        fontSize: 15,
-                        fontWeight: pw.FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    pw.SizedBox(height: 4),
-                  ],
-                  pw.Text(
-                    titulo.titulo,
-                    textAlign: pw.TextAlign.center,
-                    maxLines: 2,
-                    style: pw.TextStyle(
-                      color: _flyerAmarillo,
-                      fontSize: 22,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.SizedBox(height: 10),
-                  _dashedPill(
-                    color: PdfColors.white,
-                    radius: 14,
-                    child: pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 7,
-                      ),
-                      child: pw.Text(
-                        subtitulo,
-                        style: pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: 10,
-                          fontWeight: pw.FontWeight.bold,
-                          letterSpacing: 0.6,
-                        ),
-                      ),
-                    ),
-                  ),
-                  pw.SizedBox(height: 18),
-                  _flyerCardResultados(
-                    campeonato: campeonato,
-                    resultados: resultados,
-                    etiquetaFecha: etiquetaFecha,
-                    logos: logos,
-                  ),
-                  // Sin `Expanded` de relleno: con la franja de
-                  // auspiciadores el contenido ya ocupa casi toda la
-                  // hoja, y el espaciador dejaba al pie sin lugar, así
-                  // que el paquete `pdf` descartaba la franja entera sin
-                  // avisar. Con separaciones fijas siempre entra.
-                ],
-              ),
-            ),
-          ],
-        );
-      },
+    return _paginaFlyer(
+      campeonato: campeonato,
+      subtitulo: 'RESULTADOS SEMANALES',
+      logos: logos,
+      card: _flyerCardResultados(
+        campeonato: campeonato,
+        resultados: resultados,
+        etiquetaFecha: etiquetaFecha,
+        logos: logos,
+      ),
     );
   }
 
@@ -1282,68 +1225,12 @@ class PdfService {
     required String etiquetaFecha,
     required _PdfLogos logos,
   }) {
-    // La sombra va con `CustomPaint` (se pinta antes que el hijo) y no
-    // con `boxShadow`: el paquete `pdf` dibuja la sombra del decorado
-    // como un rectángulo recto, ignorando el `borderRadius`, y asomaban
-    // esquinas duras. Así se calca la sombra maciza y desplazada que
-    // tiene la card en la plantilla original.
-    return pw.CustomPaint(
-      painter: (canvas, size) {
-        canvas
-          ..setFillColor(PdfColor(0, 0, 0, 0.17))
-          ..drawRRect(3, -5, size.x, size.y, 22, 22)
-          ..fillPath();
-      },
-      child: pw.Container(
-        width: double.infinity,
-        padding: const pw.EdgeInsets.all(14),
-        decoration: pw.BoxDecoration(
-          color: PdfColors.white,
-          borderRadius: pw.BorderRadius.circular(22),
-        ),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-          children: [
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.center,
-              children: [
-                _flyerIconoDeporte(campeonato, logos),
-                pw.SizedBox(width: 8),
-                pw.Text(
-                  _deporteCardLabel(campeonato),
-                  style: pw.TextStyle(
-                    color: _verdeOscuro,
-                    fontSize: 15,
-                    fontWeight: pw.FontWeight.bold,
-                    letterSpacing: 1,
-                  ),
-                ),
-                pw.SizedBox(width: 8),
-                _flyerIconoDeporte(campeonato, logos),
-              ],
-            ),
-            pw.SizedBox(height: 8),
-            _flyerPildoraFecha(etiquetaFecha),
-            pw.SizedBox(height: 12),
-            if (resultados.isEmpty)
-              pw.Padding(
-                padding: const pw.EdgeInsets.symmetric(vertical: 10),
-                child: pw.Text(
-                  'No hay resultados para mostrar.',
-                  textAlign: pw.TextAlign.center,
-                  style: pw.TextStyle(color: _grisMedio, fontSize: 10),
-                ),
-              )
-            else
-              ...resultados.map((item) {
-                return pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 8),
-                  child: _flyerResultadoRow(item),
-                );
-              }),
-          ],
-        ),
-      ),
+    return _flyerCardBase(
+      campeonato: campeonato,
+      etiquetaFecha: etiquetaFecha,
+      logos: logos,
+      mensajeVacio: 'No hay resultados para mostrar.',
+      filas: resultados.map(_flyerResultadoRow).toList(),
     );
   }
 

@@ -47,12 +47,6 @@ class TarjetaJugadorInput {
   });
 }
 
-/// Puntos con los que se da por ganado un walkover en básquet: 20-0
-/// para el equipo que se presentó. En vóley el equivalente sale de la
-/// configuración del campeonato (25-0 por set), pero en básquet es un
-/// número fijo del reglamento.
-const int kPuntosWalkoverBasket = 20;
-
 class ResultadoService {
   ResultadoService({FirebaseFirestore? firestore})
     : _db = firestore ?? FirebaseFirestore.instance,
@@ -308,53 +302,28 @@ class ResultadoService {
       tipoDefinicion = TipoDefinicion.sancion;
     }
 
-    // Vóley: un walkover (o una sanción) se da por ganado con el marcador
-    // completo a favor del que se presentó: 25-0 en cada set. No es solo
-    // una formalidad, son 50 puntos a favor y 0 en contra, y eso pesa en
-    // la tabla porque el desempate mira la diferencia de puntos. Se
-    // arman acá y no en la pantalla para que el resultado sea siempre el
-    // mismo, lo cargue quien lo cargue.
-    if (sistemaResultado == SistemaResultado.sets &&
-        tipoResultado != TipoResultado.normal) {
+    // Walkover o sanción: el marcador lo fija el reglamento del deporte,
+    // no quien lo carga, así que el resultado es siempre el mismo. En
+    // vóley son 25-0 por set (50 a 0 en total) y en básquet 20-0. No es
+    // una formalidad: pesa en la tabla, porque el desempate mira la
+    // diferencia de puntos.
+    if (tipoResultado != TipoResultado.normal) {
       if (empate) {
         throw Exception(
           'Un walkover o una sanción necesitan un ganador: marca qué equipo se presentó.',
         );
       }
 
-      final ganaLocal = golesLocal > golesVisitante;
-      final setsNecesarios = campeonato.configuracion.setsParaGanar;
-      final puntosPorSet = campeonato.configuracion.puntosSetNormal;
-
-      setsFinal = List.generate(
-        setsNecesarios,
-        (_) => SetPartido(
-          local: ganaLocal ? puntosPorSet : 0,
-          visitante: ganaLocal ? 0 : puntosPorSet,
-        ),
+      final reglamentario = TablaCalculo.marcadorPorNoPresentarse(
+        campeonato: campeonato,
+        ganaLocal: golesLocal > golesVisitante,
       );
 
-      // El marcador son los sets ganados, así queda coherente con el
-      // detalle que se acaba de armar.
-      golesLocal = ganaLocal ? setsNecesarios : 0;
-      golesVisitante = ganaLocal ? 0 : setsNecesarios;
-    }
-
-    // Básquet: mismo criterio que en vóley, pero el reglamento fija el
-    // marcador en 20-0. También pesa en la tabla, porque el desempate
-    // mira la diferencia de puntos.
-    if (sistemaResultado == SistemaResultado.puntos &&
-        tipoResultado != TipoResultado.normal) {
-      if (empate) {
-        throw Exception(
-          'Un walkover o una sanción necesitan un ganador: marca qué equipo se presentó.',
-        );
+      if (reglamentario != null) {
+        golesLocal = reglamentario.golesLocal;
+        golesVisitante = reglamentario.golesVisitante;
+        setsFinal = reglamentario.sets;
       }
-
-      final ganaLocal = golesLocal > golesVisitante;
-
-      golesLocal = ganaLocal ? kPuntosWalkoverBasket : 0;
-      golesVisitante = ganaLocal ? 0 : kPuntosWalkoverBasket;
     }
 
     if (!empate) {

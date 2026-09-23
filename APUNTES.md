@@ -93,6 +93,29 @@ Esto se equivocó una vez: los dos comparadores (el de la tabla y el de
 la siembra) usaban diferencia de sets, y en vóley damas eso movía 8 de
 las 12 posiciones de la llave.
 
+## Cuadros que no se pueden deducir solos
+
+Cuando los clasificados son potencia de 2 (8, 16), el cuadro sale
+automático. Cuando no, el formato lo define el reglamento y no hay forma
+de adivinarlo. Ejemplo real, vóley damas con 12 clasificados:
+
+```
+12 equipos -> 6 cruces -> 3 cuartos -> semifinal (3 ganadores + 1 mejor)
+```
+
+Esa semifinal con un "mejor tercero" no se deduce de ningún lado.
+
+Para eso, "Generar llaves" pregunta **desde qué ronda arrancar** y si
+sembrar con la tabla o dejar los cruces vacíos. El procedimiento en esos
+casos es:
+
+1. Armar a mano las primeras rondas con "Agregar cruce manual".
+2. Generar el cuadro desde la ronda que ya sea regular (semifinal, por
+   ejemplo), sin sembrar.
+3. Completar los equipos de esa ronda con el lápiz de cada cruce.
+
+De ahí en adelante los ganadores avanzan solos como siempre.
+
 ## Orden de los clasificados
 
 `Clasificacion.calcular()` ordena por bloques: primero todos los 1ros de

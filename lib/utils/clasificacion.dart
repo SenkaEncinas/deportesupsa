@@ -1,4 +1,5 @@
 import '../models/tabla_posicion_model.dart';
+import 'tabla_calculo.dart';
 
 /// Un equipo clasificado a la fase final.
 ///
@@ -38,30 +39,6 @@ class ClasificadoInfo {
 class Clasificacion {
   Clasificacion._();
 
-  static int _compararTabla(TablaPosicionModel a, TablaPosicionModel b) {
-    var compare = b.puntos.compareTo(a.puntos);
-    if (compare != 0) return compare;
-
-    // Diferencia de PUNTOS, no de goles/sets.
-    //
-    // En fútbol y básquet da lo mismo: los puntos a favor son el
-    // marcador del partido. En vóley no: `golesFavor` son los sets
-    // ganados y `puntosFavor` los puntos de cada set. El desempate mira
-    // los puntos, que es lo que hace que un walkover (50-0) pese de
-    // verdad; si mirara sets, un walkover valdría +2 y los 50 puntos no
-    // servirían para nada.
-    compare = b.diferenciaPuntos.compareTo(a.diferenciaPuntos);
-    if (compare != 0) return compare;
-
-    compare = b.puntosFavor.compareTo(a.puntosFavor);
-    if (compare != 0) return compare;
-
-    compare = a.puntosContra.compareTo(b.puntosContra);
-    if (compare != 0) return compare;
-
-    return a.equipoNombre.compareTo(b.equipoNombre);
-  }
-
   static List<ClasificadoInfo> calcular({
     required List<TablaPosicionModel> tabla,
     required int clasificanPorGrupo,
@@ -95,7 +72,7 @@ class Clasificacion {
       final delPuesto = porPuesto[puesto];
       if (delPuesto == null) continue;
 
-      delPuesto.sort(_compararTabla);
+      delPuesto.sort(TablaCalculo.comparar);
 
       clasificados.addAll(
         delPuesto.map(
@@ -110,7 +87,7 @@ class Clasificacion {
 
     // Y al final los mejores terceros, también ordenados entre sí.
     if (mejoresTerceros > 0) {
-      candidatosRepechaje.sort(_compararTabla);
+      candidatosRepechaje.sort(TablaCalculo.comparar);
 
       clasificados.addAll(
         candidatosRepechaje

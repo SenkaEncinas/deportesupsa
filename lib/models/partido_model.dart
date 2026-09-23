@@ -280,6 +280,12 @@ class PartidoModel {
   /// no sea un pase directo.
   bool get admiteResultado => tieneEquiposDefinidos && !esBye;
 
+  /// Es un cruce de la primera ronda del cuadro: sus equipos no salen de
+  /// una llave anterior, así que se pueden cargar a mano aunque el cruce
+  /// se haya creado vacío.
+  bool get esPrimeraRondaDeLlave =>
+      esDeLlave && vieneDeLocal == null && vieneDeVisitante == null;
+
   bool get estaPendienteProgramacion =>
       estado == PartidoEstado.pendienteProgramacion;
 

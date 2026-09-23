@@ -46,18 +46,6 @@ class PartidoService {
     });
   }
 
-  Stream<List<PartidoModel>> streamPartidosProgramados(String campeonatoId) {
-    return _partidos(campeonatoId)
-        .where('estado', isEqualTo: PartidoEstado.programado)
-        .orderBy('fechaHora')
-        .snapshots()
-        .map((snap) {
-          return snap.docs.map((doc) {
-            return PartidoModel.fromMap(doc.id, doc.data());
-          }).toList();
-        });
-  }
-
   Future<List<PartidoModel>> getPartidos(String campeonatoId) async {
     final snap = await _partidos(
       campeonatoId,
@@ -97,7 +85,8 @@ class PartidoService {
       'vuelta': vuelta,
       'grupoId': grupoId,
       'equipoLocalId': local?.id ?? '',
-      'equipoLocalNombre': local?.nombre ?? localPendienteTexto ?? 'Por definir',
+      'equipoLocalNombre':
+          local?.nombre ?? localPendienteTexto ?? 'Por definir',
       'equipoVisitanteId': visitante?.id ?? '',
       'equipoVisitanteNombre':
           visitante?.nombre ?? visitantePendienteTexto ?? 'Por definir',
@@ -411,22 +400,6 @@ class PartidoService {
     );
   }
 
-  /// Generador histórico (ida y vuelta). Se mantiene por compatibilidad;
-  /// internamente usa el mismo round-robin nuevo.
-  Future<void> generarFixtureIdaVueltaAleatorio({
-    required String campeonatoId,
-  }) async {
-    await _validarSinFixture(campeonatoId);
-
-    final equipos = await _equiposActivos(campeonatoId);
-
-    await _generarRoundRobin(
-      campeonatoId: campeonatoId,
-      equipos: equipos,
-      vueltas: 2,
-    );
-  }
-
   /// Determina el grupoId real de un cruce manual: mientras el
   /// campeonato deba restringir los cruces al mismo grupo ("fase de
   /// grupos" pura, o "grupos + eliminación" antes de activar la fase
@@ -603,13 +576,38 @@ class PartidoService {
   ///
   /// Los cruces quedan sin grupo (son fase final) y el admin los puede
   /// retocar después desde la pantalla de llaves.
+  /// [rondaInicial] fuerza por qué ronda arranca el cuadro en vez de
+  /// deducirla de la cantidad de clasificados. Sirve para los formatos
+  /// que no se pueden deducir solos (12 equipos con repechaje, por
+  /// ejemplo): el admin arma a mano las primeras rondas y genera el
+  /// cuadro recién desde semifinales.
+  ///
+  /// Con [sembrar] en false los cruces se crean vacíos, para completar
+  /// los equipos a mano. Es lo que hace falta cuando quienes llegan a
+  /// esa ronda no salen de la tabla (el "mejor tercero", un repechaje).
   Future<void> generarLlavesEliminatorias({
     required String campeonatoId,
     required List<EquipoModel> clasificados,
+    String? rondaInicial,
+    bool sembrar = true,
   }) async {
-    if (clasificados.length < 2) {
+    final tamanoForzado = rondaInicial == null
+        ? null
+        : RondaLlave.equiposQueLaJuegan(rondaInicial);
+
+    if (rondaInicial != null && tamanoForzado == null) {
+      throw Exception('No se reconoce la ronda "$rondaInicial".');
+    }
+
+    if (sembrar && clasificados.length < 2) {
       throw Exception(
         'Hacen falta al menos 2 equipos clasificados para armar la llave.',
+      );
+    }
+
+    if (!sembrar && tamanoForzado == null) {
+      throw Exception(
+        'Para armar el cuadro sin sembrar hay que elegir desde qué ronda arranca.',
       );
     }
 
@@ -650,7 +648,12 @@ class PartidoService {
 
     final reutilizados = <String>{};
 
-    for (final cruce in Llaves.estructura(clasificados.length)) {
+    final estructura = Llaves.estructura(
+      clasificados.length,
+      tamanoForzado: tamanoForzado,
+    );
+
+    for (final cruce in estructura) {
       // La jornada guarda el número de ronda (1 = la primera que se
       // juega) para que el fixture las ordene solo.
       final jornada = cruce.rondaIndice + 1;
@@ -659,7 +662,7 @@ class PartidoService {
       EquipoModel? visitante;
       PartidoModel? previo;
 
-      if (cruce.esPrimeraRonda) {
+      if (cruce.esPrimeraRonda && sembrar) {
         // Las siembras van de 1 a n; la lista, de 0 a n-1. Una siembra
         // más alta que la cantidad de clasificados es un lugar vacío del
         // cuadro, o sea que el rival queda libre.
@@ -682,18 +685,21 @@ class PartidoService {
         local: local,
         visitante: visitante,
         generadoPorSistema: true,
-        localPendienteTexto: cruce.esPrimeraRonda
-            ? 'Libre'
-            : Llaves.pendiente(cruce.vieneDeLocal),
-        visitantePendienteTexto: cruce.esPrimeraRonda
-            ? 'Libre'
-            : Llaves.pendiente(cruce.vieneDeVisitante),
+        localPendienteTexto: !cruce.esPrimeraRonda
+            ? Llaves.pendiente(cruce.vieneDeLocal)
+            : (sembrar ? 'Libre' : 'Por definir'),
+        visitantePendienteTexto: !cruce.esPrimeraRonda
+            ? Llaves.pendiente(cruce.vieneDeVisitante)
+            : (sembrar ? 'Libre' : 'Por definir'),
         rondaLlave: cruce.ronda,
         llave: cruce.llave,
         ordenLlave: cruce.ordenVisual,
         vieneDeLocal: cruce.vieneDeLocal,
         vieneDeVisitante: cruce.vieneDeVisitante,
-        esBye: cruce.esPrimeraRonda && (local == null || visitante == null),
+        esBye:
+            cruce.esPrimeraRonda &&
+            sembrar &&
+            (local == null || visitante == null),
       );
 
       if (previo == null) {
@@ -731,7 +737,7 @@ class PartidoService {
     // Los "libres" ya tienen ganador desde el momento en que se arma el
     // cuadro: se propagan enseguida para que la ronda siguiente no
     // quede diciendo "Ganador llave 3" cuando esa llave no se juega.
-    await avanzarGanadores(campeonatoId);
+    await _resultadoService.avanzarGanadoresDeLlave(campeonatoId);
   }
 
   /// Identifica un cruce por sus dos equipos, sin importar quién figura
@@ -751,14 +757,6 @@ class PartidoService {
     }
 
     return clasificados[siembra - 1];
-  }
-
-  /// Lleva a los ganadores de cada ronda al cruce que les toca en la
-  /// ronda siguiente. La implementación vive en `ResultadoService`
-  /// porque también hay que dispararla al cargar un resultado, y desde
-  /// ahí no se puede depender de este servicio sin hacer un círculo.
-  Future<void> avanzarGanadores(String campeonatoId) {
-    return _resultadoService.avanzarGanadoresDeLlave(campeonatoId);
   }
 
   /// Cambia los equipos de un cruce ya creado (para retocar la llave a

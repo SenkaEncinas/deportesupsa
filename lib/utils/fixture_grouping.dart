@@ -73,64 +73,36 @@ class FixtureGrouping {
     return secciones;
   }
 
-  /// Nombre de la ronda eliminatoria según la cantidad de partidos que
-  /// tiene esa jornada: 1 partido es la final, 2 semifinales, 4 cuartos,
-  /// 8 octavos, 16 dieciseisavos; cualquier otro valor cae a un nombre
-  /// genérico basado en la cantidad de equipos que arrancan la ronda.
+  /// Nombre de la ronda que tiene [cantidadPartidos] cruces: 1 es la
+  /// final, 2 semifinales, 4 cuartos... Para tamaños que no son de un
+  /// cuadro estándar cae a un nombre genérico.
   static String nombreRondaEliminatoria(int cantidadPartidos) {
-    switch (cantidadPartidos) {
-      case 1:
-        return 'Final';
-      case 2:
-        return 'Semifinales';
-      case 4:
-        return 'Cuartos de final';
-      case 8:
-        return 'Octavos de final';
-      case 16:
-        return 'Dieciseisavos de final';
-      default:
-        return cantidadPartidos <= 0
-            ? 'Llaves'
-            : 'Ronda de ${cantidadPartidos * 2}';
-    }
+    if (cantidadPartidos <= 0) return 'Llaves';
+
+    final clave = RondaLlave.porCantidadDePartidos(cantidadPartidos);
+    if (clave != RondaLlave.sinNombre) return RondaLlave.nombre(clave);
+
+    return 'Ronda de ${cantidadPartidos * 2}';
   }
 
   /// Igual que [nombreRondaEliminatoria] pero a partir de la cantidad de
-  /// equipos clasificados (no de partidos): por ejemplo 16 equipos
-  /// arrancan en octavos de final (8 partidos).
+  /// equipos: 16 equipos arrancan en octavos (8 cruces).
   static String rondaSegunEquipos(int cantidadEquipos) {
     if (cantidadEquipos < 2) return 'Sin definir';
     return nombreRondaEliminatoria(cantidadEquipos ~/ 2);
   }
 
-  /// Clave corta (para guardar en `configuracion.rondaEliminatoriaInicial`)
-  /// de la ronda con la que arrancaría una llave de [cantidadEquipos]
-  /// clasificados. Cae a 'llaves' cuando no calza con un tamaño estándar
-  /// (no es necesario que sea potencia de 2: los cruces siguientes se
-  /// arman igual con "cruce manual").
+  /// Clave corta de la ronda con la que arrancaría una llave de
+  /// [cantidadEquipos] clasificados, para guardar en
+  /// `configuracion.rondaEliminatoriaInicial`.
   static String claveRondaSegunEquipos(int cantidadEquipos) {
     if (cantidadEquipos < 2) return 'no_aplica';
-
-    switch (cantidadEquipos ~/ 2) {
-      case 1:
-        return 'final';
-      case 2:
-        return 'semifinal';
-      case 4:
-        return 'cuartos';
-      case 8:
-        return 'octavos';
-      case 16:
-        return 'dieciseisavos';
-      default:
-        return 'llaves';
-    }
+    return RondaLlave.porCantidadDePartidos(cantidadEquipos ~/ 2);
   }
 
-  /// Si [n] es potencia de 2 (2, 4, 8, 16, 32...): una llave eliminatoria
-  /// de ese tamaño no deja ningún equipo sin cruce en la primera ronda.
-  static bool esPotenciaDeDos(int n) => n > 0 && (n & (n - 1)) == 0;
+  /// Si [n] es potencia de 2: un cuadro de ese tamaño no deja a nadie
+  /// libre en la primera ronda.
+  static bool esPotenciaDeDos(int n) => Llaves.esPotenciaDeDos(n);
 
   /// Arma la lista de rondas (nombre + partidos) de una llave eliminatoria
   /// a partir de sus partidos, agrupando por jornada y ordenando de la
@@ -183,11 +155,12 @@ class FixtureGrouping {
       // Se respeta el orden en que se crearon los cruces (no alfabético):
       // ese orden es el que define qué ganador de una llave pasa a
       // enfrentar a cuál en la siguiente ronda.
-      final lista = porJornada[jornada]!..sort((a, b) {
-        final fechaA = a.fechaCreacion ?? DateTime(1900);
-        final fechaB = b.fechaCreacion ?? DateTime(1900);
-        return fechaA.compareTo(fechaB);
-      });
+      final lista = porJornada[jornada]!
+        ..sort((a, b) {
+          final fechaA = a.fechaCreacion ?? DateTime(1900);
+          final fechaB = b.fechaCreacion ?? DateTime(1900);
+          return fechaA.compareTo(fechaB);
+        });
 
       return MapEntry(nombreRondaEliminatoria(lista.length), lista);
     }).toList();

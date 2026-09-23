@@ -170,14 +170,50 @@ class TablaCalculo {
     return (local: partido.golesLocal!, visitante: partido.golesVisitante!);
   }
 
-  /// Puntos de un partido ganado por no presentación (walkover) o por
-  /// sanción, según el reglamento del deporte:
+  /// El marcador con el que se da por ganado un walkover o una sanción,
+  /// según el reglamento del deporte. Devuelve `null` en fútbol, donde
+  /// no hay un marcador fijo y vale el que cargue el admin.
   ///
-  /// - Vóley: cada set se da por ganado por el máximo (25-0 con la
-  ///   configuración habitual), o sea 50 a 0 con dos sets para ganar.
-  /// - Básquet: 20-0.
-  /// - Fútbol/futsal: no hay marcador reglamentario, así que vale el que
-  ///   haya cargado el admin y se devuelve `null`.
+  /// Lo usa el registro de resultados para guardar siempre lo mismo, sin
+  /// importar quién lo cargue.
+  static ({int golesLocal, int golesVisitante, List<SetPartido> sets})?
+  marcadorPorNoPresentarse({
+    required CampeonatoModel campeonato,
+    required bool ganaLocal,
+  }) {
+    switch (campeonato.sistemaResultadoEfectivo) {
+      case SistemaResultado.sets:
+        final sets = campeonato.configuracion.setsParaGanar;
+        final porSet = campeonato.configuracion.puntosSetNormal;
+
+        return (
+          golesLocal: ganaLocal ? sets : 0,
+          golesVisitante: ganaLocal ? 0 : sets,
+          sets: List.generate(
+            sets,
+            (_) => SetPartido(
+              local: ganaLocal ? porSet : 0,
+              visitante: ganaLocal ? 0 : porSet,
+            ),
+          ),
+        );
+
+      case SistemaResultado.puntos:
+        return (
+          golesLocal: ganaLocal ? puntosWalkoverBasket : 0,
+          golesVisitante: ganaLocal ? 0 : puntosWalkoverBasket,
+          sets: const [],
+        );
+
+      default:
+        return null;
+    }
+  }
+
+  /// Los puntos que deja un walkover o una sanción, derivados del mismo
+  /// marcador reglamentario que se guarda en el partido. Devuelve `null`
+  /// si el partido no es administrativo o si el deporte no fija un
+  /// marcador (fútbol).
   static ({int local, int visitante})? puntosPorNoPresentarse(
     CampeonatoModel campeonato,
     PartidoModel partido,
@@ -187,18 +223,27 @@ class TablaCalculo {
       return null;
     }
 
-    final total = switch (campeonato.sistemaResultadoEfectivo) {
-      SistemaResultado.sets =>
-        campeonato.configuracion.setsParaGanar *
-            campeonato.configuracion.puntosSetNormal,
-      SistemaResultado.puntos => puntosWalkoverBasket,
-      _ => null,
-    };
+    final marcador = marcadorPorNoPresentarse(
+      campeonato: campeonato,
+      ganaLocal: partido.golesLocal! > partido.golesVisitante!,
+    );
 
-    if (total == null) return null;
+    if (marcador == null) return null;
 
-    final ganaLocal = partido.golesLocal! > partido.golesVisitante!;
-    return (local: ganaLocal ? total : 0, visitante: ganaLocal ? 0 : total);
+    // En vóley los puntos son los de los sets; en básquet, el marcador.
+    if (marcador.sets.isEmpty) {
+      return (local: marcador.golesLocal, visitante: marcador.golesVisitante);
+    }
+
+    var local = 0;
+    var visitante = 0;
+
+    for (final set in marcador.sets) {
+      local += set.local;
+      visitante += set.visitante;
+    }
+
+    return (local: local, visitante: visitante);
   }
 
   /// Ordena y numera. Con grupos, cada uno se ordena por separado para
@@ -207,47 +252,44 @@ class TablaCalculo {
     List<_Acumulado> items, {
     required bool usaGrupos,
   }) {
-    final ordenada = <_Acumulado>[];
+    final filas = items.map((item) => item.aModelo()).toList();
+
+    // Sin grupos, una sola tabla. Con grupos, una por grupo: la posición
+    // es el puesto dentro del grupo, no contra todo el campeonato.
+    final bloques = <List<TablaPosicionModel>>[];
 
     if (usaGrupos) {
-      final porGrupo = <String?, List<_Acumulado>>{};
+      final porGrupo = <String?, List<TablaPosicionModel>>{};
 
-      for (final item in items) {
-        porGrupo.putIfAbsent(item.grupoId, () => []).add(item);
+      for (final fila in filas) {
+        porGrupo.putIfAbsent(fila.grupoId, () => []).add(fila);
       }
 
       // Los equipos sin grupo van al final.
       final claves = porGrupo.keys.toList()
         ..sort((a, b) {
-          if (a == null && b == null) return 0;
-          if (a == null) return 1;
-          if (b == null) return -1;
+          if (a == null || b == null) return a == null ? 1 : -1;
           return a.compareTo(b);
         });
 
-      for (final clave in claves) {
-        final lista = porGrupo[clave]!..sort(_comparar);
-
-        for (var i = 0; i < lista.length; i++) {
-          lista[i].posicion = i + 1;
-        }
-
-        ordenada.addAll(lista);
-      }
+      bloques.addAll(claves.map((clave) => porGrupo[clave]!));
     } else {
-      final lista = [...items]..sort(_comparar);
-
-      for (var i = 0; i < lista.length; i++) {
-        lista[i].posicion = i + 1;
-      }
-
-      ordenada.addAll(lista);
+      bloques.add(filas);
     }
 
-    return ordenada.map((item) => item.aModelo()).toList();
+    return [
+      for (final bloque in bloques)
+        ...(bloque..sort(comparar)).indexed.map(
+          (par) => par.$2.conPosicion(par.$1 + 1),
+        ),
+    ];
   }
 
-  static int _comparar(_Acumulado a, _Acumulado b) {
+  /// Orden de la tabla: puntos, y si hay empate la diferencia de puntos.
+  ///
+  /// Es el único criterio de desempate del sistema: lo usa la tabla de
+  /// cada grupo y también la siembra de la llave (ver `Clasificacion`).
+  static int comparar(TablaPosicionModel a, TablaPosicionModel b) {
     var compare = b.puntos.compareTo(a.puntos);
     if (compare != 0) return compare;
 
@@ -277,7 +319,6 @@ class _Acumulado {
   final String equipoNombre;
   final String? grupoId;
 
-  int posicion = 0;
   int partidosJugados = 0;
   int partidosGanados = 0;
   int partidosEmpatados = 0;
@@ -310,7 +351,7 @@ class _Acumulado {
       golesContra: golesContra,
       diferenciaGoles: diferenciaGoles,
       puntos: puntos,
-      posicion: posicion,
+      posicion: 0,
       fechaActualizacion: DateTime.now(),
       puntosFavor: puntosFavor,
       puntosContra: puntosContra,

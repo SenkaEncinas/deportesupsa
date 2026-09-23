@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/campeonato_service.dart';
 import '../services/jugador_service.dart';
 import '../services/resultado_service.dart';
+import '../utils/tabla_calculo.dart';
 import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
@@ -514,8 +515,8 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
   /// Qué marcador se va a guardar, para mostrárselo al admin antes.
   String _detalleResultadoAdministrativo(CampeonatoModel? campeonato) {
     if (_esBasket(campeonato)) {
-      return 'Se va a guardar $kPuntosWalkoverBasket-0 a favor suyo '
-          '($kPuntosWalkoverBasket puntos a favor y 0 en contra).';
+      return 'Se va a guardar ${TablaCalculo.puntosWalkoverBasket}-0 a favor suyo '
+          '(${TablaCalculo.puntosWalkoverBasket} puntos a favor y 0 en contra).';
     }
 
     final sets = campeonato?.configuracion.setsParaGanar ?? 2;

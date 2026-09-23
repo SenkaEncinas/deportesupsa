@@ -75,9 +75,10 @@ void main() {
       final ganadorPorLlave = <int, Map<int, int>>{};
 
       for (final cruce in cuadro.where((c) => c.esPrimeraRonda)) {
-        ganadorPorLlave
-            .putIfAbsent(0, () => {})[cruce.llave] = cruce.siembraLocal! <
-                cruce.siembraVisitante!
+        ganadorPorLlave.putIfAbsent(
+          0,
+          () => {},
+        )[cruce.llave] = cruce.siembraLocal! < cruce.siembraVisitante!
             ? cruce.siembraLocal!
             : cruce.siembraVisitante!;
       }
@@ -89,9 +90,8 @@ void main() {
         RondaLlave.semifinal,
         RondaLlave.finalRonda,
       ]) {
-        final indice = RondaLlave.orden(ronda) - RondaLlave.orden(
-          RondaLlave.octavos,
-        );
+        final indice =
+            RondaLlave.orden(ronda) - RondaLlave.orden(RondaLlave.octavos);
 
         final previos = ganadorPorLlave[indice - 1]!;
         final actuales = <int, int>{};

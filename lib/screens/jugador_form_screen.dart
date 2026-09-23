@@ -855,7 +855,9 @@ class _JugadoresMasivosForm extends StatelessWidget {
           runSpacing: 10,
           children: [
             Text(
-              hayExistentes ? 'Jugadores del equipo' : 'Jugadores disponibles para registrar',
+              hayExistentes
+                  ? 'Jugadores del equipo'
+                  : 'Jugadores disponibles para registrar',
               style: AppTextStyles.heading3,
             ),
             AppBadge(

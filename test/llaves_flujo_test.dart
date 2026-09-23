@@ -217,7 +217,10 @@ void main() {
       );
 
       // Llave 1: Equipo 1 vs Equipo 16. Gana el 1.
-      await _ganaLocal(resultados, _llave(await _partidos(db), RondaLlave.octavos, 1));
+      await _ganaLocal(
+        resultados,
+        _llave(await _partidos(db), RondaLlave.octavos, 1),
+      );
 
       var cuartos1 = _llave(await _partidos(db), RondaLlave.cuartos, 1);
       expect(cuartos1.equipoLocalNombre, 'Equipo 1');
@@ -228,7 +231,10 @@ void main() {
       );
 
       // Llave 8: Equipo 8 vs Equipo 9. Gana el 8.
-      await _ganaLocal(resultados, _llave(await _partidos(db), RondaLlave.octavos, 8));
+      await _ganaLocal(
+        resultados,
+        _llave(await _partidos(db), RondaLlave.octavos, 8),
+      );
 
       cuartos1 = _llave(await _partidos(db), RondaLlave.cuartos, 1);
       expect(cuartos1.equipoLocalNombre, 'Equipo 1');
@@ -236,49 +242,51 @@ void main() {
       expect(cuartos1.tieneEquiposDefinidos, isTrue);
     });
 
-    test('jugando el campeonato entero, gana el 1 y el 2 llega a la final',
-        () async {
-      final db = await _baseConCampeonato();
-      final resultados = ResultadoService(firestore: db);
+    test(
+      'jugando el campeonato entero, gana el 1 y el 2 llega a la final',
+      () async {
+        final db = await _baseConCampeonato();
+        final resultados = ResultadoService(firestore: db);
 
-      await PartidoService(firestore: db).generarLlavesEliminatorias(
-        campeonatoId: kCampeonato,
-        clasificados: _clasificados(16),
-      );
+        await PartidoService(firestore: db).generarLlavesEliminatorias(
+          campeonatoId: kCampeonato,
+          clasificados: _clasificados(16),
+        );
 
-      // Siempre gana el mejor sembrado, que en cada cruce es el local.
-      for (final ronda in [
-        RondaLlave.octavos,
-        RondaLlave.cuartos,
-        RondaLlave.semifinal,
-        RondaLlave.finalRonda,
-      ]) {
-        final deLaRonda = (await _partidos(db))
-            .where((p) => p.rondaLlave == ronda)
-            .toList()
-          ..sort((a, b) => a.llave!.compareTo(b.llave!));
+        // Siempre gana el mejor sembrado, que en cada cruce es el local.
+        for (final ronda in [
+          RondaLlave.octavos,
+          RondaLlave.cuartos,
+          RondaLlave.semifinal,
+          RondaLlave.finalRonda,
+        ]) {
+          final deLaRonda =
+              (await _partidos(db)).where((p) => p.rondaLlave == ronda).toList()
+                ..sort((a, b) => a.llave!.compareTo(b.llave!));
 
-        for (final cruce in deLaRonda) {
-          expect(
-            cruce.tieneEquiposDefinidos,
-            isTrue,
-            reason: 'al llegar a $ronda llave ${cruce.llave} ya debería '
-                'tener sus dos equipos',
-          );
-          await _ganaLocal(resultados, cruce);
+          for (final cruce in deLaRonda) {
+            expect(
+              cruce.tieneEquiposDefinidos,
+              isTrue,
+              reason:
+                  'al llegar a $ronda llave ${cruce.llave} ya debería '
+                  'tener sus dos equipos',
+            );
+            await _ganaLocal(resultados, cruce);
+          }
         }
-      }
 
-      final laFinal = _llave(await _partidos(db), RondaLlave.finalRonda, 1);
+        final laFinal = _llave(await _partidos(db), RondaLlave.finalRonda, 1);
 
-      expect(laFinal.equipoLocalNombre, 'Equipo 1');
-      expect(
-        laFinal.equipoVisitanteNombre,
-        'Equipo 2',
-        reason: 'el 1° y el 2° solo se cruzan en la final',
-      );
-      expect(laFinal.ganadorId, 'e1');
-    });
+        expect(laFinal.equipoLocalNombre, 'Equipo 1');
+        expect(
+          laFinal.equipoVisitanteNombre,
+          'Equipo 2',
+          reason: 'el 1° y el 2° solo se cruzan en la final',
+        );
+        expect(laFinal.ganadorId, 'e1');
+      },
+    );
 
     test('corregir un resultado corrige la ronda siguiente', () async {
       final db = await _baseConCampeonato();
@@ -323,23 +331,25 @@ void main() {
       );
     });
 
-    test('no se puede cargar resultado en un cruce sin rival definido',
-        () async {
-      final db = await _baseConCampeonato();
-      final resultados = ResultadoService(firestore: db);
+    test(
+      'no se puede cargar resultado en un cruce sin rival definido',
+      () async {
+        final db = await _baseConCampeonato();
+        final resultados = ResultadoService(firestore: db);
 
-      await PartidoService(firestore: db).generarLlavesEliminatorias(
-        campeonatoId: kCampeonato,
-        clasificados: _clasificados(16),
-      );
+        await PartidoService(firestore: db).generarLlavesEliminatorias(
+          campeonatoId: kCampeonato,
+          clasificados: _clasificados(16),
+        );
 
-      final cuartos1 = _llave(await _partidos(db), RondaLlave.cuartos, 1);
+        final cuartos1 = _llave(await _partidos(db), RondaLlave.cuartos, 1);
 
-      expect(
-        () => _ganaLocal(resultados, cuartos1),
-        throwsA(isA<Exception>()),
-      );
-    });
+        expect(
+          () => _ganaLocal(resultados, cuartos1),
+          throwsA(isA<Exception>()),
+        );
+      },
+    );
   });
 
   group('Regenerar el cuadro', () {
@@ -384,7 +394,10 @@ void main() {
         clasificados: _clasificados(16),
       );
 
-      await _ganaLocal(resultados, _llave(await _partidos(db), RondaLlave.octavos, 1));
+      await _ganaLocal(
+        resultados,
+        _llave(await _partidos(db), RondaLlave.octavos, 1),
+      );
 
       expect(
         () => partidoService.generarLlavesEliminatorias(
@@ -417,15 +430,164 @@ void main() {
       final libres = partidos.where((p) => p.esBye).toList();
 
       expect(libres.length, 4);
-      expect(
-        libres.map((p) => p.equipoLocalNombre).toSet(),
-        {'Equipo 1', 'Equipo 2', 'Equipo 3', 'Equipo 4'},
-      );
+      expect(libres.map((p) => p.equipoLocalNombre).toSet(), {
+        'Equipo 1',
+        'Equipo 2',
+        'Equipo 3',
+        'Equipo 4',
+      });
 
       // Un pase directo no espera resultado: el equipo ya está puesto en
       // la ronda siguiente.
       final cuartos1 = _llave(partidos, RondaLlave.cuartos, 1);
       expect(cuartos1.equipoLocalNombre, 'Equipo 1');
+    });
+  });
+
+  group('Arrancar el cuadro en una ronda elegida', () {
+    // El caso de vóley damas: 12 clasificados, con 6 cruces en la
+    // primera ronda, 3 cuartos y un "mejor tercero" que entra a
+    // semifinales. Eso no se deduce solo, así que el admin arma esas
+    // rondas a mano y genera el cuadro recién desde semifinales.
+
+    test('desde semifinal se crean solo 2 semis y la final', () async {
+      final db = await _baseConCampeonato();
+
+      await PartidoService(firestore: db).generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: _clasificados(12),
+        rondaInicial: RondaLlave.semifinal,
+        sembrar: false,
+      );
+
+      final partidos = await _partidos(db);
+
+      expect(partidos.length, 3);
+      expect(
+        partidos.where((p) => p.rondaLlave == RondaLlave.semifinal).length,
+        2,
+      );
+      expect(
+        partidos.where((p) => p.rondaLlave == RondaLlave.finalRonda).length,
+        1,
+      );
+      expect(
+        partidos.any((p) => p.rondaLlave == RondaLlave.cuartos),
+        isFalse,
+        reason: 'los cuartos los arma el admin a mano',
+      );
+    });
+
+    test(
+      'sin sembrar, los cruces quedan vacíos para cargarlos a mano',
+      () async {
+        final db = await _baseConCampeonato();
+
+        await PartidoService(firestore: db).generarLlavesEliminatorias(
+          campeonatoId: kCampeonato,
+          clasificados: _clasificados(12),
+          rondaInicial: RondaLlave.semifinal,
+          sembrar: false,
+        );
+
+        final semis = (await _partidos(
+          db,
+        )).where((p) => p.rondaLlave == RondaLlave.semifinal).toList();
+
+        for (final semi in semis) {
+          expect(semi.tieneEquiposDefinidos, isFalse);
+          expect(semi.esBye, isFalse, reason: 'vacío no es lo mismo que libre');
+          expect(
+            semi.esPrimeraRondaDeLlave,
+            isTrue,
+            reason: 'se tienen que poder editar con el lápiz',
+          );
+          expect(semi.equipoLocalNombre, 'Por definir');
+        }
+      },
+    );
+
+    test('la final sigue esperando a los ganadores de las semis', () async {
+      final db = await _baseConCampeonato();
+
+      await PartidoService(firestore: db).generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: _clasificados(12),
+        rondaInicial: RondaLlave.semifinal,
+        sembrar: false,
+      );
+
+      final laFinal = _llave(await _partidos(db), RondaLlave.finalRonda, 1);
+
+      expect(laFinal.vieneDeLocal, 1);
+      expect(laFinal.vieneDeVisitante, 2);
+      expect(laFinal.equipoLocalNombre, 'Ganador llave 1');
+    });
+
+    test('cargados los equipos a mano, el ganador avanza igual', () async {
+      final db = await _baseConCampeonato();
+      final partidoService = PartidoService(firestore: db);
+      final resultados = ResultadoService(firestore: db);
+
+      await partidoService.generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: _clasificados(12),
+        rondaInicial: RondaLlave.semifinal,
+        sembrar: false,
+      );
+
+      // El admin completa la semifinal 1 con los dos equipos que
+      // llegaron por su cuenta.
+      final semi1 = _llave(await _partidos(db), RondaLlave.semifinal, 1);
+
+      await partidoService.cambiarEquiposPartido(
+        campeonatoId: kCampeonato,
+        partidoId: semi1.id,
+        local: _equipo(1),
+        visitante: _equipo(5),
+      );
+
+      await _ganaLocal(
+        resultados,
+        _llave(await _partidos(db), RondaLlave.semifinal, 1),
+      );
+
+      final laFinal = _llave(await _partidos(db), RondaLlave.finalRonda, 1);
+
+      expect(laFinal.equipoLocalNombre, 'Equipo 1');
+      expect(laFinal.equipoVisitanteNombre, 'Ganador llave 2');
+    });
+
+    test('desde cuartos con siembra ubica a los 8 mejores', () async {
+      final db = await _baseConCampeonato();
+
+      await PartidoService(firestore: db).generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: _clasificados(16),
+        rondaInicial: RondaLlave.cuartos,
+        sembrar: true,
+      );
+
+      final partidos = await _partidos(db);
+
+      expect(partidos.length, 7, reason: '4 cuartos + 2 semis + final');
+
+      final cuartos1 = _llave(partidos, RondaLlave.cuartos, 1);
+      expect(cuartos1.equipoLocalNombre, 'Equipo 1');
+      expect(cuartos1.equipoVisitanteNombre, 'Equipo 8');
+    });
+
+    test('una ronda que no existe se rechaza', () async {
+      final db = await _baseConCampeonato();
+
+      expect(
+        () => PartidoService(firestore: db).generarLlavesEliminatorias(
+          campeonatoId: kCampeonato,
+          clasificados: _clasificados(16),
+          rondaInicial: 'cuartos_y_medio',
+        ),
+        throwsA(isA<Exception>()),
+      );
     });
   });
 }

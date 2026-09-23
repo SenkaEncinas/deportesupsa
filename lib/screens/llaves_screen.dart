@@ -10,6 +10,7 @@ import '../services/partido_service.dart';
 import '../services/public_home_service.dart';
 import '../utils/clasificacion.dart';
 import '../utils/fixture_grouping.dart';
+import '../utils/llaves.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
@@ -96,20 +97,12 @@ class _LlavesScreenState extends State<LlavesScreen> {
       return;
     }
 
-    final confirmar = await AppDialogs.confirm(
+    final opciones = await showDialog<_OpcionesCuadro>(
       context: context,
-      title: 'Generar llaves',
-      message:
-          'Se arma el cuadro completo con los ${clasificados.length} clasificados: '
-          '${FixtureGrouping.rondaSegunEquipos(clasificados.length).toLowerCase()} y todas las rondas siguientes hasta la final, '
-          'esperando al ganador de cada llave.\n\n'
-          'La siembra es la del cuadro oficial: el 1° contra el último, el 2° contra el anteúltimo, y en cada ronda la llave 1 contra la última. '
-          'Así el 1° y el 2° de la tabla solo se pueden cruzar en la final.\n\n'
-          'Si ya había llaves armadas sin resultados, se reemplazan.',
-      confirmText: 'Generar',
+      builder: (_) => _GenerarLlavesDialog(clasificados: clasificados.length),
     );
 
-    if (!confirmar || !mounted) return;
+    if (opciones == null || !mounted) return;
 
     setState(() => _loading = true);
 
@@ -128,6 +121,8 @@ class _LlavesScreenState extends State<LlavesScreen> {
       await _partidoService.generarLlavesEliminatorias(
         campeonatoId: widget.campeonatoId,
         clasificados: ordenados,
+        rondaInicial: opciones.rondaInicial,
+        sembrar: opciones.sembrar,
       );
 
       if (!mounted) return;
@@ -408,10 +403,15 @@ class _CruceFila extends StatelessWidget {
     final bloqueado = partido.resultadoRegistrado;
     final isMobile = Responsive.isMobile(context);
 
-    // Un cruce que todavía espera al ganador de la ronda anterior no se
-    // edita a mano: lo llena solo la app al cargar ese resultado.
+    // Un cruce que espera al ganador de la ronda anterior no se edita a
+    // mano: lo llena solo la app al cargar ese resultado. Los de la
+    // primera ronda sí, porque pueden haberse creado vacíos a propósito
+    // para completarlos con equipos que no salen de la tabla.
     final esperaGanador =
-        partido.esDeLlave && !partido.tieneEquiposDefinidos && !partido.esBye;
+        partido.esDeLlave &&
+        !partido.tieneEquiposDefinidos &&
+        !partido.esBye &&
+        !partido.esPrimeraRondaDeLlave;
 
     final equipos = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -683,5 +683,186 @@ class _Selector extends StatelessWidget {
           .toList(),
       onChanged: onChanged,
     );
+  }
+}
+
+/// Lo que el admin eligió para armar el cuadro.
+class _OpcionesCuadro {
+  /// Clave de la ronda por la que arranca (ver `RondaLlave`), o `null`
+  /// para que se deduzca de la cantidad de clasificados.
+  final String? rondaInicial;
+
+  /// Si los cruces de la primera ronda se llenan con la tabla o quedan
+  /// vacíos para cargarlos a mano.
+  final bool sembrar;
+
+  const _OpcionesCuadro({required this.rondaInicial, required this.sembrar});
+}
+
+/// Desde dónde armar el cuadro.
+///
+/// Con un número de clasificados que sea potencia de 2 alcanza con la
+/// opción automática. Pero hay formatos que no se pueden deducir: 12
+/// equipos donde la primera ronda son 6 cruces, los 6 ganadores dan 3
+/// cuartos y a la semifinal entra además un "mejor tercero". Ahí el
+/// admin arma esas rondas a mano y genera el cuadro recién desde
+/// semifinales.
+class _GenerarLlavesDialog extends StatefulWidget {
+  final int clasificados;
+
+  const _GenerarLlavesDialog({required this.clasificados});
+
+  @override
+  State<_GenerarLlavesDialog> createState() => _GenerarLlavesDialogState();
+}
+
+class _GenerarLlavesDialogState extends State<_GenerarLlavesDialog> {
+  /// `null` = automática, según la cantidad de clasificados.
+  String? _ronda;
+  bool _sembrar = true;
+
+  /// Las rondas que tienen sentido ofrecer: desde la que arrancaría el
+  /// cuadro automático hacia la final. Una más larga que eso dejaría el
+  /// cuadro medio vacío.
+  List<String> get _rondasOfrecidas {
+    final tamano = Llaves.tamanoCuadro(widget.clasificados);
+
+    return RondaLlave.posiblesComoInicial.where((clave) {
+      final equipos = RondaLlave.equiposQueLaJuegan(clave);
+      return equipos != null && equipos <= tamano;
+    }).toList();
+  }
+
+  String get _rondaAutomatica =>
+      FixtureGrouping.rondaSegunEquipos(widget.clasificados);
+
+  @override
+  Widget build(BuildContext context) {
+    final automatico = _ronda == null;
+
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      title: Text('Generar llaves', style: AppTextStyles.heading3),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Hay ${widget.clasificados} clasificados.',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String?>(
+                initialValue: _ronda,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Arrancar el cuadro en',
+                ),
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(
+                      'Automático · ${_rondaAutomatica.toLowerCase()}',
+                    ),
+                  ),
+                  for (final clave in _rondasOfrecidas)
+                    DropdownMenuItem<String?>(
+                      value: clave,
+                      child: Text(
+                        '${RondaLlave.nombre(clave)} '
+                        '(${RondaLlave.equiposQueLaJuegan(clave)! ~/ 2} cruces)',
+                      ),
+                    ),
+                ],
+                onChanged: (valor) => setState(() {
+                  _ronda = valor;
+                  // Sembrar una ronda elegida a mano casi nunca es lo
+                  // que se quiere: si se eligió, es porque los equipos
+                  // no salen de la tabla.
+                  if (valor != null) _sembrar = false;
+                }),
+              ),
+              const SizedBox(height: 14),
+              SwitchListTile(
+                value: _sembrar,
+                onChanged: automatico
+                    ? null
+                    : (valor) => setState(() => _sembrar = valor),
+                title: const Text('Sembrar con la tabla'),
+                subtitle: Text(
+                  _sembrar
+                      ? 'El 1° contra el último, el 2° contra el anteúltimo, y así.'
+                      : 'Los cruces quedan vacíos para cargar los equipos a mano.',
+                ),
+                activeThumbColor: AppColors.primary,
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  _resumen(),
+                  style: AppTextStyles.small.copyWith(
+                    color: AppColors.primaryDark,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Si ya había llaves armadas sin resultados, se reemplazan. '
+                'Las que tengan resultado cargado no se tocan.',
+                style: AppTextStyles.small.copyWith(color: AppColors.textMuted),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        AppButton.ghost(
+          text: 'Cancelar',
+          onPressed: () => Navigator.pop(context),
+        ),
+        AppButton.primary(
+          text: 'Generar',
+          icon: Icons.account_tree_outlined,
+          onPressed: () => Navigator.pop(
+            context,
+            _OpcionesCuadro(rondaInicial: _ronda, sembrar: _sembrar),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _resumen() {
+    final ronda = _ronda;
+
+    if (ronda == null) {
+      return 'Se arma el cuadro completo desde ${_rondaAutomatica.toLowerCase()} '
+          'hasta la final, con los clasificados ya ubicados.';
+    }
+
+    final cruces = RondaLlave.equiposQueLaJuegan(ronda)! ~/ 2;
+    final desde = RondaLlave.nombre(ronda).toLowerCase();
+
+    if (_sembrar) {
+      return 'Se arman $cruces cruces de $desde y las rondas siguientes, '
+          'ubicando a los clasificados por siembra.';
+    }
+
+    return 'Se arman $cruces cruces de $desde y las rondas siguientes, vacíos. '
+        'Los equipos los cargás con el lápiz de cada cruce.';
   }
 }

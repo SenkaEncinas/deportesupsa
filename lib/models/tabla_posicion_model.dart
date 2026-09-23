@@ -70,6 +70,31 @@ class TablaPosicionModel {
     );
   }
 
+  /// Copia la fila cambiando solo la posición. La tabla se arma en dos
+  /// pasos: primero se acumulan los partidos y después se ordena, y el
+  /// puesto recién se sabe al final.
+  TablaPosicionModel conPosicion(int nuevaPosicion) {
+    return TablaPosicionModel(
+      equipoId: equipoId,
+      equipoNombre: equipoNombre,
+      grupoId: grupoId,
+      partidosJugados: partidosJugados,
+      partidosGanados: partidosGanados,
+      partidosEmpatados: partidosEmpatados,
+      partidosPerdidos: partidosPerdidos,
+      golesFavor: golesFavor,
+      golesContra: golesContra,
+      diferenciaGoles: diferenciaGoles,
+      puntos: puntos,
+      posicion: nuevaPosicion,
+      fechaActualizacion: fechaActualizacion,
+      puntosFavor: puntosFavor,
+      puntosContra: puntosContra,
+      diferenciaPuntos: diferenciaPuntos,
+      puntosIgualacion: puntosIgualacion,
+    );
+  }
+
   factory TablaPosicionModel.fromMap(String id, Map<String, dynamic> map) {
     return TablaPosicionModel(
       equipoId: stringFromJson(map['equipoId'], defaultValue: id),

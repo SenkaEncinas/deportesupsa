@@ -33,9 +33,7 @@ class _LanzadorFalso extends UrlLauncherPlatform
 /// sin desbordar.
 Widget _app() {
   return const MaterialApp(
-    home: Scaffold(
-      body: SingleChildScrollView(child: AppPublicFooter()),
-    ),
+    home: Scaffold(body: SingleChildScrollView(child: AppPublicFooter())),
   );
 }
 
@@ -55,7 +53,11 @@ void main() {
     await tester.pumpAndSettle();
 
     final credito = find.byTooltip('Ir al sitio de 57 Nations');
-    expect(credito, findsOneWidget, reason: 'el crédito tiene que ser un enlace');
+    expect(
+      credito,
+      findsOneWidget,
+      reason: 'el crédito tiene que ser un enlace',
+    );
 
     await tester.tap(credito, warnIfMissed: false);
     await tester.pumpAndSettle();
@@ -78,9 +80,7 @@ void main() {
 
   test('los auspiciantes sin sitio cargado no llevan a ningún lado', () {
     expect(
-      PatrocinadoresAssets.sitioDe(
-        'assets/images/patrocinadores/1_revive.png',
-      ),
+      PatrocinadoresAssets.sitioDe('assets/images/patrocinadores/1_revive.png'),
       isNull,
     );
     expect(

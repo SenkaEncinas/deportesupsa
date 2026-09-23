@@ -131,9 +131,7 @@ void main() {
       expect(find.text('Campeón'), findsOneWidget);
     });
 
-    testWidgets('el árbol entero entra en el ancho disponible', (
-      tester,
-    ) async {
+    testWidgets('el árbol entero entra en el ancho disponible', (tester) async {
       const ancho = 1440.0;
       await _pumpEn(tester, const Size(ancho, 1400));
 

@@ -35,6 +35,11 @@ class RondaLlave {
   static const String semifinal = 'semifinal';
   static const String finalRonda = 'final';
 
+  /// Una ronda con una cantidad de cruces que no es la de ningún cuadro
+  /// estándar. Pasa en los formatos armados a mano (12 equipos, por
+  /// ejemplo, donde la primera ronda tiene 6 cruces).
+  static const String sinNombre = 'llaves';
+
   /// Clave de la ronda que tiene [cantidadPartidos] cruces.
   static String porCantidadDePartidos(int cantidadPartidos) {
     switch (cantidadPartidos) {
@@ -51,7 +56,7 @@ class RondaLlave {
       case 32:
         return treintaidosavos;
       default:
-        return 'llaves';
+        return sinNombre;
     }
   }
 
@@ -74,6 +79,39 @@ class RondaLlave {
         return 'Llaves';
     }
   }
+
+  /// Cuántos equipos entran a jugar una ronda: la final la juegan 2, la
+  /// semifinal 4, los cuartos 8, los octavos 16. Es el tamaño del cuadro
+  /// si se arranca por ahí.
+  static int? equiposQueLaJuegan(String clave) {
+    switch (clave) {
+      case finalRonda:
+        return 2;
+      case semifinal:
+        return 4;
+      case cuartos:
+        return 8;
+      case octavos:
+        return 16;
+      case dieciseisavos:
+        return 32;
+      case treintaidosavos:
+        return 64;
+      default:
+        return null;
+    }
+  }
+
+  /// Las rondas por las que se puede arrancar un cuadro, de la más
+  /// larga a la final.
+  static const List<String> posiblesComoInicial = [
+    treintaidosavos,
+    dieciseisavos,
+    octavos,
+    cuartos,
+    semifinal,
+    finalRonda,
+  ];
 
   /// Qué tan avanzada está la ronda: 0 es la primera que se juega y el
   /// número crece hasta la final. Sirve para ordenar las rondas sin
@@ -214,8 +252,17 @@ class Llaves {
   /// Si los clasificados no son potencia de 2, el cuadro se completa
   /// hasta la potencia de 2 siguiente y las siembras sobrantes quedan
   /// vacías: ese cruce es un "libre" y el equipo pasa directo.
-  static List<CruceLlave> estructura(int cantidadClasificados) {
-    final tamano = tamanoCuadro(cantidadClasificados);
+  ///
+  /// [tamanoForzado] permite armar el cuadro desde una ronda elegida a
+  /// mano en vez de deducirla de la cantidad de clasificados. Hace falta
+  /// cuando el formato no se puede deducir solo: por ejemplo 12 equipos
+  /// con repechaje, donde la primera ronda la arma el admin a mano y el
+  /// cuadro automático arranca recién en semifinales.
+  static List<CruceLlave> estructura(
+    int cantidadClasificados, {
+    int? tamanoForzado,
+  }) {
+    final tamano = tamanoForzado ?? tamanoCuadro(cantidadClasificados);
     if (tamano < 2) return const [];
 
     final cruces = <CruceLlave>[];
@@ -230,9 +277,8 @@ class Llaves {
       for (var llave = 1; llave <= cantidadLlaves; llave++) {
         // El rival de la llave i es siempre la llave (o la siembra)
         // que está a la misma distancia del otro extremo.
-        final espejo = (rondaIndice == 0 ? tamano : cantidadLlaves * 2) +
-            1 -
-            llave;
+        final espejo =
+            (rondaIndice == 0 ? tamano : cantidadLlaves * 2) + 1 - llave;
 
         cruces.add(
           CruceLlave(

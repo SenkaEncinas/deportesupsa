@@ -281,8 +281,7 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
                                 children: [
                                   AppTextField(
                                     label: 'Buscar partido',
-                                    hint:
-                                        'Nombre de alguno de los equipos...',
+                                    hint: 'Nombre de alguno de los equipos...',
                                     controller: _searchController,
                                     prefixIcon: Icons.search_rounded,
                                     onChanged: (value) {
@@ -291,9 +290,7 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
                                   ),
                                   const SizedBox(height: 14),
                                   _EquipoFiltroDropdown(
-                                    equipos: _equiposDisponibles(
-                                      data.partidos,
-                                    ),
+                                    equipos: _equiposDisponibles(data.partidos),
                                     valor: _equipoFiltro,
                                     onChanged: (value) {
                                       setState(() => _equipoFiltro = value);
