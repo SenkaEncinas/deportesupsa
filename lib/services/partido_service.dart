@@ -462,11 +462,38 @@ class PartidoService {
     return null;
   }
 
+  /// La jornada de un cruce nuevo cargado a mano.
+  ///
+  /// No se le pregunta al admin: todos los cruces que agrega van juntos
+  /// a la misma, así se muestran como una ronda y no cada uno por su
+  /// lado. Pedir el número solo daba lugar a errores (un cruce con una
+  /// jornada distinta al resto terminaba dibujándose como si fuera una
+  /// ronda propia).
+  ///
+  /// Los partidos del cuadro generado no cuentan para el cálculo: tienen
+  /// su propia numeración y no deben arrastrar a los manuales.
+  Future<int> _jornadaParaCruceManual(
+    String campeonatoId,
+    String? grupoId,
+  ) async {
+    final snap = await _partidos(campeonatoId).get();
+
+    final delMismoLado = snap.docs
+        .map((doc) => PartidoModel.fromMap(doc.id, doc.data()))
+        .where((partido) => (partido.grupoId ?? '') == (grupoId ?? ''))
+        .where((partido) => !partido.esDeLlave);
+
+    if (delMismoLado.isEmpty) return 1;
+
+    return delMismoLado
+        .map((partido) => partido.jornada)
+        .reduce((mayor, actual) => actual > mayor ? actual : mayor);
+  }
+
   Future<void> crearCruceManual({
     required String campeonatoId,
     required EquipoModel equipoLocal,
     required EquipoModel equipoVisitante,
-    required int jornada,
     required bool idaYVuelta,
     String? grupoId,
     bool privilegio = false,
@@ -475,9 +502,15 @@ class PartidoService {
       throw Exception('Un equipo no puede jugar contra sí mismo.');
     }
 
-    if (jornada <= 0) {
-      throw Exception('La jornada debe ser mayor a cero.');
-    }
+    final grupoIdFinal = await _grupoIdParaCruceManual(
+      campeonatoId: campeonatoId,
+      equipoLocal: equipoLocal,
+      equipoVisitante: equipoVisitante,
+      grupoIdSolicitado: grupoId,
+      privilegio: privilegio,
+    );
+
+    final jornada = await _jornadaParaCruceManual(campeonatoId, grupoIdFinal);
 
     final existentesSnap = await _partidos(
       campeonatoId,
@@ -493,17 +526,11 @@ class PartidoService {
               partido.equipoVisitanteId == equipoLocal.id);
 
       if (mismoCruce) {
-        throw Exception('Ese cruce ya existe en la jornada $jornada.');
+        throw Exception(
+          'Ese cruce ya existe: ${equipoLocal.nombre} contra ${equipoVisitante.nombre}.',
+        );
       }
     }
-
-    final grupoIdFinal = await _grupoIdParaCruceManual(
-      campeonatoId: campeonatoId,
-      equipoLocal: equipoLocal,
-      equipoVisitante: equipoVisitante,
-      grupoIdSolicitado: grupoId,
-      privilegio: privilegio,
-    );
 
     final batch = _db.batch();
 

@@ -884,7 +884,11 @@ class _NextMatchesSection extends StatelessWidget {
                     padding: EdgeInsets.only(
                       bottom: index < partidos.length - 1 ? 10 : 0,
                     ),
-                    child: AppMatchCard(partido: partido, deporte: deporte),
+                    child: AppMatchCard(
+                      partido: partido,
+                      deporte: deporte,
+                      showResult: partido.resultadoRegistrado,
+                    ),
                   );
                 }),
             ],
@@ -1009,29 +1013,26 @@ class _FixtureSection extends StatelessWidget {
         // tabla de posiciones y los clasificados cubren esa información
         // de forma más útil. Esta sección queda solo para la llave
         // visual de la fase eliminatoria.
-        final List<MapEntry<String, List<PartidoModel>>> rondasLlave;
+        // Los partidos con privilegio también van sin grupo, pero no son
+        // parte de la fase final: se filtran aparte.
+        final deFaseFinal = (_esEliminacionPura || _esGruposEliminacion)
+            ? partidos
+                  .where(
+                    (p) =>
+                        (p.grupoId == null || p.grupoId!.isEmpty) &&
+                        !p.privilegio,
+                  )
+                  .toList()
+            : <PartidoModel>[];
 
-        if (_esEliminacionPura) {
-          rondasLlave = FixtureGrouping.rondasEliminatorias(
-            partidos.where((p) => !p.privilegio).toList(),
-          );
-        } else if (_esGruposEliminacion) {
-          // Los partidos con privilegio también van sin grupo, pero no
-          // son parte de la llave: se filtran para que no aparezcan
-          // como una ronda más.
-          final deFaseFinal = partidos
-              .where(
-                (p) =>
-                    (p.grupoId == null || p.grupoId!.isEmpty) && !p.privilegio,
-              )
-              .toList();
+        final rondasLlave = FixtureGrouping.rondasEliminatorias(deFaseFinal);
 
-          rondasLlave = FixtureGrouping.rondasEliminatorias(deFaseFinal);
-        } else {
-          rondasLlave = const [];
-        }
+        // Cruces de fase final que todavía no entran en ningún cuadro.
+        // No son una ronda, pero se juegan igual, así que el público los
+        // tiene que ver con su fecha y su resultado.
+        final sueltos = FixtureGrouping.crucesSueltos(deFaseFinal);
 
-        if (rondasLlave.isEmpty) {
+        if (rondasLlave.isEmpty && sueltos.isEmpty) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1044,7 +1045,7 @@ class _FixtureSection extends StatelessWidget {
               ],
               const AppInlineEmptyState(
                 icon: Icons.account_tree_outlined,
-                text: 'Todavía no hay llaves eliminatorias generadas.',
+                text: 'Todavía no hay partidos de fase final.',
               ),
             ],
           );
@@ -1060,13 +1061,69 @@ class _FixtureSection extends StatelessWidget {
               ),
               const SizedBox(height: 16),
             ],
-            AppBracketView(
-              rondas: rondasLlave,
-              deporte: campeonato.deporteEfectivo,
-            ),
+            if (rondasLlave.isNotEmpty)
+              AppBracketView(
+                rondas: rondasLlave,
+                deporte: campeonato.deporteEfectivo,
+              ),
+            if (sueltos.isNotEmpty) ...[
+              if (rondasLlave.isNotEmpty) const SizedBox(height: 24),
+              _PartidosFaseFinalSection(
+                partidos: sueltos,
+                deporte: campeonato.deporteEfectivo,
+              ),
+            ],
           ],
         );
       },
+    );
+  }
+}
+
+/// Partidos de fase final que todavía no forman parte del cuadro.
+///
+/// Pasa en los formatos que no se pueden generar solos (12 clasificados
+/// con repechaje, por ejemplo): esas primeras rondas las carga el admin
+/// a mano y no son una ronda del cuadro hasta que lo arme. Igual se
+/// juegan, así que se muestran acá con su fecha y su resultado.
+class _PartidosFaseFinalSection extends StatelessWidget {
+  final List<PartidoModel> partidos;
+  final String deporte;
+
+  const _PartidosFaseFinalSection({
+    required this.partidos,
+    required this.deporte,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ordenados = [...partidos]
+      ..sort((a, b) {
+        // Primero los que tienen fecha, en orden; los que todavía no se
+        // programaron quedan al final.
+        final fechaA = a.fechaHora;
+        final fechaB = b.fechaHora;
+        if (fechaA == null && fechaB == null) return 0;
+        if (fechaA == null) return 1;
+        if (fechaB == null) return -1;
+        return fechaA.compareTo(fechaB);
+      });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const AppSectionHeader(
+          title: 'Partidos de fase final',
+          subtitle: 'Cruces que se juegan antes de entrar al cuadro.',
+        ),
+        const SizedBox(height: 16),
+        ...ordenados.map(
+          (partido) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: AppMatchCard(partido: partido, deporte: deporte),
+          ),
+        ),
+      ],
     );
   }
 }

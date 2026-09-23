@@ -142,7 +142,6 @@ class _FixtureScreenState extends State<FixtureScreen> {
         campeonatoId: widget.campeonatoId,
         equipoLocal: result.local,
         equipoVisitante: result.visitante,
-        jornada: result.jornada,
         idaYVuelta: result.idaYVuelta,
         grupoId: result.grupoId,
         privilegio: result.privilegio,
@@ -820,14 +819,10 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
   /// Con privilegio se ignora la restricción de grupo del diálogo.
   bool get _restringir => widget.restringirAGrupo && !_privilegio;
 
-  final TextEditingController _jornadaController = TextEditingController(
-    text: '1',
-  );
   final TextEditingController _grupoController = TextEditingController();
 
   @override
   void dispose() {
-    _jornadaController.dispose();
     _grupoController.dispose();
     super.dispose();
   }
@@ -843,18 +838,14 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
   }
 
   void _guardar() {
-    final jornada = int.tryParse(_jornadaController.text.trim()) ?? 0;
-
     if (_local == null || _visitante == null) return;
     if (_local!.id == _visitante!.id) return;
-    if (jornada <= 0) return;
 
     Navigator.pop(
       context,
       _CruceManualResult(
         local: _local!,
         visitante: _visitante!,
-        jornada: jornada,
         idaYVuelta: _idaYVuelta,
         // En fase de grupos el servicio ignora este valor y lo calcula
         // solo a partir de la inscripción real, así que acá solo importa
@@ -962,23 +953,6 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
                 },
               ),
               const SizedBox(height: 14),
-              TextField(
-                controller: _jornadaController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Jornada / ronda',
-                  hintText: 'Ejemplo: 1, 2, 3...',
-                  // Es lo que agrupa las columnas del cuadro: si dos
-                  // cruces de la misma ronda llevan números distintos,
-                  // se dibujan como dos rondas separadas.
-                  helperText:
-                      'El mismo número para todos los cruces de la '
-                      'misma ronda',
-                  helperMaxLines: 2,
-                  prefixIcon: Icon(Icons.calendar_today_outlined),
-                ),
-              ),
-              const SizedBox(height: 14),
               if (!widget.restringirAGrupo &&
                   !widget.ocultarCampoGrupoLibre) ...[
                 TextField(
@@ -1080,7 +1054,6 @@ class _EquipoDropdown extends StatelessWidget {
 class _CruceManualResult {
   final EquipoModel local;
   final EquipoModel visitante;
-  final int jornada;
   final bool idaYVuelta;
   final String? grupoId;
   final bool privilegio;
@@ -1088,7 +1061,6 @@ class _CruceManualResult {
   const _CruceManualResult({
     required this.local,
     required this.visitante,
-    required this.jornada,
     required this.idaYVuelta,
     this.grupoId,
     this.privilegio = false,

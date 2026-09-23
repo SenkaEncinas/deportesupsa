@@ -612,7 +612,6 @@ void main() {
           campeonatoId: kCampeonato,
           equipoLocal: _equipo(i),
           equipoVisitante: _equipo(13 - i),
-          jornada: 1,
           idaYVuelta: false,
         );
       }
@@ -623,7 +622,6 @@ void main() {
           campeonatoId: kCampeonato,
           equipoLocal: _equipo(i),
           equipoVisitante: _equipo(7 - i),
-          jornada: 2,
           idaYVuelta: false,
         );
       }
@@ -654,20 +652,22 @@ void main() {
       final db = await armarADosManos();
       final partidos = await _partidos(db);
 
-      final cuartosAMano = partidos
-          .where((p) => !p.generadoPorSistema && p.jornada == 2)
-          .toList();
+      final aMano = partidos.where((p) => !p.generadoPorSistema).toList();
       final semis = partidos
           .where((p) => p.rondaLlave == RondaLlave.semifinal)
           .toList();
       final laFinal = _llave(partidos, RondaLlave.finalRonda, 1);
 
-      expect(cuartosAMano.length, 3);
+      // Los cruces cargados a mano van todos juntos: la jornada la pone
+      // la app, no el admin.
+      expect(aMano.length, 9);
+      expect(aMano.every((p) => p.jornada == aMano.first.jornada), isTrue);
+
       for (final semi in semis) {
         expect(
           semi.jornada,
-          greaterThan(cuartosAMano.first.jornada),
-          reason: 'una semifinal no puede ordenarse antes que un cuarto',
+          greaterThan(aMano.first.jornada),
+          reason: 'una semifinal no puede ordenarse antes que lo manual',
         );
         expect(laFinal.jornada, greaterThan(semi.jornada));
       }
@@ -794,7 +794,6 @@ void main() {
         campeonatoId: kCampeonato,
         equipoLocal: _equipo(1),
         equipoVisitante: _equipo(2),
-        jornada: 5,
         idaYVuelta: false,
       );
 
@@ -818,7 +817,6 @@ void main() {
           campeonatoId: kCampeonato,
           equipoLocal: _equipo(i),
           equipoVisitante: _equipo(i + 8),
-          jornada: i,
           idaYVuelta: false,
         );
       }
@@ -837,7 +835,6 @@ void main() {
         campeonatoId: kCampeonato,
         equipoLocal: _equipo(1),
         equipoVisitante: _equipo(2),
-        jornada: 1,
         idaYVuelta: false,
       );
 
