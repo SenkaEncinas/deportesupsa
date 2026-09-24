@@ -126,6 +126,28 @@ Consecuencia a tener presente: **un 1° de grupo nunca queda debajo de un
 alguna vez se quiere ordenar puramente por puntos, hay que cambiar esa
 función.
 
+## Una sola definición para cada regla
+
+Estas reglas existen **una sola vez**. Si hace falta usarlas en otro
+lado, se llaman; nunca se copian ni se reescriben:
+
+| Regla | Dónde vive |
+|---|---|
+| Orden de la tabla y desempate | `TablaCalculo.comparar()` |
+| Marcador de un walkover | `TablaCalculo.marcadorPorNoPresentarse()` |
+| ¿Tiene grupo? / ¿Es de fase final? | `PartidoModel.tieneGrupo` / `.esDeFaseFinal` |
+| ¿Quién ganó? / ¿Quién pasa? | `PartidoModel.ganoLocal`, `.nombreGanador`, `.quienPasa` |
+| Nombre de una ronda | `RondaLlave.nombre()` |
+| Formato de fechas | `Fechas` (`lib/utils/fechas.dart`) |
+| Texto de un error | `mensajeDeError()` (`lib/utils/mensajes.dart`) |
+
+Por qué importa: la tabla general desempataba por sets mientras la del
+grupo desempataba por puntos, porque había **tres** copias del mismo
+comparador y se había corregido una sola. El buscador de código
+repetido no la encontró, porque busca texto idéntico y esa copia ya
+estaba escrita distinto. Una regla repetida no se nota hasta que
+alguien cambia una sola de las copias.
+
 ## Firestore
 
 Las reglas permiten **lectura pública** y exigen sesión de admin para

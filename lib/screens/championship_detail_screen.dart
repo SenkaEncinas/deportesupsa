@@ -8,6 +8,7 @@ import '../models/tabla_posicion_model.dart';
 import '../services/public_home_service.dart';
 import '../utils/clasificacion.dart';
 import '../utils/fixture_grouping.dart';
+import '../utils/tabla_calculo.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_bracket_view.dart';
 import 'reciclaje/app_button.dart';
@@ -1016,13 +1017,7 @@ class _FixtureSection extends StatelessWidget {
         // Los partidos con privilegio también van sin grupo, pero no son
         // parte de la fase final: se filtran aparte.
         final deFaseFinal = (_esEliminacionPura || _esGruposEliminacion)
-            ? partidos
-                  .where(
-                    (p) =>
-                        (p.grupoId == null || p.grupoId!.isEmpty) &&
-                        !p.privilegio,
-                  )
-                  .toList()
+            ? partidos.where((p) => p.esDeFaseFinal).toList()
             : <PartidoModel>[];
 
         final rondasLlave = FixtureGrouping.rondasEliminatorias(deFaseFinal);
@@ -1418,27 +1413,13 @@ class _TableSectionState extends State<_TableSection> {
     );
   }
 
-  int _compararGeneral(TablaPosicionModel a, TablaPosicionModel b) {
-    var compare = b.puntos.compareTo(a.puntos);
-    if (compare != 0) return compare;
-
-    compare = b.diferenciaGoles.compareTo(a.diferenciaGoles);
-    if (compare != 0) return compare;
-
-    compare = b.golesFavor.compareTo(a.golesFavor);
-    if (compare != 0) return compare;
-
-    compare = a.golesContra.compareTo(b.golesContra);
-    if (compare != 0) return compare;
-
-    return a.equipoNombre.compareTo(b.equipoNombre);
-  }
-
   /// Copia cada equipo con la posición recalculada para el ranking
   /// general (1..N sobre todos los grupos juntos): la posición que trae
   /// el modelo es la posición dentro de su propio grupo, no sirve acá.
   List<TablaPosicionModel> _rankingGeneral(List<TablaPosicionModel> tabla) {
-    final ordenado = [...tabla]..sort(_compararGeneral);
+    // El mismo criterio que la tabla de cada grupo y que la siembra de
+    // la llave: hay uno solo para todo el sistema.
+    final ordenado = [...tabla]..sort(TablaCalculo.comparar);
 
     return List.generate(ordenado.length, (i) {
       final item = ordenado[i];

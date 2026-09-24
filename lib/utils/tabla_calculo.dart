@@ -44,7 +44,7 @@ class TablaCalculo {
     final equipoGrupo = <String, String>{};
 
     for (final partido in partidos) {
-      if (partido.grupoId == null || partido.grupoId!.isEmpty) continue;
+      if (!partido.tieneGrupo) continue;
       equipoGrupo[partido.equipoLocalId] = partido.grupoId!;
       equipoGrupo[partido.equipoVisitanteId] = partido.grupoId!;
     }
@@ -133,7 +133,7 @@ class TablaCalculo {
     if (partido.golesLocal == null || partido.golesVisitante == null) {
       return false;
     }
-    if (usaGrupos && (partido.grupoId == null || partido.grupoId!.isEmpty)) {
+    if (usaGrupos && !partido.tieneGrupo) {
       return false;
     }
     return true;

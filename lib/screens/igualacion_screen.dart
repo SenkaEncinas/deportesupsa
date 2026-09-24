@@ -17,6 +17,7 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_section_header.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
+import '../utils/mensajes.dart';
 
 /// Puntos de igualación: el ajuste manual que el admin le carga a los
 /// equipos de un grupo que tiene menos equipos que los demás.
@@ -102,10 +103,7 @@ class _IgualacionScreenState extends State<IgualacionScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -229,7 +227,7 @@ class _IgualacionScreenState extends State<IgualacionScreen> {
       // Partidos del grupo (los de fase final no tienen grupoId y no
       // cuentan para la fase de grupos).
       final delGrupo = partidos.where((p) {
-        if (clave == null) return p.grupoId == null || p.grupoId!.isEmpty;
+        if (clave == null) return !p.tieneGrupo;
         return p.grupoId == clave;
       }).toList();
 

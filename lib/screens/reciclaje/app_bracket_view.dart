@@ -5,6 +5,7 @@ import '../../utils/fixture_grouping.dart';
 import 'app_badge.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
+import '../../utils/fechas.dart';
 
 // Alcanza para el número de llave, los dos equipos y el renglón de
 // fecha/hora del cruce.
@@ -54,13 +55,7 @@ class _Slot {
   bool get vacio => partido == null;
 
   /// Nombre del ganador, si el partido ya se jugó y hubo ganador.
-  String? get ganador {
-    final p = partido;
-    if (p == null || !p.resultadoRegistrado || p.empate) return null;
-    if (p.ganadorId == p.equipoLocalId) return p.equipoLocalNombre;
-    if (p.ganadorId == p.equipoVisitanteId) return p.equipoVisitanteNombre;
-    return null;
-  }
+  String? get ganador => partido?.nombreGanador;
 }
 
 /// Llave eliminatoria visual (octavos, cuartos, semifinal, final y
@@ -554,12 +549,8 @@ class _BracketMatchCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final jugado = partido.resultadoRegistrado;
-    final ganaLocal =
-        jugado && !partido.empate && partido.ganadorId == partido.equipoLocalId;
-    final ganaVisitante =
-        jugado &&
-        !partido.empate &&
-        partido.ganadorId == partido.equipoVisitanteId;
+    final ganaLocal = partido.ganoLocal;
+    final ganaVisitante = partido.ganoVisitante;
 
     final colorEstado = jugado
         ? AppColors.success
@@ -656,13 +647,7 @@ class _FechaCruce extends StatelessWidget {
     final f = fecha;
     if (f == null) return 'Sin programar';
 
-    final dia = _dias[f.weekday - 1];
-    final numero = f.day.toString().padLeft(2, '0');
-    final mes = f.month.toString().padLeft(2, '0');
-    final hora = f.hour.toString().padLeft(2, '0');
-    final minuto = f.minute.toString().padLeft(2, '0');
-
-    return '$dia $numero/$mes · $hora:$minuto';
+    return '${_dias[f.weekday - 1]} ${Fechas.diaCorto(f)} · ${Fechas.hora(f)}';
   }
 
   @override

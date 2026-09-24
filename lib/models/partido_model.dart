@@ -267,6 +267,44 @@ class PartidoModel {
     };
   }
 
+  /// El partido pertenece a un grupo de la fase de grupos.
+  bool get tieneGrupo => grupoId != null && grupoId!.isNotEmpty;
+
+  /// Cruce de fase final: sin grupo y sin privilegio. Los de privilegio
+  /// también van sin grupo, pero son amistosos o partidos especiales y
+  /// no forman parte de la eliminatoria.
+  bool get esDeFaseFinal => !tieneGrupo && !privilegio;
+
+  /// Ganó el local: se jugó, no fue empate y el ganador es el local.
+  bool get ganoLocal =>
+      resultadoRegistrado && !empate && ganadorId == equipoLocalId;
+
+  /// Ganó el visitante.
+  bool get ganoVisitante =>
+      resultadoRegistrado && !empate && ganadorId == equipoVisitanteId;
+
+  /// Nombre del ganador, o `null` si todavía no hay.
+  String? get nombreGanador => ganoLocal
+      ? equipoLocalNombre
+      : ganoVisitante
+      ? equipoVisitanteNombre
+      : null;
+
+  /// El equipo que pasa a la ronda siguiente: el ganador, o en un pase
+  /// directo el único que tiene el cruce. `null` si todavía no se sabe.
+  ({String id, String nombre})? get quienPasa {
+    if (esBye) {
+      return equipoLocalId.isNotEmpty
+          ? (id: equipoLocalId, nombre: equipoLocalNombre)
+          : (id: equipoVisitanteId, nombre: equipoVisitanteNombre);
+    }
+    if (ganoLocal) return (id: equipoLocalId, nombre: equipoLocalNombre);
+    if (ganoVisitante) {
+      return (id: equipoVisitanteId, nombre: equipoVisitanteNombre);
+    }
+    return null;
+  }
+
   /// El partido forma parte del cuadro eliminatorio generado por la app
   /// (tiene ronda y número de llave asignados).
   bool get esDeLlave => rondaLlave != null && llave != null;

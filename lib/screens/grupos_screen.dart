@@ -22,6 +22,7 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
+import '../utils/mensajes.dart';
 
 /// Inscribe equipos activos en los grupos de la fase de grupos. Antes,
 /// esta asignación se hacía automáticamente y en silencio cada vez que se
@@ -78,10 +79,7 @@ class _GruposScreenState extends State<GruposScreen> {
       AppSnackbars.success(context, 'Grupos generados automáticamente.');
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -114,10 +112,7 @@ class _GruposScreenState extends State<GruposScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -144,10 +139,7 @@ class _GruposScreenState extends State<GruposScreen> {
       AppSnackbars.success(context, 'Clasificación actualizada.');
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -174,10 +166,7 @@ class _GruposScreenState extends State<GruposScreen> {
       AppSnackbars.success(context, 'Grupos reiniciados.');
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -208,10 +197,7 @@ class _GruposScreenState extends State<GruposScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     }
   }
 

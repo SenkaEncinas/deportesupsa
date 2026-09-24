@@ -6,6 +6,7 @@ import 'app_badge.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 import 'responsive.dart';
+import '../../utils/fechas.dart';
 
 /// Ícono representativo de cada deporte, reutilizado en toda la app para
 /// que el mismo deporte siempre se vea con el mismo ícono.
@@ -134,13 +135,8 @@ class _MobileMatchCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final esEmpate = partido.empate;
-    final ganaLocal =
-        showResult && !esEmpate && partido.ganadorId == partido.equipoLocalId;
-    final ganaVisitante =
-        showResult &&
-        !esEmpate &&
-        partido.ganadorId == partido.equipoVisitanteId;
+    final ganaLocal = showResult && partido.ganoLocal;
+    final ganaVisitante = showResult && partido.ganoVisitante;
 
     final extra = _resultadoExtraTexto(partido);
 
@@ -470,21 +466,12 @@ String? _resultadoExtraTexto(PartidoModel partido) {
 
 String _fechaTexto(DateTime? fecha) {
   if (fecha == null) return 'Sin fecha';
-
-  final dia = fecha.day.toString().padLeft(2, '0');
-  final mes = fecha.month.toString().padLeft(2, '0');
-  final anio = fecha.year.toString();
-
-  return '$dia/$mes/$anio';
+  return Fechas.dia(fecha);
 }
 
 String _horaTexto(DateTime? fecha) {
   if (fecha == null) return '--:--';
-
-  final hora = fecha.hour.toString().padLeft(2, '0');
-  final minuto = fecha.minute.toString().padLeft(2, '0');
-
-  return '$hora:$minuto';
+  return Fechas.hora(fecha);
 }
 
 String _formatLabel(String value) {

@@ -16,6 +16,7 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
+import '../utils/fechas.dart';
 
 class TablaPosicionesScreen extends StatefulWidget {
   final String campeonatoId;
@@ -186,14 +187,7 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
 
   String _fechaTexto(DateTime? fecha) {
     if (fecha == null) return 'Sin fecha programada';
-
-    final dia = fecha.day.toString().padLeft(2, '0');
-    final mes = fecha.month.toString().padLeft(2, '0');
-    final anio = fecha.year.toString();
-    final hora = fecha.hour.toString().padLeft(2, '0');
-    final minuto = fecha.minute.toString().padLeft(2, '0');
-
-    return '$dia/$mes/$anio $hora:$minuto';
+    return Fechas.diaYHora(fecha);
   }
 
   String _resultadoTexto(PartidoModel partido) {

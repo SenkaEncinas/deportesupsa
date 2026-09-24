@@ -10,6 +10,7 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
+import '../utils/mensajes.dart';
 
 class EquipoFormScreen extends StatefulWidget {
   final String campeonatoId;
@@ -115,10 +116,7 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) {
         setState(() {

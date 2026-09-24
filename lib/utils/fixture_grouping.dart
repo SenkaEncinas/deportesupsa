@@ -21,9 +21,7 @@ class FixtureGrouping {
   }) {
     final secciones = <String, List<PartidoModel>>{};
 
-    final tieneGrupos = todos.any(
-      (p) => p.grupoId != null && p.grupoId!.isNotEmpty,
-    );
+    final tieneGrupos = todos.any((p) => p.tieneGrupo);
     final tieneVarias = todos.any((p) => p.vuelta > 1);
     final esEliminacion = tipoCampeonato == TipoCampeonato.eliminacionDirecta;
 
@@ -32,7 +30,7 @@ class FixtureGrouping {
     // sirve para deducir el nombre de la ronda (4tos, 8vos, semis...).
     final partidosPorJornadaFinal = <int, int>{};
     for (final partido in todos) {
-      if (partido.grupoId != null && partido.grupoId!.isNotEmpty) continue;
+      if (partido.tieneGrupo) continue;
       partidosPorJornadaFinal[partido.jornada] =
           (partidosPorJornadaFinal[partido.jornada] ?? 0) + 1;
     }
@@ -41,7 +39,7 @@ class FixtureGrouping {
       String clave;
 
       if (tieneGrupos) {
-        if (partido.grupoId == null || partido.grupoId!.isEmpty) {
+        if (!partido.tieneGrupo) {
           final ronda = nombreRondaEliminatoria(
             partidosPorJornadaFinal[partido.jornada] ?? 1,
           );

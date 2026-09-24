@@ -216,7 +216,7 @@ class _ResultadoCard extends StatelessWidget {
               text: partido.estado,
               type: AppBadge.typeFromEstado(partido.estado),
             ),
-            if (partido.grupoId != null && partido.grupoId!.isNotEmpty)
+            if (partido.tieneGrupo)
               AppBadge(text: partido.grupoId!, type: AppBadgeType.info),
             if (partido.definidoPorPenales)
               const AppBadge(text: 'Penales', type: AppBadgeType.warning),

@@ -18,6 +18,7 @@ import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
+import '../utils/mensajes.dart';
 
 class ResultadoFormScreen extends StatefulWidget {
   final String campeonatoId;
@@ -485,10 +486,7 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) {
         setState(() {

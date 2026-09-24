@@ -589,21 +589,8 @@ class ResultadoService {
       final pasan = <int, ({String id, String nombre})>{};
 
       for (final partido in porRonda[ordenes[i]]!) {
-        // Un "libre" no se juega: pasa el único equipo que tiene.
-        final ganadorId = partido.esBye
-            ? (partido.equipoLocalId.isNotEmpty
-                  ? partido.equipoLocalId
-                  : partido.equipoVisitanteId)
-            : (partido.resultadoRegistrado ? partido.ganadorId : null);
-
-        if (ganadorId == null || ganadorId.isEmpty) continue;
-
-        pasan[partido.llave!] = (
-          id: ganadorId,
-          nombre: ganadorId == partido.equipoLocalId
-              ? partido.equipoLocalNombre
-              : partido.equipoVisitanteNombre,
-        );
+        final pasa = partido.quienPasa;
+        if (pasa != null) pasan[partido.llave!] = pasa;
       }
 
       for (final partido in porRonda[ordenes[i + 1]]!) {

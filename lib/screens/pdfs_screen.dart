@@ -19,6 +19,7 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_section_header.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
+import '../utils/fechas.dart';
 
 class PdfsScreen extends StatefulWidget {
   final String campeonatoId;
@@ -100,12 +101,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
 
   String _fechaBoton(DateTime? fecha) {
     if (fecha == null) return 'Elegir fecha';
-
-    final dia = fecha.day.toString().padLeft(2, '0');
-    final mes = fecha.month.toString().padLeft(2, '0');
-    final anio = fecha.year.toString();
-
-    return '$dia/$mes/$anio';
+    return Fechas.dia(fecha);
   }
 
   Future<void> _pickDate({
@@ -457,14 +453,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
     final fecha = partido.fechaHora;
 
     if (fecha == null) return 'Sin fecha programada';
-
-    final dia = fecha.day.toString().padLeft(2, '0');
-    final mes = fecha.month.toString().padLeft(2, '0');
-    final anio = fecha.year;
-    final hora = fecha.hour.toString().padLeft(2, '0');
-    final minuto = fecha.minute.toString().padLeft(2, '0');
-
-    return '$dia/$mes/$anio $hora:$minuto';
+    return Fechas.diaYHora(fecha);
   }
 
   @override

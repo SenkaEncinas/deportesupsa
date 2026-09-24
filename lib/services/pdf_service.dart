@@ -9,6 +9,7 @@ import '../models/campeonato_model.dart';
 import '../models/equipo_model.dart';
 import '../models/jugador_model.dart';
 import '../models/partido_model.dart';
+import '../utils/fechas.dart';
 
 class PdfGolPartidoItem {
   final String jugadorNombre;
@@ -142,21 +143,12 @@ class PdfService {
 
   String _horaTexto(DateTime? fecha) {
     if (fecha == null) return '--:--';
-
-    final hora = fecha.hour.toString().padLeft(2, '0');
-    final minuto = fecha.minute.toString().padLeft(2, '0');
-
-    return '$hora:$minuto';
+    return Fechas.hora(fecha);
   }
 
   String _fechaCorta(DateTime? fecha) {
     if (fecha == null) return 'Sin fecha';
-
-    final dia = fecha.day.toString().padLeft(2, '0');
-    final mes = fecha.month.toString().padLeft(2, '0');
-    final anio = fecha.year.toString();
-
-    return '$dia/$mes/$anio';
+    return Fechas.dia(fecha);
   }
 
   /// Formato oración ("Miércoles 02 de septiembre"), el estilo que usa
@@ -244,8 +236,7 @@ class PdfService {
       final fecha = partido.fechaHora;
       if (fecha == null) continue;
 
-      final key =
-          '${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}';
+      final key = Fechas.clave(fecha);
 
       agrupados.putIfAbsent(key, () => []);
       agrupados[key]!.add(partido);
@@ -1186,8 +1177,7 @@ class PdfService {
       final fecha = item.partido.fechaHora;
       if (fecha == null) continue;
 
-      final key =
-          '${fecha.year}-${fecha.month.toString().padLeft(2, '0')}-${fecha.day.toString().padLeft(2, '0')}';
+      final key = Fechas.clave(fecha);
 
       agrupados.putIfAbsent(key, () => []);
       agrupados[key]!.add(item);

@@ -28,6 +28,7 @@ import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import 'reciclaje/stat_card.dart';
+import '../utils/mensajes.dart';
 
 /// Filtros disponibles para la lista de partidos del fixture.
 enum _FixtureFiltro { todos, sinProgramar, programados, manuales, automaticos }
@@ -76,10 +77,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) {
         setState(() {
@@ -158,10 +156,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) {
         setState(() {
@@ -215,10 +210,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) {
         setState(() {
@@ -268,10 +260,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
       AppSnackbars.success(context, 'Partido programado correctamente.');
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     }
   }
 

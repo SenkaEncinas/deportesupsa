@@ -10,6 +10,7 @@ import 'reciclaje/app_empty_state.dart';
 import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_text_styles.dart';
+import '../utils/fechas.dart';
 
 class HistorialJugadorScreen extends StatelessWidget {
   final String campeonatoId;
@@ -41,14 +42,7 @@ class HistorialJugadorScreen extends StatelessWidget {
 
   String _fechaTexto(DateTime? fecha) {
     if (fecha == null) return 'Sin fecha';
-
-    final dia = fecha.day.toString().padLeft(2, '0');
-    final mes = fecha.month.toString().padLeft(2, '0');
-    final anio = fecha.year;
-    final hora = fecha.hour.toString().padLeft(2, '0');
-    final minuto = fecha.minute.toString().padLeft(2, '0');
-
-    return '$dia/$mes/$anio $hora:$minuto';
+    return Fechas.diaYHora(fecha);
   }
 
   String _mapText(Map<String, dynamic> data) {

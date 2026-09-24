@@ -29,6 +29,7 @@ import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import 'reciclaje/stat_card.dart';
+import '../utils/mensajes.dart';
 
 class DetalleCampeonatoScreen extends StatefulWidget {
   final String campeonatoId;
@@ -77,10 +78,7 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) {
         setState(() {
@@ -115,10 +113,7 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) {
         setState(() {

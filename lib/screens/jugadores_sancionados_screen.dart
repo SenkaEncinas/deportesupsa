@@ -18,6 +18,7 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/stat_card.dart';
+import '../utils/fechas.dart';
 
 enum _FiltroSancion { todas, amarillas, rojas }
 
@@ -651,13 +652,7 @@ class _FilaOcasion extends StatelessWidget {
 
   String _fechaTexto(DateTime? fecha) {
     if (fecha == null) return 'Sin fecha';
-
-    final dia = fecha.day.toString().padLeft(2, '0');
-    final mes = fecha.month.toString().padLeft(2, '0');
-    final hora = fecha.hour.toString().padLeft(2, '0');
-    final minuto = fecha.minute.toString().padLeft(2, '0');
-
-    return '$dia/$mes/${fecha.year} · $hora:$minuto';
+    return Fechas.diaYHora(fecha, separador: ' · ');
   }
 
   @override

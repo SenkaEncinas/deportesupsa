@@ -23,6 +23,7 @@ import 'reciclaje/app_section_header.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
+import '../utils/mensajes.dart';
 
 /// Llaves de la fase eliminatoria, del lado del admin: se generan solas
 /// a partir de los clasificados (1° contra el último, 2° contra el
@@ -74,8 +75,7 @@ class _LlavesScreenState extends State<LlavesScreen> {
       setState(() => _loading = false);
       AppSnackbars.error(
         context,
-        'No se pudo leer la tabla para sembrar: '
-        '${e.toString().replaceAll('Exception:', '').trim()}',
+        'No se pudo leer la tabla para sembrar: ${mensajeDeError(e)}',
       );
       return;
     }
@@ -129,10 +129,7 @@ class _LlavesScreenState extends State<LlavesScreen> {
       AppSnackbars.success(context, 'Llaves generadas.');
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -167,10 +164,7 @@ class _LlavesScreenState extends State<LlavesScreen> {
       AppSnackbars.success(context, 'Cruce actualizado.');
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -200,10 +194,7 @@ class _LlavesScreenState extends State<LlavesScreen> {
       AppSnackbars.success(context, 'Cruce eliminado.');
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(
-        context,
-        e.toString().replaceAll('Exception:', '').trim(),
-      );
+      AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

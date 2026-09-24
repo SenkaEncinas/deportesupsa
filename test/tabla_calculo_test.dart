@@ -529,4 +529,68 @@ void main() {
       );
     });
   });
+
+  group('Tabla general de vóley varones', () {
+    // Los números reales de la tabla general. En pantalla salía Santa
+    // Ana arriba de Dios Es Amor y Cambridge arriba de Cristo Rey: esa
+    // vista tenía su propio ordenamiento, que desempataba por sets.
+
+    TablaPosicionModel fila(
+      String nombre,
+      String grupo,
+      int puntos, {
+      required int sf,
+      required int sc,
+      required int pf,
+      required int pc,
+    }) {
+      return TablaPosicionModel(
+        equipoId: nombre,
+        equipoNombre: nombre,
+        grupoId: grupo,
+        partidosJugados: 3,
+        partidosGanados: 0,
+        partidosEmpatados: 0,
+        partidosPerdidos: 0,
+        golesFavor: sf,
+        golesContra: sc,
+        diferenciaGoles: sf - sc,
+        puntos: puntos,
+        posicion: 0,
+        puntosFavor: pf,
+        puntosContra: pc,
+        diferenciaPuntos: pf - pc,
+      );
+    }
+
+    test('ordena por puntos y desempata por diferencia de puntos', () {
+      final tabla = [
+        fila('Juan Pablo II (M)', 'B', 6, sf: 6, sc: 0, pf: 153, pc: 109),
+        fila('Santa Ana', 'A', 6, sf: 6, sc: 1, pf: 166, pc: 133),
+        fila('Dios Es Amor', 'C', 6, sf: 4, sc: 0, pf: 100, pc: 60),
+        fila('Cambridge', 'B', 5, sf: 4, sc: 2, pf: 138, pc: 143),
+        fila('Cristo Rey', 'C', 5, sf: 2, sc: 2, pf: 81, pc: 75),
+        fila('Adventista', 'A', 4, sf: 4, sc: 4, pf: 162, pc: 121),
+        fila('Rene Moreno (M)', 'B', 4, sf: 2, sc: 4, pf: 135, pc: 104),
+        fila('Bautista', 'A', 4, sf: 2, sc: 5, pf: 117, pc: 150),
+        fila('Don Bosco B', 'A', 3, sf: 2, sc: 4, pf: 94, pc: 135),
+        fila('Santa Teresa', 'C', 3, sf: 0, sc: 4, pf: 54, pc: 100),
+        fila('Domingo Savio', 'B', 2, sf: 0, sc: 6, pf: 81, pc: 151),
+      ]..sort(TablaCalculo.comparar);
+
+      expect(tabla.map((f) => f.equipoNombre).toList(), [
+        'Juan Pablo II (M)', // 6 pts, dif 44
+        'Dios Es Amor', //      6 pts, dif 40  (antes quedaba 3.°)
+        'Santa Ana', //         6 pts, dif 33
+        'Cristo Rey', //        5 pts, dif 6   (antes quedaba 5.°)
+        'Cambridge', //         5 pts, dif -5
+        'Adventista', //        4 pts, dif 41
+        'Rene Moreno (M)', //   4 pts, dif 31
+        'Bautista', //          4 pts, dif -33
+        'Don Bosco B', //       3 pts, dif -41
+        'Santa Teresa', //      3 pts, dif -46
+        'Domingo Savio', //     2 pts, dif -70
+      ]);
+    });
+  });
 }

@@ -527,10 +527,8 @@ class PartidoService {
       if ((partido.grupoId ?? '') != (grupoIdFinal ?? '')) continue;
 
       final mismoCruce =
-          (partido.equipoLocalId == equipoLocal.id &&
-              partido.equipoVisitanteId == equipoVisitante.id) ||
-          (partido.equipoLocalId == equipoVisitante.id &&
-              partido.equipoVisitanteId == equipoLocal.id);
+          _clavePar(partido.equipoLocalId, partido.equipoVisitanteId) ==
+          _clavePar(equipoLocal.id, equipoVisitante.id);
 
       if (mismoCruce) {
         throw Exception(
@@ -583,11 +581,7 @@ class PartidoService {
   /// Partidos que forman la llave eliminatoria: los que no tienen grupo
   /// y no son partidos de privilegio (esos quedan fuera a propósito).
   List<PartidoModel> soloDeLlave(List<PartidoModel> partidos) {
-    return partidos
-        .where(
-          (p) => (p.grupoId == null || p.grupoId!.isEmpty) && !p.privilegio,
-        )
-        .toList();
+    return partidos.where((p) => p.esDeFaseFinal).toList();
   }
 
   /// Genera el **cuadro completo** de la fase eliminatoria: la primera
