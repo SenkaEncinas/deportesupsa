@@ -973,4 +973,76 @@ void main() {
       expect(octavo.esDeLlave, isTrue);
     });
   });
+
+  group('Cruce repetido', () {
+    // Caso real de vóley damas: Britanico y Don Bosco B jugaron en el
+    // Grupo D (jornada 1) y se vuelven a cruzar en la eliminatoria. El
+    // control de repetidos confundía ese partido de grupo con el cruce
+    // nuevo y no dejaba cargarlo.
+
+    test('dos equipos que ya jugaron en el grupo se pueden cruzar en la '
+        'fase final', () async {
+      final db = await _baseConCampeonato();
+
+      await db
+          .collection('campeonatos')
+          .doc(kCampeonato)
+          .collection('partidos')
+          .doc('de-grupo')
+          .set({
+            'jornada': 1,
+            'vuelta': 1,
+            'grupoId': 'Grupo D',
+            'equipoLocalId': _equipo(12).id,
+            'equipoLocalNombre': _equipo(12).nombre,
+            'equipoVisitanteId': _equipo(1).id,
+            'equipoVisitanteNombre': _equipo(1).nombre,
+            'estado': PartidoEstado.finalizado,
+            'resultadoRegistrado': true,
+            'golesLocal': 0,
+            'golesVisitante': 2,
+          });
+
+      await PartidoService(firestore: db).crearCruceManual(
+        campeonatoId: kCampeonato,
+        equipoLocal: _equipo(1),
+        equipoVisitante: _equipo(12),
+        idaYVuelta: false,
+      );
+
+      final partidos = await _partidos(db);
+
+      expect(partidos.length, 2, reason: 'el de grupo y el de fase final');
+      expect(
+        partidos.where((p) => p.grupoId == null || p.grupoId!.isEmpty).length,
+        1,
+      );
+    });
+
+    test(
+      'dentro de la fase final, el mismo cruce sigue rechazándose',
+      () async {
+        final db = await _baseConCampeonato();
+        final servicio = PartidoService(firestore: db);
+
+        await servicio.crearCruceManual(
+          campeonatoId: kCampeonato,
+          equipoLocal: _equipo(1),
+          equipoVisitante: _equipo(12),
+          idaYVuelta: false,
+        );
+
+        expect(
+          () => servicio.crearCruceManual(
+            campeonatoId: kCampeonato,
+            equipoLocal: _equipo(12),
+            equipoVisitante: _equipo(1),
+            idaYVuelta: false,
+          ),
+          throwsA(isA<Exception>()),
+          reason: 'mismo par, mismo lado: es un repetido de verdad',
+        );
+      },
+    );
+  });
 }

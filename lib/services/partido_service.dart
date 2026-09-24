@@ -519,6 +519,13 @@ class PartidoService {
     for (final doc in existentesSnap.docs) {
       final partido = PartidoModel.fromMap(doc.id, doc.data());
 
+      // Solo cuenta como repetido dentro del mismo lado: un partido de la
+      // fase de grupos no puede bloquear un cruce de fase final, aunque
+      // caigan en la misma jornada y sean los mismos dos equipos. Pasa
+      // seguido: dos equipos del mismo grupo que se vuelven a cruzar en
+      // la eliminatoria.
+      if ((partido.grupoId ?? '') != (grupoIdFinal ?? '')) continue;
+
       final mismoCruce =
           (partido.equipoLocalId == equipoLocal.id &&
               partido.equipoVisitanteId == equipoVisitante.id) ||
