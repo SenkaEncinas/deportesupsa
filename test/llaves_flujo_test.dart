@@ -856,4 +856,121 @@ void main() {
       );
     });
   });
+
+  group('Botones de editar y borrar', () {
+    Future<(FakeFirebaseFirestore, PartidoModel)> conCruceSuelto() async {
+      final db = await _baseConCampeonato();
+
+      await PartidoService(firestore: db).crearCruceManual(
+        campeonatoId: kCampeonato,
+        equipoLocal: _equipo(1),
+        equipoVisitante: _equipo(2),
+        idaYVuelta: false,
+      );
+
+      return (db, (await _partidos(db)).single);
+    }
+
+    test('un cruce suelto se puede borrar', () async {
+      final (db, cruce) = await conCruceSuelto();
+
+      await PartidoService(
+        firestore: db,
+      ).eliminarPartido(campeonatoId: kCampeonato, partidoId: cruce.id);
+
+      expect((await _partidos(db)).isEmpty, isTrue);
+    });
+
+    test('borrado y vuelto a crear: no dice que ya existe', () async {
+      final (db, cruce) = await conCruceSuelto();
+      final servicio = PartidoService(firestore: db);
+
+      await servicio.eliminarPartido(
+        campeonatoId: kCampeonato,
+        partidoId: cruce.id,
+      );
+
+      // Es lo que no podían hacer: borrar el equivocado y volver a
+      // cargarlo bien.
+      await servicio.crearCruceManual(
+        campeonatoId: kCampeonato,
+        equipoLocal: _equipo(1),
+        equipoVisitante: _equipo(2),
+        idaYVuelta: false,
+      );
+
+      expect((await _partidos(db)).length, 1);
+    });
+
+    test('crear el mismo cruce dos veces sí se rechaza', () async {
+      final (db, _) = await conCruceSuelto();
+
+      expect(
+        () => PartidoService(firestore: db).crearCruceManual(
+          campeonatoId: kCampeonato,
+          equipoLocal: _equipo(1),
+          equipoVisitante: _equipo(2),
+          idaYVuelta: false,
+        ),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('un cruce suelto se puede editar', () async {
+      final (db, cruce) = await conCruceSuelto();
+
+      await PartidoService(firestore: db).cambiarEquiposPartido(
+        campeonatoId: kCampeonato,
+        partidoId: cruce.id,
+        local: _equipo(3),
+        visitante: _equipo(4),
+      );
+
+      final despues = (await _partidos(db)).single;
+
+      expect(despues.id, cruce.id);
+      expect(despues.equipoLocalNombre, 'Equipo 3');
+      expect(despues.equipoVisitanteNombre, 'Equipo 4');
+    });
+
+    test('con resultado cargado no se borra ni se edita', () async {
+      final (db, cruce) = await conCruceSuelto();
+      final servicio = PartidoService(firestore: db);
+
+      await _ganaLocal(ResultadoService(firestore: db), cruce);
+
+      expect(
+        () => servicio.eliminarPartido(
+          campeonatoId: kCampeonato,
+          partidoId: cruce.id,
+        ),
+        throwsA(isA<Exception>()),
+      );
+      expect(
+        () => servicio.cambiarEquiposPartido(
+          campeonatoId: kCampeonato,
+          partidoId: cruce.id,
+          local: _equipo(3),
+          visitante: _equipo(4),
+        ),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('un cruce del cuadro no se borra suelto', () async {
+      final db = await _baseConCampeonato();
+      final servicio = PartidoService(firestore: db);
+
+      await servicio.generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: _clasificados(16),
+      );
+
+      final octavo = _llave(await _partidos(db), RondaLlave.octavos, 1);
+
+      // Se puede borrar desde el servicio, pero la pantalla lo bloquea:
+      // forma parte del cuadro y se rehace con "Regenerar llaves".
+      expect(octavo.esDeLlave, isTrue);
+    });
+  });
 }
