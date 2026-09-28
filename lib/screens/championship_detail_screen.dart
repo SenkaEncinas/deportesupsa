@@ -186,9 +186,9 @@ class _ChampionshipContent extends StatelessWidget {
           )
         else
           _TableSection(service: service, campeonato: campeonato),
-        // Al final de la página y colapsada por defecto (ver
-        // AppClasificadosCard): es información de referencia, no hace
-        // falta que compita por atención con la tabla y el fixture.
+        // Desplegada, debajo de la tabla: muestra en vivo quién va
+        // clasificando y en qué puesto de siembra, para que nadie tenga
+        // que deducirlo de la tabla general.
         if (campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion) ...[
           const SizedBox(height: 24),
           _ClasificadosSection(service: service, campeonato: campeonato),
@@ -221,6 +221,14 @@ class _ContenidoEliminatoria extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _FixtureSection(service: service, campeonato: campeonato),
+        // Justo debajo del cuadro: es lo que explica por qué cada equipo
+        // quedó en su llave (el 1° contra el último, el 2° contra el
+        // anteúltimo). Sin ella, la gente mira la tabla general y no
+        // entiende la siembra.
+        if (campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion) ...[
+          const SizedBox(height: 24),
+          _ClasificadosSection(service: service, campeonato: campeonato),
+        ],
         const SizedBox(height: 24),
         // La tabla de la fase de grupos se sigue mostrando: sirve para
         // ver cómo quedó cada grupo. Los partidos de la fase final no la
@@ -399,10 +407,23 @@ class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
                 ),
                 // La llave ocupa la sección entera: es lo que se
                 // viene a mirar y necesita todo el ancho para recorrerla.
-                _MobileSeccion.llaves => _FixtureSection(
-                  service: service,
-                  campeonato: campeonato,
-                  conEncabezado: false,
+                _MobileSeccion.llaves => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _FixtureSection(
+                      service: service,
+                      campeonato: campeonato,
+                      conEncabezado: false,
+                    ),
+                    if (campeonato.tipoCampeonato ==
+                        TipoCampeonato.gruposEliminacion) ...[
+                      const SizedBox(height: 20),
+                      _ClasificadosSection(
+                        service: service,
+                        campeonato: campeonato,
+                      ),
+                    ],
+                  ],
                 ),
                 _MobileSeccion.tabla => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,15 +439,9 @@ class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
                     ],
                   ],
                 ),
-                // colapsable:false en móvil: ya se llegó acá navegando
-                // desde el sidebar, así que no hace falta un toque extra
-                // para desplegarlo. El toggle +/- queda solo para
-                // escritorio, donde comparte una sola página larga con
-                // el resto del contenido.
                 _MobileSeccion.clasificados => _ClasificadosSection(
                   service: service,
                   campeonato: campeonato,
-                  colapsable: false,
                 ),
               },
               // El footer va fuera del padding lateral para que la
@@ -1123,19 +1138,18 @@ class _PartidosFaseFinalSection extends StatelessWidget {
   }
 }
 
-/// Quién clasifica de la fase de grupos a la fase final (directos por
-/// grupo + mejores terceros), calculado en vivo con los resultados
-/// actuales. Solo aplica al formato "grupos + eliminación".
+/// Quién clasifica a la fase final y en qué puesto de siembra: los 1ros
+/// de grupo, después los 2dos y al final los mejores terceros. Se
+/// calcula en vivo y solo aplica al formato "grupos + eliminación".
+///
+/// Va siempre desplegada. Estuvo colapsada al final de la página, y la
+/// gente se guiaba por la tabla general, que ordena solo por puntos y no
+/// dice en qué llave cae cada uno.
 class _ClasificadosSection extends StatelessWidget {
   final PublicHomeService service;
   final CampeonatoModel campeonato;
-  final bool colapsable;
 
-  const _ClasificadosSection({
-    required this.service,
-    required this.campeonato,
-    this.colapsable = true,
-  });
+  const _ClasificadosSection({required this.service, required this.campeonato});
 
   @override
   Widget build(BuildContext context) {
@@ -1158,7 +1172,7 @@ class _ClasificadosSection extends StatelessWidget {
         return AppClasificadosCard(
           clasificados: clasificados,
           totalEsperado: total,
-          colapsable: colapsable,
+          colapsable: false,
         );
       },
     );

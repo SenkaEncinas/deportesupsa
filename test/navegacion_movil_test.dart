@@ -74,11 +74,17 @@ void main() {
     await tester.tap(find.byIcon(Icons.menu_rounded));
     await tester.pumpAndSettle();
 
-    expect(find.text('Llaves eliminatorias'), findsWidgets);
-    expect(find.text('Resumen'), findsOneWidget);
-    expect(find.text('Tabla de posiciones'), findsOneWidget);
-    expect(find.text('Tabla por grupos'), findsOneWidget);
-    expect(find.text('Clasificados a la fase final'), findsOneWidget);
+    // Se busca dentro del menú: algunos de estos títulos también
+    // aparecen en la pantalla de atrás (la tabla de clasificados, por
+    // ejemplo, se muestra debajo del cuadro).
+    Finder enMenu(String texto) =>
+        find.descendant(of: find.byType(Drawer), matching: find.text(texto));
+
+    expect(enMenu('Llaves eliminatorias'), findsOneWidget);
+    expect(enMenu('Resumen'), findsOneWidget);
+    expect(enMenu('Tabla de posiciones'), findsOneWidget);
+    expect(enMenu('Tabla por grupos'), findsOneWidget);
+    expect(enMenu('Clasificados a la fase final'), findsOneWidget);
   });
 
   testWidgets('en fase de grupos el menú todavía no ofrece las llaves', (
@@ -103,5 +109,15 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('CopaUpsa Prepromo'), findsWidgets);
+  });
+
+  testWidgets('en eliminatoria se ve la tabla de clasificados debajo del '
+      'cuadro', (tester) async {
+    await _pumpMovil(tester, _campeonato(fase: FaseCampeonato.eliminatoria));
+
+    // Sin abrir el menú: tiene que estar a la vista en la sección de
+    // llaves, que es la que se abre por defecto.
+    expect(find.byType(Drawer), findsNothing);
+    expect(find.text('Clasificados a la fase final'), findsOneWidget);
   });
 }
