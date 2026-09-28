@@ -546,6 +546,19 @@ class _BracketMatchCard extends StatelessWidget {
 
   const _BracketMatchCard({required this.partido, required this.deporte});
 
+  /// Un cruce empatado que se definió por penales muestra la tanda
+  /// entre paréntesis ("3 (4)"): sin eso el cuadro público se leía como
+  /// un 3-3 sin explicar por qué avanzó uno de los dos.
+  String _marcadorConPenales(int? goles, int? penales) {
+    final base = '${goles ?? 0}';
+    if (!partido.definidoPorPenales ||
+        partido.penalesLocal == null ||
+        partido.penalesVisitante == null) {
+      return base;
+    }
+    return '$base ($penales)';
+  }
+
   @override
   Widget build(BuildContext context) {
     final jugado = partido.resultadoRegistrado;
@@ -607,7 +620,12 @@ class _BracketMatchCard extends StatelessWidget {
                     ],
                     _BracketTeamRow(
                       nombre: partido.equipoLocalNombre,
-                      marcador: jugado ? '${partido.golesLocal ?? 0}' : null,
+                      marcador: jugado
+                          ? _marcadorConPenales(
+                              partido.golesLocal,
+                              partido.penalesLocal,
+                            )
+                          : null,
                       ganador: ganaLocal,
                       pendiente: partido.equipoLocalId.isEmpty,
                     ),
@@ -615,7 +633,10 @@ class _BracketMatchCard extends StatelessWidget {
                     _BracketTeamRow(
                       nombre: partido.equipoVisitanteNombre,
                       marcador: jugado
-                          ? '${partido.golesVisitante ?? 0}'
+                          ? _marcadorConPenales(
+                              partido.golesVisitante,
+                              partido.penalesVisitante,
+                            )
                           : null,
                       ganador: ganaVisitante,
                       pendiente: partido.equipoVisitanteId.isEmpty,
