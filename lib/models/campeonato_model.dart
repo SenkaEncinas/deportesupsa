@@ -1,4 +1,5 @@
 import 'model_helpers.dart';
+import 'partido_model.dart';
 
 class CampeonatoEstado {
   static const String inscripcion = 'inscripcion';
@@ -469,6 +470,38 @@ class CampeonatoModel {
 
   /// Puntos de igualación de un equipo (0 si no tiene).
   int igualacionDe(String equipoId) => igualaciones[equipoId] ?? 0;
+
+  /// Si el partido tiene que terminar con un ganador. En fútbol eso
+  /// quiere decir que un empate se define por penales.
+  ///
+  /// La fase regular (grupos, liga) admite empate; la eliminatoria no,
+  /// porque alguien tiene que avanzar. Cuál es cuál depende del formato:
+  ///
+  /// - Grupos + eliminación: los de fase final, que son los que no
+  ///   tienen grupo (generados por el cuadro o cargados a mano).
+  /// - Liga + final / playoffs: la liga la arma el sistema y no tiene
+  ///   grupos, así que ahí la señal es otra: que sea del cuadro o que lo
+  ///   haya cargado el admin.
+  ///
+  /// Es la única definición: la usan el registro de resultados y el
+  /// formulario. Antes había una copia en cada lado, y el formulario
+  /// quedó sin reconocer los cruces del cuadro generado: no mostraba
+  /// los penales y no dejaba cerrar un empate.
+  bool requiereGanador(PartidoModel partido) {
+    if (!configuracion.permiteEmpate) return true;
+
+    switch (tipoCampeonato) {
+      case TipoCampeonato.eliminacionDirecta:
+        return true;
+      case TipoCampeonato.gruposEliminacion:
+        return partido.esDeFaseFinal;
+      case TipoCampeonato.ligaFinal:
+      case TipoCampeonato.ligaPlayoffs:
+        return partido.esDeLlave || !partido.generadoPorSistema;
+      default:
+        return false;
+    }
+  }
 
   bool get tieneIgualaciones =>
       igualaciones.values.any((puntos) => puntos != 0);

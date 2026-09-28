@@ -137,6 +137,7 @@ lado, se llaman; nunca se copian ni se reescriben:
 | Marcador de un walkover | `TablaCalculo.marcadorPorNoPresentarse()` |
 | ¿Tiene grupo? / ¿Es de fase final? | `PartidoModel.tieneGrupo` / `.esDeFaseFinal` |
 | ¿Quién ganó? / ¿Quién pasa? | `PartidoModel.ganoLocal`, `.nombreGanador`, `.quienPasa` |
+| ¿El partido necesita ganador? (penales) | `CampeonatoModel.requiereGanador()` |
 | Nombre de una ronda | `RondaLlave.nombre()` |
 | Formato de fechas | `Fechas` (`lib/utils/fechas.dart`) |
 | Texto de un error | `mensajeDeError()` (`lib/utils/mensajes.dart`) |

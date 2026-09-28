@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../models/campeonato_model.dart';
@@ -28,11 +29,16 @@ class ResultadoFormScreen extends StatefulWidget {
   /// pasarlo para evitar una lectura extra; si no, se carga aquí.
   final CampeonatoModel? campeonato;
 
+  /// Solo para los tests, que necesitan apuntar a un Firestore de
+  /// mentira. En la app queda en null y se usa el de siempre.
+  final FirebaseFirestore? firestore;
+
   const ResultadoFormScreen({
     super.key,
     required this.campeonatoId,
     required this.partido,
     this.campeonato,
+    this.firestore,
   });
 
   @override
@@ -42,10 +48,14 @@ class ResultadoFormScreen extends StatefulWidget {
 class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _authService = AuthService();
-  final _jugadorService = JugadorService();
-  final _campeonatoService = CampeonatoService();
-  final _resultadoService = ResultadoService();
+  // Se crean recién cuando se usan: la sesión de Firebase, por ejemplo,
+  // solo hace falta al guardar.
+  late final _authService = AuthService();
+  late final _jugadorService = JugadorService(firestore: widget.firestore);
+  late final _campeonatoService = CampeonatoService(
+    firestore: widget.firestore,
+  );
+  late final _resultadoService = ResultadoService(firestore: widget.firestore);
 
   final _golesLocalController = TextEditingController();
   final _golesVisitanteController = TextEditingController();
@@ -263,32 +273,18 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
   bool _esBasket(CampeonatoModel? campeonato) =>
       campeonato != null && campeonato.esBasket;
 
-  /// El formato exige ganador (sin empate) para fútbol/futsal. En
-  /// formatos de dos fases (grupos+eliminación, liga+final,
-  /// liga+playoffs), la fase de grupos/liga puede permitir empate pero
-  /// la fase final no: esos cruces siempre se crean manualmente (todavía
-  /// no hay generador automático de llaves), así que
-  /// `generadoPorSistema == false` identifica de forma confiable un
-  /// partido de fase final.
-  bool _futbolRequiereGanador(CampeonatoModel? campeonato) {
-    if (campeonato == null) return false;
+  /// Si este partido tiene que terminar con ganador (la regla vive en
+  /// el campeonato, ver `CampeonatoModel.requiereGanador`).
+  bool _requiereGanador(CampeonatoModel? campeonato) =>
+      campeonato != null && campeonato.requiereGanador(widget.partido);
 
-    final formatoDosFases =
-        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion ||
-        campeonato.tipoCampeonato == TipoCampeonato.ligaFinal ||
-        campeonato.tipoCampeonato == TipoCampeonato.ligaPlayoffs;
-
-    final esFaseFinal = formatoDosFases && !widget.partido.generadoPorSistema;
-
-    return !campeonato.configuracion.permiteEmpate ||
-        campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta ||
-        esFaseFinal;
-  }
-
+  /// Los penales aparecen ante cualquier empate de fútbol. En la
+  /// eliminatoria son obligatorios; en la fase regular los decide el
+  /// admin: los carga si el partido se definió así, o los deja vacíos y
+  /// queda empate.
   bool _mostrarPenales(CampeonatoModel? campeonato) {
     if (!_esFutbol(campeonato)) return false;
     if (_tipoResultado != TipoResultado.normal) return false;
-    if (!_futbolRequiereGanador(campeonato)) return false;
 
     final local = _golesLocalController.text.trim();
     final visitante = _golesVisitanteController.text.trim();
@@ -372,8 +368,18 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
         golesVisitante = _parseInt(_golesVisitanteController.text);
 
         if (_mostrarPenales(campeonato)) {
-          penalesLocal = _parseInt(_penalesLocalController.text);
-          penalesVisitante = _parseInt(_penalesVisitanteController.text);
+          // Un campo vacío quiere decir "no hubo penales", no cero: con
+          // penales opcionales, leerlo como 0 mandaría un 0 a 0 y el
+          // registro lo rechazaría por empatado.
+          penalesLocal = int.tryParse(_penalesLocalController.text.trim());
+          penalesVisitante = int.tryParse(
+            _penalesVisitanteController.text.trim(),
+          );
+
+          final cargoUno = (penalesLocal == null) != (penalesVisitante == null);
+          if (cargoUno) {
+            throw Exception('Completá los penales de los dos equipos.');
+          }
         }
       }
 
@@ -683,6 +689,7 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
                       if (_mostrarPenales(campeonato)) ...[
                         const SizedBox(height: 22),
                         _PenalesSection(
+                          obligatorio: _requiereGanador(campeonato),
                           localNombre: widget.partido.equipoLocalNombre,
                           visitanteNombre: widget.partido.equipoVisitanteNombre,
                           penalesLocalController: _penalesLocalController,
@@ -762,12 +769,16 @@ class _FormData {
 }
 
 class _PenalesSection extends StatelessWidget {
+  /// En la eliminatoria alguien tiene que avanzar: los penales hacen
+  /// falta. En la fase regular son opcionales.
+  final bool obligatorio;
   final String localNombre;
   final String visitanteNombre;
   final TextEditingController penalesLocalController;
   final TextEditingController penalesVisitanteController;
 
   const _PenalesSection({
+    required this.obligatorio,
     required this.localNombre,
     required this.visitanteNombre,
     required this.penalesLocalController,
@@ -796,7 +807,9 @@ class _PenalesSection extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Este formato no permite empate. Registra los penales para definir al ganador.',
+                  obligatorio
+                      ? 'Empate en un cruce eliminatorio: registrá los penales para definir quién avanza.'
+                      : 'Empate. Si se definió por penales, cargalos; si no, dejalos vacíos y queda empate.',
                   style: AppTextStyles.body.copyWith(
                     color: const Color(0xFF92600A),
                     fontWeight: FontWeight.w700,

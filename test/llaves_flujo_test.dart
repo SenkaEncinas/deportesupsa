@@ -13,6 +13,7 @@ import 'package:futsal/models/equipo_model.dart';
 import 'package:futsal/models/partido_model.dart';
 import 'package:futsal/services/campeonato_service.dart';
 import 'package:futsal/services/partido_service.dart';
+import 'package:futsal/services/public_home_service.dart';
 import 'package:futsal/services/resultado_service.dart';
 import 'package:futsal/utils/fixture_grouping.dart';
 import 'package:futsal/utils/llaves.dart';
@@ -1042,6 +1043,374 @@ void main() {
           throwsA(isA<Exception>()),
           reason: 'mismo par, mismo lado: es un repetido de verdad',
         );
+      },
+    );
+  });
+
+  group('Empate y penales', () {
+    /// Carga un 1-1, con penales si se pasan.
+    Future<void> empate(
+      ResultadoService resultados,
+      PartidoModel partido, {
+      int? penalesLocal,
+      int? penalesVisitante,
+    }) {
+      return resultados.registrarResultado(
+        campeonatoId: kCampeonato,
+        partidoId: partido.id,
+        golesLocal: 1,
+        golesVisitante: 1,
+        golesJugadores: [
+          GolJugadorInput(
+            equipoId: partido.equipoLocalId,
+            equipoNombre: partido.equipoLocalNombre,
+            jugadorId: 'j-local',
+            jugadorNombre: 'Jugador',
+            cantidad: 1,
+          ),
+          GolJugadorInput(
+            equipoId: partido.equipoVisitanteId,
+            equipoNombre: partido.equipoVisitanteNombre,
+            jugadorId: 'j-visita',
+            jugadorNombre: 'Jugador',
+            cantidad: 1,
+          ),
+        ],
+        penalesLocal: penalesLocal,
+        penalesVisitante: penalesVisitante,
+        usuarioId: 'admin',
+        usuarioNombre: 'Admin',
+      );
+    }
+
+    /// Un partido de la fase de grupos.
+    Future<PartidoModel> deGrupo(FakeFirebaseFirestore db) async {
+      await db
+          .collection('campeonatos')
+          .doc(kCampeonato)
+          .collection('partidos')
+          .doc('grupo-1')
+          .set({
+            'jornada': 1,
+            'vuelta': 1,
+            'grupoId': 'Grupo A',
+            'equipoLocalId': _equipo(1).id,
+            'equipoLocalNombre': _equipo(1).nombre,
+            'equipoVisitanteId': _equipo(2).id,
+            'equipoVisitanteNombre': _equipo(2).nombre,
+            'estado': PartidoEstado.programado,
+            'resultadoRegistrado': false,
+            'generadoPorSistema': true,
+          });
+      return (await _partidos(db)).firstWhere((p) => p.id == 'grupo-1');
+    }
+
+    test('un cruce del cuadro generado se define por penales', () async {
+      // El caso que no andaba: el formulario no reconocía los cruces del
+      // cuadro generado como eliminatorios y no mostraba los penales.
+      final db = await _baseConCampeonato();
+      final resultados = ResultadoService(firestore: db);
+
+      await PartidoService(firestore: db).generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: _clasificados(16),
+      );
+
+      final octavo = _llave(await _partidos(db), RondaLlave.octavos, 1);
+      await empate(resultados, octavo, penalesLocal: 3, penalesVisitante: 4);
+
+      final jugado = _llave(await _partidos(db), RondaLlave.octavos, 1);
+      expect(jugado.definidoPorPenales, isTrue);
+      expect(jugado.ganadorId, octavo.equipoVisitanteId);
+
+      // Y el que ganó por penales avanza.
+      final cuarto = _llave(await _partidos(db), RondaLlave.cuartos, 1);
+      expect(cuarto.equipoLocalNombre, octavo.equipoVisitanteNombre);
+    });
+
+    test('en la eliminatoria, un empate sin penales se rechaza', () async {
+      final db = await _baseConCampeonato();
+
+      await PartidoService(firestore: db).generarLlavesEliminatorias(
+        campeonatoId: kCampeonato,
+        clasificados: _clasificados(16),
+      );
+
+      final octavo = _llave(await _partidos(db), RondaLlave.octavos, 1);
+
+      expect(
+        () => empate(ResultadoService(firestore: db), octavo),
+        throwsA(isA<Exception>()),
+        reason: 'alguien tiene que avanzar',
+      );
+    });
+
+    test('en la fase de grupos, un empate sin penales es empate', () async {
+      final db = await _baseConCampeonato();
+      final partido = await deGrupo(db);
+
+      await empate(ResultadoService(firestore: db), partido);
+
+      final jugado = (await _partidos(
+        db,
+      )).firstWhere((p) => p.id == partido.id);
+      expect(jugado.empate, isTrue);
+      expect(jugado.definidoPorPenales, isFalse);
+    });
+
+    test('en la fase de grupos, el admin puede cargar penales', () async {
+      final db = await _baseConCampeonato();
+      final partido = await deGrupo(db);
+
+      await empate(
+        ResultadoService(firestore: db),
+        partido,
+        penalesLocal: 5,
+        penalesVisitante: 4,
+      );
+
+      final jugado = (await _partidos(
+        db,
+      )).firstWhere((p) => p.id == partido.id);
+      expect(jugado.definidoPorPenales, isTrue);
+      expect(jugado.ganadorId, partido.equipoLocalId);
+    });
+
+    test('los penales no cambian los puntos de la tabla de grupos', () async {
+      final db = await _baseConCampeonato();
+      final partido = await deGrupo(db);
+
+      await empate(
+        ResultadoService(firestore: db),
+        partido,
+        penalesLocal: 5,
+        penalesVisitante: 4,
+      );
+
+      final tabla = await PublicHomeService(
+        firestore: db,
+      ).streamTabla(kCampeonato).first;
+      final porId = {for (final fila in tabla) fila.equipoId: fila};
+
+      // 1-1 en el marcador: empate para los dos, un punto cada uno.
+      expect(porId[partido.equipoLocalId]!.puntos, 1);
+      expect(porId[partido.equipoVisitanteId]!.puntos, 1);
+    });
+  });
+
+  group('Quién necesita ganador', () {
+    PartidoModel partido(Map<String, dynamic> datos) {
+      return PartidoModel.fromMap('p', {
+        'equipoLocalId': 'a',
+        'equipoVisitanteId': 'b',
+        ...datos,
+      });
+    }
+
+    CampeonatoModel campeonato(String tipo, {bool permiteEmpate = true}) {
+      return CampeonatoModel.fromMap('c', {
+        'deporte': DeporteTipo.futbol,
+        'tipoCampeonato': tipo,
+        'configuracion': {'formato': tipo, 'permiteEmpate': permiteEmpate},
+      });
+    }
+
+    final grupos = campeonato(TipoCampeonato.gruposEliminacion);
+
+    test('grupos + eliminación: solo la fase final', () {
+      expect(
+        grupos.requiereGanador(
+          partido({'grupoId': 'Grupo A', 'generadoPorSistema': true}),
+        ),
+        isFalse,
+      );
+      expect(
+        grupos.requiereGanador(
+          partido({
+            'rondaLlave': 'octavos',
+            'llave': 1,
+            'generadoPorSistema': true,
+          }),
+        ),
+        isTrue,
+        reason: 'cruce del cuadro generado',
+      );
+      expect(
+        grupos.requiereGanador(partido({'generadoPorSistema': false})),
+        isTrue,
+        reason: 'cruce de fase final cargado a mano',
+      );
+    });
+
+    test('un cruce manual de la fase de grupos admite empate', () {
+      expect(
+        grupos.requiereGanador(
+          partido({'grupoId': 'Grupo A', 'generadoPorSistema': false}),
+        ),
+        isFalse,
+      );
+    });
+
+    test('un partido con privilegio admite empate', () {
+      expect(
+        grupos.requiereGanador(
+          partido({'privilegio': true, 'generadoPorSistema': false}),
+        ),
+        isFalse,
+      );
+    });
+
+    test('eliminación directa y formatos sin empate: siempre', () {
+      expect(
+        campeonato(
+          TipoCampeonato.eliminacionDirecta,
+        ).requiereGanador(partido({'grupoId': 'Grupo A'})),
+        isTrue,
+      );
+      expect(
+        campeonato(
+          TipoCampeonato.soloIda,
+          permiteEmpate: false,
+        ).requiereGanador(partido({})),
+        isTrue,
+      );
+    });
+  });
+
+  group('La tabla no se toca en la eliminatoria', () {
+    // Una vez activada la fase eliminatoria, los partidos sirven para
+    // avanzar en el cuadro, no para sumar puntos: la tabla de la fase
+    // de grupos tiene que quedar exactamente como estaba.
+
+    /// Carga la fase de grupos: el 1 le gana al 2, 3-0.
+    Future<FakeFirebaseFirestore> conGruposJugados() async {
+      final db = await _baseConCampeonato();
+
+      await db
+          .collection('campeonatos')
+          .doc(kCampeonato)
+          .collection('partidos')
+          .doc('grupo-1')
+          .set({
+            'jornada': 1,
+            'vuelta': 1,
+            'grupoId': 'Grupo A',
+            'equipoLocalId': _equipo(1).id,
+            'equipoLocalNombre': _equipo(1).nombre,
+            'equipoVisitanteId': _equipo(2).id,
+            'equipoVisitanteNombre': _equipo(2).nombre,
+            'estado': PartidoEstado.finalizado,
+            'resultadoRegistrado': true,
+            'golesLocal': 3,
+            'golesVisitante': 0,
+            'ganadorId': _equipo(1).id,
+            'generadoPorSistema': true,
+          });
+
+      return db;
+    }
+
+    Future<Map<String, String>> fotoDeLaTabla(FakeFirebaseFirestore db) async {
+      final tabla = await PublicHomeService(
+        firestore: db,
+      ).streamTabla(kCampeonato).first;
+
+      return {
+        for (final fila in tabla)
+          fila.equipoId:
+              'pts=${fila.puntos} pj=${fila.partidosJugados} '
+              'pg=${fila.partidosGanados} pe=${fila.partidosEmpatados} '
+              'pp=${fila.partidosPerdidos} gf=${fila.golesFavor} '
+              'gc=${fila.golesContra} pos=${fila.posicion}',
+      };
+    }
+
+    test(
+      'jugar la eliminatoria, con penales y sin, no mueve la tabla',
+      () async {
+        final db = await conGruposJugados();
+        final resultados = ResultadoService(firestore: db);
+
+        final antes = await fotoDeLaTabla(db);
+
+        await PartidoService(firestore: db).generarLlavesEliminatorias(
+          campeonatoId: kCampeonato,
+          clasificados: _clasificados(16),
+        );
+
+        // Un octavo ganado en el tiempo...
+        await _ganaLocal(
+          resultados,
+          _llave(await _partidos(db), RondaLlave.octavos, 1),
+        );
+
+        // ...y otro empatado y definido por penales.
+        final octavo2 = _llave(await _partidos(db), RondaLlave.octavos, 2);
+        await resultados.registrarResultado(
+          campeonatoId: kCampeonato,
+          partidoId: octavo2.id,
+          golesLocal: 2,
+          golesVisitante: 2,
+          golesJugadores: [
+            GolJugadorInput(
+              equipoId: octavo2.equipoLocalId,
+              equipoNombre: octavo2.equipoLocalNombre,
+              jugadorId: 'j-local',
+              jugadorNombre: 'Jugador',
+              cantidad: 2,
+            ),
+            GolJugadorInput(
+              equipoId: octavo2.equipoVisitanteId,
+              equipoNombre: octavo2.equipoVisitanteNombre,
+              jugadorId: 'j-visita',
+              jugadorNombre: 'Jugador',
+              cantidad: 2,
+            ),
+          ],
+          penalesLocal: 4,
+          penalesVisitante: 5,
+          usuarioId: 'admin',
+          usuarioNombre: 'Admin',
+        );
+
+        expect(
+          await fotoDeLaTabla(db),
+          antes,
+          reason: 'la eliminatoria no suma ni resta nada en la tabla',
+        );
+
+        // Y los dos ganadores avanzaron.
+        final cuartos = (await _partidos(
+          db,
+        )).where((p) => p.rondaLlave == RondaLlave.cuartos).toList();
+        final yaDefinidos = cuartos
+            .expand((p) => [p.equipoLocalId, p.equipoVisitanteId])
+            .where((id) => id.isNotEmpty)
+            .toList();
+
+        expect(yaDefinidos, contains(_equipo(1).id));
+        expect(yaDefinidos, contains(octavo2.equipoVisitanteId));
+      },
+    );
+
+    test(
+      'un cruce cargado a mano en la eliminatoria tampoco la mueve',
+      () async {
+        final db = await conGruposJugados();
+        final antes = await fotoDeLaTabla(db);
+
+        final servicio = PartidoService(firestore: db);
+        await servicio.crearCruceManual(
+          campeonatoId: kCampeonato,
+          equipoLocal: _equipo(1),
+          equipoVisitante: _equipo(2),
+          idaYVuelta: false,
+        );
+
+        final cruce = (await _partidos(db)).firstWhere((p) => !p.tieneGrupo);
+        await _ganaLocal(ResultadoService(firestore: db), cruce);
+
+        expect(await fotoDeLaTabla(db), antes);
       },
     );
   });

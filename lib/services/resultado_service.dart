@@ -399,16 +399,19 @@ class ResultadoService {
           tipoDefinicion = TipoDefinicion.prorroga;
         }
       } else {
-        // ---- Fútbol/futsal: goles, con penales si no se permite empate. ----
-        final requiereGanador =
-            !campeonato.configuracion.permiteEmpate ||
-            campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta ||
-            _esFaseFinalSinEmpate(campeonato, partido);
+        // ---- Fútbol/futsal: goles, y penales si hubo empate. ----
+        //
+        // En la eliminatoria son obligatorios: alguien tiene que avanzar.
+        // En la fase regular los decide el admin: si los carga, quedan
+        // registrados y marcan al ganador, pero la tabla igual lo cuenta
+        // como empate (mira el marcador, no los penales).
+        final requiereGanador = campeonato.requiereGanador(partido);
+        final hayPenales = penalesLocal != null && penalesVisitante != null;
 
-        if (empate && requiereGanador) {
-          if (penalesLocal == null || penalesVisitante == null) {
+        if (empate && (requiereGanador || hayPenales)) {
+          if (!hayPenales) {
             throw Exception(
-              'Este formato no permite empates: registra los penales para definir un ganador.',
+              'Este partido necesita un ganador: registra los penales para definir quién avanza.',
             );
           }
 
@@ -529,25 +532,6 @@ class ResultadoService {
           '${partido.equipoVisitanteNombre}.',
       observacion: observacionResultado,
     );
-  }
-
-  /// En formatos de dos fases (grupos+eliminación, liga+final,
-  /// liga+playoffs) la fase de grupos/liga permite empate, pero la fase
-  /// final no: de un cruce eliminatorio tiene que salir un ganador.
-  ///
-  /// Un cruce generado por el cuadro se reconoce por su ronda de llave.
-  /// Los que se arman a mano no la tienen, y ahí sigue valiendo la
-  /// señal vieja: los de la fase de grupos los genera el sistema, los
-  /// de fase final los carga el admin con "cruce manual".
-  bool _esFaseFinalSinEmpate(CampeonatoModel campeonato, PartidoModel partido) {
-    final formatoDosFases =
-        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion ||
-        campeonato.tipoCampeonato == TipoCampeonato.ligaFinal ||
-        campeonato.tipoCampeonato == TipoCampeonato.ligaPlayoffs;
-
-    if (!formatoDosFases) return false;
-
-    return partido.esDeLlave || !partido.generadoPorSistema;
   }
 
   /// Lleva a los ganadores de cada ronda de la llave al cruce que les
