@@ -418,7 +418,7 @@ void main() {
       expect(ultima['b']!.puntos, 1);
 
       await sub.cancel();
-    });
+    }); 
 
     test('al cambiar una igualación, la tabla cambia sola', () async {
       final db = await base();
