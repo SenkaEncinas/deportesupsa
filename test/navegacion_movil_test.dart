@@ -111,13 +111,44 @@ void main() {
     expect(find.text('CopaUpsa Prepromo'), findsWidgets);
   });
 
-  testWidgets('en eliminatoria se ve la tabla de clasificados debajo del '
-      'cuadro', (tester) async {
+  testWidgets('en eliminatoria la pantalla principal no muestra los '
+      'clasificados', (tester) async {
     await _pumpMovil(tester, _campeonato(fase: FaseCampeonato.eliminatoria));
 
-    // Sin abrir el menú: tiene que estar a la vista en la sección de
-    // llaves, que es la que se abre por defecto.
+    // Los clasificados y la tabla se abren desde el menú: en la sección
+    // de llaves solo van el cuadro, los próximos partidos y los
+    // resultados.
     expect(find.byType(Drawer), findsNothing);
-    expect(find.text('Clasificados a la fase final'), findsOneWidget);
+    expect(find.text('Clasificados a la fase final'), findsNothing);
+    expect(find.text('Próximos partidos'), findsOneWidget);
+    expect(find.text('Últimos resultados'), findsOneWidget);
+  });
+
+  testWidgets('en escritorio la eliminatoria tiene barra lateral', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1440, 1000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChampionshipDetailScreen(
+          campeonato: _campeonato(fase: FaseCampeonato.eliminatoria),
+          service: PublicHomeService(firestore: FakeFirebaseFirestore()),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Arranca en las llaves, con la tabla y los clasificados en la barra.
+    expect(find.text('Próximos partidos'), findsOneWidget);
+    expect(find.text('Tabla por grupos'), findsOneWidget);
+
+    await tester.tap(find.text('Clasificados a la fase final'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Próximos partidos'), findsNothing);
   });
 }
