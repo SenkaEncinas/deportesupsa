@@ -91,34 +91,49 @@ class PublicHomeService {
         });
   }
 
-  /// Partidos programados que faltan jugar esta semana: desde ahora
-  /// hasta el próximo lunes 00:00 (fin de la semana en curso). Antes
-  /// mostraba simplemente "los próximos 5", sin importar si eran de
-  /// dentro de un mes; el usuario pidió que sea la agenda de la semana.
+  /// Rango de fechas de "Próximos partidos": desde el comienzo de hoy
+  /// hasta el final de la semana que viene (semanas de lunes a domingo).
+  ///
+  /// Antes la semana se cortaba el sábado a las 14:00, y los partidos
+  /// del sábado a la tarde no aparecían hasta que pasaba ese corte. Ahora
+  /// se ve todo lo programado de esta semana y de la siguiente. No más
+  /// allá: cuando el profe programa el campeonato entero de una, la lista
+  /// no se llena con partidos de dentro de un mes.
+  ///
+  /// [corteSemana] separa "esta semana" de "la semana que viene"; la
+  /// pantalla lo usa para mostrar primero los de esta semana.
+  static ({DateTime desde, DateTime corteSemana, DateTime hasta}) rangoProximos(
+    DateTime ahora,
+  ) {
+    final hoy = DateTime(ahora.year, ahora.month, ahora.day);
+    // Se arma con DateTime(...) y no sumando Duration: así un cambio de
+    // horario no corre el lunes a las 23:00 del domingo.
+    final lunes = DateTime(hoy.year, hoy.month, hoy.day - (hoy.weekday - 1));
+
+    return (
+      desde: hoy,
+      corteSemana: DateTime(lunes.year, lunes.month, lunes.day + 7),
+      hasta: DateTime(lunes.year, lunes.month, lunes.day + 14),
+    );
+  }
+
+  /// Partidos programados de esta semana y la siguiente, por fecha (ver
+  /// [rangoProximos]). Arranca a principio del día y no "desde ahora"
+  /// para que el partido de hoy siga a la vista mientras se juega: sale
+  /// de la lista cuando se carga su resultado y deja de estar
+  /// programado.
   Stream<List<PartidoModel>> streamProximosPartidos(String campeonatoId) {
-    final ahora = DateTime.now();
-
-    // La "semana" pública termina el sábado a las 14:00: hasta esa hora
-    // se muestran los partidos de esta semana, y pasadas las 14:00 ya se
-    // muestran los de la semana siguiente (hasta el próximo sábado 14:00).
-    final diasHastaSabado = (DateTime.saturday - ahora.weekday) % 7;
-    var finSemana = DateTime(
-      ahora.year,
-      ahora.month,
-      ahora.day,
-      14,
-    ).add(Duration(days: diasHastaSabado));
-
-    if (ahora.isAfter(finSemana)) {
-      finSemana = finSemana.add(const Duration(days: 7));
-    }
+    final rango = rangoProximos(DateTime.now());
 
     return _campeonatos
         .doc(campeonatoId)
         .collection('partidos')
         .where('estado', isEqualTo: PartidoEstado.programado)
-        .where('fechaHora', isGreaterThanOrEqualTo: Timestamp.fromDate(ahora))
-        .where('fechaHora', isLessThan: Timestamp.fromDate(finSemana))
+        .where(
+          'fechaHora',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(rango.desde),
+        )
+        .where('fechaHora', isLessThan: Timestamp.fromDate(rango.hasta))
         .orderBy('fechaHora')
         .snapshots()
         .map((snap) {

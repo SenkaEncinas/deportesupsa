@@ -978,12 +978,24 @@ class _NextMatchesSection extends StatelessWidget {
         builder: (context, snapshot) {
           final partidos = snapshot.data ?? [];
 
+          // Los de esta semana van primero, que son los que importan;
+          // los de la semana que viene quedan debajo, en su propio bloque.
+          final corte = PublicHomeService.rangoProximos(
+            DateTime.now(),
+          ).corteSemana;
+          final estaSemana = partidos
+              .where((p) => p.fechaHora != null && p.fechaHora!.isBefore(corte))
+              .toList();
+          final proximaSemana = partidos
+              .where((p) => !estaSemana.contains(p))
+              .toList();
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const AppSectionHeader(
                 title: 'Próximos partidos',
-                subtitle: 'Programación oficial del campeonato.',
+                subtitle: 'Programación de esta semana y la siguiente.',
               ),
               const SizedBox(height: 16),
               if (snapshot.connectionState == ConnectionState.waiting)
@@ -991,27 +1003,111 @@ class _NextMatchesSection extends StatelessWidget {
               else if (partidos.isEmpty)
                 const AppInlineEmptyState(
                   icon: Icons.event_busy_outlined,
-                  text: 'Todavía no hay partidos programados.',
+                  text: 'No hay partidos programados para estas dos semanas.',
                 )
-              else
-                ...List.generate(partidos.length, (index) {
-                  final partido = partidos[index];
-
-                  return Padding(
-                    padding: EdgeInsets.only(
-                      bottom: index < partidos.length - 1 ? 10 : 0,
-                    ),
-                    child: AppMatchCard(
-                      partido: partido,
-                      deporte: deporte,
-                      showResult: partido.resultadoRegistrado,
-                    ),
-                  );
-                }),
+              else ...[
+                _BloqueSemana(
+                  titulo: 'ESTA SEMANA',
+                  partidos: estaSemana,
+                  deporte: deporte,
+                  vacio: 'No quedan partidos esta semana.',
+                ),
+                if (proximaSemana.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  _BloqueSemana(
+                    titulo: 'SEMANA QUE VIENE',
+                    partidos: proximaSemana,
+                    deporte: deporte,
+                  ),
+                ],
+              ],
             ],
           );
         },
       ),
+    );
+  }
+}
+
+/// Un bloque de "Próximos partidos" ("Esta semana" o "Semana que
+/// viene"): una etiqueta chica con la cantidad y los partidos debajo.
+class _BloqueSemana extends StatelessWidget {
+  final String titulo;
+  final List<PartidoModel> partidos;
+  final String deporte;
+
+  /// Texto cuando el bloque no tiene partidos. Sin él, un bloque vacío
+  /// no se dibuja.
+  final String? vacio;
+
+  const _BloqueSemana({
+    required this.titulo,
+    required this.partidos,
+    required this.deporte,
+    this.vacio,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (partidos.isEmpty && vacio == null) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  titulo,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.small.copyWith(
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+              ),
+              if (partidos.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${partidos.length}',
+                    style: AppTextStyles.small.copyWith(
+                      color: AppColors.primaryDark,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (partidos.isEmpty)
+          Text(
+            vacio!,
+            style: AppTextStyles.small.copyWith(color: AppColors.textSecondary),
+          )
+        else
+          ...List.generate(partidos.length, (index) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: index < partidos.length - 1 ? 10 : 0,
+              ),
+              child: AppMatchCard(partido: partidos[index], deporte: deporte),
+            );
+          }),
+      ],
     );
   }
 }
