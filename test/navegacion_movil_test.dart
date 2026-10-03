@@ -115,13 +115,13 @@ void main() {
       'clasificados', (tester) async {
     await _pumpMovil(tester, _campeonato(fase: FaseCampeonato.eliminatoria));
 
-    // Los clasificados y la tabla se abren desde el menú: en la sección
-    // de llaves solo van el cuadro, los próximos partidos y los
-    // resultados.
+    // Los clasificados y la tabla se abren desde el menú. Tampoco van
+    // "Próximos partidos" ni "Últimos resultados": repetían los cruces
+    // que ya muestra la lista de partidos de fase final.
     expect(find.byType(Drawer), findsNothing);
     expect(find.text('Clasificados a la fase final'), findsNothing);
-    expect(find.text('Próximos partidos'), findsOneWidget);
-    expect(find.text('Últimos resultados'), findsOneWidget);
+    expect(find.text('Próximos partidos'), findsNothing);
+    expect(find.text('Últimos resultados'), findsNothing);
   });
 
   testWidgets('en escritorio la eliminatoria tiene barra lateral', (
@@ -142,13 +142,15 @@ void main() {
     await tester.pump();
 
     // Arranca en las llaves, con la tabla y los clasificados en la barra.
-    expect(find.text('Próximos partidos'), findsOneWidget);
+    expect(find.text('Llaves eliminatorias'), findsWidgets);
+    expect(find.text('Próximos partidos'), findsNothing);
     expect(find.text('Tabla por grupos'), findsOneWidget);
 
     await tester.tap(find.text('Clasificados a la fase final'));
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Próximos partidos'), findsNothing);
+    // El encabezado del cuadro ya no está: se cambió de sección.
+    expect(find.text('De la ronda inicial hasta la gran final.'), findsNothing);
   });
 }

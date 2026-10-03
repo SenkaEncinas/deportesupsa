@@ -199,10 +199,13 @@ class _ChampionshipContent extends StatelessWidget {
   }
 }
 
-/// Lo que se ve al entrar en fase eliminatoria: el cuadro, y debajo
-/// los próximos partidos y los últimos resultados. La tabla y los
-/// clasificados ya no van acá: se abren desde la barra lateral, para que
-/// la pantalla principal muestre solo lo que se juega ahora.
+/// Lo que se ve al entrar en fase eliminatoria: el cuadro y, debajo, la
+/// lista de partidos de fase final, que hace de fixture (los que faltan,
+/// con su fecha) y de resultados (los jugados, con su marcador). La
+/// tabla y los clasificados se abren desde la barra lateral.
+///
+/// "Próximos partidos" y "Últimos resultados" no van acá: repetían los
+/// mismos cruces que ya muestra esa lista, cada uno dos veces.
 ///
 /// La usan escritorio y móvil, así que lo que aparece en la pantalla
 /// principal es lo mismo en los dos.
@@ -221,28 +224,10 @@ class _PrincipalEliminatoria extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _FixtureSection(
-          service: service,
-          campeonato: campeonato,
-          conEncabezado: conEncabezado,
-        ),
-        const SizedBox(height: 24),
-        AppResponsivePair(
-          first: _NextMatchesSection(
-            service: service,
-            campeonatoId: campeonato.id,
-            deporte: campeonato.deporteEfectivo,
-          ),
-          second: _LastResultsSection(
-            service: service,
-            campeonatoId: campeonato.id,
-            deporte: campeonato.deporteEfectivo,
-          ),
-        ),
-      ],
+    return _FixtureSection(
+      service: service,
+      campeonato: campeonato,
+      conEncabezado: conEncabezado,
     );
   }
 }
@@ -503,8 +488,8 @@ class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
                   ],
                 ),
                 // El cuadro primero, que es lo que se viene a mirar, y
-                // debajo los próximos partidos y los resultados. La tabla
-                // y los clasificados se abren desde el menú.
+                // debajo el fixture con los resultados. La tabla y los
+                // clasificados se abren desde el menú.
                 _SeccionPublica.llaves => _PrincipalEliminatoria(
                   service: service,
                   campeonato: campeonato,
@@ -1240,7 +1225,7 @@ class _PartidosFaseFinalSection extends StatelessWidget {
       children: [
         const AppSectionHeader(
           title: 'Partidos de fase final',
-          subtitle: 'Cruces que se juegan antes de entrar al cuadro.',
+          subtitle: 'Fixture y resultados de los cruces de fase final.',
         ),
         const SizedBox(height: 16),
         ...ordenados.map(
