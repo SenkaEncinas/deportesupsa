@@ -6,6 +6,7 @@ import 'campeonato_form_screen.dart';
 import 'detalle_campeonato_screen.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_button.dart';
+import 'reciclaje/app_campeonato_admin_card.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_empty_state.dart';
@@ -17,9 +18,8 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_section_header.dart';
 import 'reciclaje/app_text_styles.dart';
-import 'reciclaje/championship_public_card.dart';
 import 'reciclaje/responsive.dart';
-import 'reciclaje/stat_card.dart';
+import '../utils/mensajes.dart';
 
 class CampeonatosScreen extends StatefulWidget {
   const CampeonatosScreen({super.key});
@@ -132,7 +132,7 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
                 return AppEmptyState(
                   icon: Icons.error_outline,
                   title: 'Error al cargar campeonatos',
-                  message: snapshot.error.toString(),
+                  message: mensajeDeError(snapshot.error!),
                 );
               }
 
@@ -146,7 +146,7 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
                       'Crea, revisa y administra campeonatos universitarios.',
                   actions: [
                     AppButton.secondary(
-                      text: isMobile ? 'Volver' : 'Volver',
+                      text: 'Volver',
                       icon: Icons.arrow_back_rounded,
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -175,13 +175,9 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
                             icon: Icons.emoji_events_outlined,
                           ),
                         ],
-                        side: _HeroActionBox(
-                          total: campeonatos.length,
-                          onCreate: _openForm,
-                        ),
                       ),
                       const SizedBox(height: 20),
-                      _CampeonatosStats(campeonatos: campeonatos),
+                      AppCampeonatosStats(campeonatos: campeonatos),
                       const SizedBox(height: 22),
                       _FiltersCard(
                         controller: _searchController,
@@ -228,9 +224,9 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
                           desktopColumns: 3,
                           spacing: 16,
                           children: filtered.map((campeonato) {
-                            return _CampeonatoAdminCard(
+                            return AppCampeonatoAdminCard(
                               campeonato: campeonato,
-                              onTap: () => _openDetalle(campeonato),
+                              onAdministrar: () => _openDetalle(campeonato),
                             );
                           }).toList(),
                         ),
@@ -243,149 +239,6 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Caja lateral del hero con el conteo de campeonatos y el botón de
-/// creación. AppHeroCard ya la ubica a ancho completo en móvil y a
-/// 300px fija junto al texto en desktop, así que no necesita conocer
-/// el breakpoint por sí misma.
-class _HeroActionBox extends StatelessWidget {
-  final int total;
-  final VoidCallback onCreate;
-
-  const _HeroActionBox({required this.total, required this.onCreate});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: Responsive.isMobile(context) ? double.infinity : 300,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppColors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.white.withValues(alpha: 0.18)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _HeroStatLine(
-            icon: Icons.emoji_events_outlined,
-            label: 'Campeonatos registrados',
-            value: '$total',
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'Crea un nuevo campeonato cuando inicie una nueva competencia universitaria.',
-            style: AppTextStyles.small.copyWith(
-              color: AppColors.white.withValues(alpha: 0.76),
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 16),
-          AppButton.secondary(
-            text: 'Nuevo campeonato',
-            icon: Icons.add_rounded,
-            expanded: true,
-            onPressed: onCreate,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroStatLine extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _HeroStatLine({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.white, size: 22),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            label,
-            style: AppTextStyles.body.copyWith(
-              color: AppColors.white.withValues(alpha: 0.80),
-            ),
-          ),
-        ),
-        Text(
-          value,
-          style: AppTextStyles.heading2.copyWith(
-            color: AppColors.white,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CampeonatosStats extends StatelessWidget {
-  final List<CampeonatoModel> campeonatos;
-
-  const _CampeonatosStats({required this.campeonatos});
-
-  @override
-  Widget build(BuildContext context) {
-    final activos = campeonatos
-        .where((item) => item.estado == CampeonatoEstado.activo)
-        .length;
-
-    final inscripcion = campeonatos
-        .where((item) => item.estado == CampeonatoEstado.inscripcion)
-        .length;
-
-    final finalizados = campeonatos
-        .where((item) => item.estado == CampeonatoEstado.finalizado)
-        .length;
-
-    return AppResponsiveGrid(
-      mobileColumns: 1,
-      tabletColumns: 2,
-      desktopColumns: 4,
-      children: [
-        StatCard(
-          title: 'Total',
-          value: '${campeonatos.length}',
-          icon: Icons.emoji_events_outlined,
-          subtitle: 'Campeonatos',
-          color: AppColors.primary,
-        ),
-        StatCard(
-          title: 'Activos',
-          value: '$activos',
-          icon: Icons.verified_outlined,
-          subtitle: 'En competencia',
-          color: AppColors.success,
-        ),
-        StatCard(
-          title: 'Inscripción',
-          value: '$inscripcion',
-          icon: Icons.how_to_reg_outlined,
-          subtitle: 'Recibiendo equipos',
-          color: AppColors.info,
-        ),
-        StatCard(
-          title: 'Finalizados',
-          value: '$finalizados',
-          icon: Icons.flag_outlined,
-          subtitle: 'Cerrados',
-          color: AppColors.secondary,
-        ),
-      ],
     );
   }
 }
@@ -461,144 +314,6 @@ class _FiltersCard extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _CampeonatoAdminCard extends StatelessWidget {
-  final CampeonatoModel campeonato;
-  final VoidCallback onTap;
-
-  const _CampeonatoAdminCard({required this.campeonato, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _SportIcon(modalidad: campeonato.modalidad),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  campeonato.nombre.trim().isEmpty
-                      ? 'Campeonato sin nombre'
-                      : campeonato.nombre,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.heading3,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              AppBadge(
-                text: ChampionshipPublicCard.estadoTexto(campeonato.estado),
-                type: ChampionshipPublicCard.badgeType(campeonato.estado),
-              ),
-              AppBadge(
-                text: ChampionshipPublicCard.formatLabel(campeonato.modalidad),
-                type: AppBadgeType.primary,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            campeonato.descripcion.trim().isEmpty
-                ? 'Sin descripción registrada.'
-                : campeonato.descripcion,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1),
-          const SizedBox(height: 14),
-          _InfoRow(
-            icon: Icons.calendar_today_outlined,
-            text: campeonato.temporada.trim().isEmpty
-                ? 'Temporada no definida'
-                : campeonato.temporada,
-          ),
-          const SizedBox(height: 8),
-          _InfoRow(
-            icon: Icons.account_tree_outlined,
-            text: ChampionshipPublicCard.formatLabel(campeonato.tipoCampeonato),
-          ),
-          const SizedBox(height: 8),
-          _InfoRow(
-            icon: Icons.place_outlined,
-            text: campeonato.cancha.trim().isEmpty
-                ? 'Cancha no definida'
-                : campeonato.cancha,
-          ),
-          const SizedBox(height: 16),
-          AppButton.primary(
-            text: 'Administrar campeonato',
-            icon: Icons.settings_outlined,
-            expanded: true,
-            onPressed: onTap,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SportIcon extends StatelessWidget {
-  final String modalidad;
-
-  const _SportIcon({required this.modalidad});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 46,
-      height: 46,
-      decoration: BoxDecoration(
-        color: AppColors.primaryLight,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Icon(
-        modalidad.toLowerCase().contains('fut')
-            ? Icons.sports_soccer
-            : Icons.emoji_events_outlined,
-        color: AppColors.primary,
-        size: 25,
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _InfoRow({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: AppColors.textMuted, size: 17),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.small.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ),
-      ],
     );
   }
 }

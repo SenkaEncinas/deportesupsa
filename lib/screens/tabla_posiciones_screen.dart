@@ -17,6 +17,8 @@ import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import '../utils/fechas.dart';
+import '../utils/mensajes.dart';
+import '../utils/etiquetas.dart';
 
 class TablaPosicionesScreen extends StatefulWidget {
   final String campeonatoId;
@@ -235,7 +237,7 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
             return AppEmptyState(
               icon: Icons.error_outline,
               title: 'Error al cargar historial',
-              message: snapshot.error.toString(),
+              message: mensajeDeError(snapshot.error!),
             );
           }
 
@@ -451,7 +453,7 @@ class _PartidoHistorialCard extends StatelessWidget {
                 icon: Icons.fact_check_outlined,
               ),
               AppBadge(
-                text: partido.estado,
+                text: Etiquetas.estadoPartido(partido.estado),
                 type: AppBadge.typeFromEstado(partido.estado),
                 icon: Icons.sports_soccer,
               ),

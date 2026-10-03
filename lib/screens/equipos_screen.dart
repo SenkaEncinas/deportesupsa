@@ -16,6 +16,8 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
+import '../utils/mensajes.dart';
+import '../utils/etiquetas.dart';
 
 class EquiposScreen extends StatefulWidget {
   final String campeonatoId;
@@ -83,7 +85,7 @@ class _EquiposScreenState extends State<EquiposScreen> {
                 return AppEmptyState(
                   icon: Icons.error_outline,
                   title: 'Error al cargar equipos',
-                  message: snapshot.error.toString(),
+                  message: mensajeDeError(snapshot.error!),
                 );
               }
 
@@ -220,7 +222,7 @@ class _EquiposGrid extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AppBadge(
-                text: equipo.estado,
+                text: Etiquetas.formatear(equipo.estado),
                 type: AppBadge.typeFromEstado(equipo.estado),
                 icon: Icons.verified_outlined,
               ),

@@ -20,6 +20,7 @@ import 'reciclaje/app_section_header.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/fechas.dart';
+import '../utils/mensajes.dart';
 
 class PdfsScreen extends StatefulWidget {
   final String campeonatoId;
@@ -470,7 +471,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
             return AppEmptyState(
               icon: Icons.error_outline,
               title: 'Error al cargar reportes',
-              message: snapshot.error.toString(),
+              message: mensajeDeError(snapshot.error!),
             );
           }
 

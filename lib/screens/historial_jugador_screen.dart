@@ -11,6 +11,8 @@ import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/fechas.dart';
+import '../utils/mensajes.dart';
+import '../utils/etiquetas.dart';
 
 class HistorialJugadorScreen extends StatelessWidget {
   final String campeonatoId;
@@ -69,7 +71,7 @@ class HistorialJugadorScreen extends StatelessWidget {
             return AppEmptyState(
               icon: Icons.error_outline,
               title: 'Error al cargar historial',
-              message: snapshot.error.toString(),
+              message: mensajeDeError(snapshot.error!),
             );
           }
 
@@ -104,7 +106,7 @@ class HistorialJugadorScreen extends StatelessWidget {
                                 Row(
                                   children: [
                                     AppBadge(
-                                      text: item.accion,
+                                      text: Etiquetas.accion(item.accion),
                                       type: AppBadgeType.info,
                                     ),
                                     const Spacer(),

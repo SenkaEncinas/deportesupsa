@@ -15,6 +15,8 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/fechas.dart';
+import '../utils/mensajes.dart';
+import '../utils/etiquetas.dart';
 
 class AuditoriaScreen extends StatefulWidget {
   final String campeonatoId;
@@ -99,7 +101,7 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
                 return AppEmptyState(
                   icon: Icons.error_outline,
                   title: 'Error al cargar auditoría',
-                  message: snapshot.error.toString(),
+                  message: mensajeDeError(snapshot.error!),
                 );
               }
 
@@ -168,7 +170,9 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
                                                 type: AppBadgeType.primary,
                                               ),
                                               AppBadge(
-                                                text: item.accion,
+                                                text: Etiquetas.accion(
+                                                  item.accion,
+                                                ),
                                                 type: AppBadgeType.info,
                                               ),
                                               Text(

@@ -140,7 +140,11 @@ lado, se llaman; nunca se copian ni se reescriben:
 | ¿El partido necesita ganador? (penales) | `CampeonatoModel.requiereGanador()` |
 | Nombre de una ronda | `RondaLlave.nombre()` |
 | Formato de fechas | `Fechas` (`lib/utils/fechas.dart`) |
-| Texto de un error | `mensajeDeError()` (`lib/utils/mensajes.dart`) |
+| Texto de un error (incluye los de Firebase) | `mensajeDeError()` (`lib/utils/mensajes.dart`) |
+| Texto de un estado, formato, modalidad o deporte | `Etiquetas` (`lib/utils/etiquetas.dart`) |
+| ¿Le falta el resultado? ¿Le falta la fecha? | `PartidoModel.faltaResultado`, `.faltaResultadoAl()`, `.faltaProgramar` |
+| Recuadro de ayuda | `AppInfoBox` (`lib/screens/reciclaje/app_info_box.dart`) |
+| Tarjeta y números de campeonatos del admin | `AppCampeonatoAdminCard`, `AppCampeonatosStats` |
 
 Por qué importa: la tabla general desempataba por sets mientras la del
 grupo desempataba por puntos, porque había **tres** copias del mismo

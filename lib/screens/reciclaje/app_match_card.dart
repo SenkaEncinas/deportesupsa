@@ -7,6 +7,7 @@ import 'app_colors.dart';
 import 'app_text_styles.dart';
 import 'responsive.dart';
 import '../../utils/fechas.dart';
+import '../../utils/etiquetas.dart';
 
 /// Ícono representativo de cada deporte, reutilizado en toda la app para
 /// que el mismo deporte siempre se vea con el mismo ícono.
@@ -92,7 +93,7 @@ class AppMatchCard extends StatelessWidget {
                     if (showResult && isAdministrative) ...[
                       const SizedBox(width: 10),
                       AppBadge(
-                        text: _formatLabel(partido.tipoResultado),
+                        text: Etiquetas.tipoResultado(partido.tipoResultado),
                         type: AppBadgeType.warning,
                       ),
                     ],
@@ -195,7 +196,7 @@ class _MobileMatchCard extends StatelessWidget {
         if (showResult && isAdministrative) ...[
           const SizedBox(height: 10),
           AppBadge(
-            text: _formatLabel(partido.tipoResultado),
+            text: Etiquetas.tipoResultado(partido.tipoResultado),
             type: AppBadgeType.warning,
           ),
         ],
@@ -472,21 +473,4 @@ String _fechaTexto(DateTime? fecha) {
 String _horaTexto(DateTime? fecha) {
   if (fecha == null) return '--:--';
   return Fechas.hora(fecha);
-}
-
-String _formatLabel(String value) {
-  final clean = value.trim();
-
-  if (clean.isEmpty) return 'No definido';
-
-  return clean
-      .replaceAll('_', ' ')
-      .split(' ')
-      .where((word) => word.trim().isNotEmpty)
-      .map((word) {
-        if (word.length == 1) return word.toUpperCase();
-
-        return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
-      })
-      .join(' ');
 }

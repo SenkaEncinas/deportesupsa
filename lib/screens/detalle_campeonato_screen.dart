@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../models/campeonato_model.dart';
+import '../models/equipo_model.dart';
+import '../models/partido_model.dart';
 import '../services/campeonato_service.dart';
+import '../services/equipo_service.dart';
+import '../services/partido_service.dart';
 import 'auditoria_screen.dart';
 import 'equipos_screen.dart';
 import 'fixture_screen.dart';
@@ -30,6 +34,11 @@ import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import 'reciclaje/stat_card.dart';
 import '../utils/mensajes.dart';
+import '../utils/etiquetas.dart';
+import '../utils/llaves.dart';
+import 'reciclaje/app_match_card.dart';
+import 'reciclaje/championship_public_card.dart';
+import 'reciclaje/app_info_box.dart';
 
 class DetalleCampeonatoScreen extends StatefulWidget {
   final String campeonatoId;
@@ -51,6 +60,11 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
   // reemplaza por el loading, perdiendo el foco del campo.
   late final Stream<CampeonatoModel?> _campeonatoStream = _service
       .streamCampeonato(widget.campeonatoId);
+
+  late final Stream<List<PartidoModel>> _partidosStream = PartidoService()
+      .streamPartidos(widget.campeonatoId);
+  late final Stream<List<EquipoModel>> _equiposStream = EquipoService()
+      .streamEquipos(widget.campeonatoId);
 
   bool _loadingEstado = false;
 
@@ -159,7 +173,7 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
                 return AppEmptyState(
                   icon: Icons.error_outline,
                   title: 'Error al cargar campeonato',
-                  message: snapshot.error.toString(),
+                  message: mensajeDeError(snapshot.error!),
                 );
               }
 
@@ -210,17 +224,21 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
                             : campeonato.descripcion,
                         badges: [
                           AppBadge(
-                            text: _estadoTexto(campeonato.estado),
-                            type: _estadoBadgeType(campeonato.estado),
+                            text: Etiquetas.estadoCampeonato(campeonato.estado),
+                            type: ChampionshipPublicCard.badgeType(
+                              campeonato.estado,
+                            ),
                             icon: Icons.verified_outlined,
                           ),
                           AppBadge(
-                            text: _modalidadTexto(campeonato.modalidad),
+                            text: Etiquetas.modalidad(campeonato.modalidad),
                             type: AppBadgeType.warning,
-                            icon: _deporteIcono(campeonato.deporteEfectivo),
+                            icon: deporteIcono(campeonato.deporteEfectivo),
                           ),
                           AppBadge(
-                            text: _tipoTexto(campeonato.tipoCampeonato),
+                            text: Etiquetas.tipoCampeonato(
+                              campeonato.tipoCampeonato,
+                            ),
                             type: AppBadgeType.primary,
                             icon: Icons.account_tree_outlined,
                           ),
@@ -232,9 +250,9 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
                             value: campeonato.temporada,
                           ),
                           AppHeroInfoItem(
-                            icon: _deporteIcono(campeonato.deporteEfectivo),
+                            icon: deporteIcono(campeonato.deporteEfectivo),
                             label: 'Modalidad',
-                            value: _modalidadTexto(campeonato.modalidad),
+                            value: Etiquetas.modalidad(campeonato.modalidad),
                           ),
                           AppHeroInfoItem(
                             icon: Icons.place_outlined,
@@ -244,9 +262,24 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
                           AppHeroInfoItem(
                             icon: Icons.flag_outlined,
                             label: 'Estado',
-                            value: _estadoTexto(campeonato.estado),
+                            value: Etiquetas.estadoCampeonato(
+                              campeonato.estado,
+                            ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 20),
+                      _PendientesCard(
+                        campeonato: campeonato,
+                        partidosStream: _partidosStream,
+                        equiposStream: _equiposStream,
+                        onEquipos: () =>
+                            _goTo(EquiposScreen(campeonatoId: campeonato.id)),
+                        onFixture: () =>
+                            _goTo(FixtureScreen(campeonatoId: campeonato.id)),
+                        onResultados: () => _goTo(
+                          ResultadosScreen(campeonatoId: campeonato.id),
+                        ),
                       ),
                       const SizedBox(height: 20),
                       _InfoStats(campeonato: campeonato),
@@ -300,6 +333,186 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
   }
 }
 
+/// Lo que falta hacer en el campeonato, con acceso directo al módulo
+/// donde se resuelve: partidos ya jugados sin resultado, partidos sin
+/// fecha, o que todavía no hay equipos. Antes la pantalla mostraba doce
+/// módulos iguales y había que entrar a cada uno para saber qué faltaba.
+class _PendientesCard extends StatelessWidget {
+  final CampeonatoModel campeonato;
+  final Stream<List<PartidoModel>> partidosStream;
+  final Stream<List<EquipoModel>> equiposStream;
+  final VoidCallback onEquipos;
+  final VoidCallback onFixture;
+  final VoidCallback onResultados;
+
+  const _PendientesCard({
+    required this.campeonato,
+    required this.partidosStream,
+    required this.equiposStream,
+    required this.onEquipos,
+    required this.onFixture,
+    required this.onResultados,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Un campeonato cerrado no tiene nada pendiente.
+    if (campeonato.estado == CampeonatoEstado.finalizado) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<List<EquipoModel>>(
+      stream: equiposStream,
+      builder: (context, equiposSnapshot) {
+        return StreamBuilder<List<PartidoModel>>(
+          stream: partidosStream,
+          builder: (context, partidosSnapshot) {
+            if (!equiposSnapshot.hasData || !partidosSnapshot.hasData) {
+              return const SizedBox.shrink();
+            }
+
+            final equipos = equiposSnapshot.data!;
+            final partidos = partidosSnapshot.data!;
+            final ahora = DateTime.now();
+
+            final atrasados = partidos
+                .where((p) => p.faltaResultadoAl(ahora))
+                .length;
+            final sinFecha = partidos.where((p) => p.faltaProgramar).length;
+
+            final items = <Widget>[
+              if (equipos.isEmpty)
+                _PendienteItem(
+                  icon: Icons.groups_2_outlined,
+                  texto: 'Todavía no hay equipos registrados.',
+                  accion: 'Ir a Equipos',
+                  onTap: onEquipos,
+                ),
+              if (campeonato.estado == CampeonatoEstado.activo && atrasados > 0)
+                _PendienteItem(
+                  icon: Icons.fact_check_outlined,
+                  texto: atrasados == 1
+                      ? '1 partido ya se jugó y no tiene resultado.'
+                      : '$atrasados partidos ya se jugaron y no tienen resultado.',
+                  accion: 'Cargar resultados',
+                  onTap: onResultados,
+                  urgente: true,
+                ),
+              if (sinFecha > 0)
+                _PendienteItem(
+                  icon: Icons.edit_calendar_outlined,
+                  texto: sinFecha == 1
+                      ? '1 partido no tiene fecha ni hora.'
+                      : '$sinFecha partidos no tienen fecha ni hora.',
+                  accion: 'Programar',
+                  onTap: onFixture,
+                ),
+            ];
+
+            return AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const AppSectionHeader(
+                    title: 'Pendientes',
+                    subtitle: 'Lo que falta hacer en este campeonato.',
+                  ),
+                  const SizedBox(height: 14),
+                  if (items.isEmpty)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.task_alt_rounded,
+                          color: AppColors.success,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            campeonato.estado == CampeonatoEstado.inscripcion
+                                ? '${equipos.length} equipos registrados. Cuando estén completos, activa el campeonato.'
+                                : 'Todo al día: no hay resultados atrasados ni partidos sin fecha.',
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    for (var i = 0; i < items.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 10),
+                      items[i],
+                    ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _PendienteItem extends StatelessWidget {
+  final IconData icon;
+  final String texto;
+  final String accion;
+  final VoidCallback onTap;
+
+  /// Algo que ya debería estar hecho (un resultado atrasado): se marca
+  /// en naranja para que se vea primero.
+  final bool urgente;
+
+  const _PendienteItem({
+    required this.icon,
+    required this.texto,
+    required this.accion,
+    required this.onTap,
+    this.urgente = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = urgente ? AppColors.warning : AppColors.primary;
+    final isMobile = Responsive.isMobile(context);
+
+    return Material(
+      color: urgente ? AppColors.warningLight : AppColors.surfaceSoft,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  texto,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (!isMobile)
+                Text(
+                  accion,
+                  style: AppTextStyles.button.copyWith(color: color),
+                ),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_forward_rounded, color: color, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _InfoStats extends StatelessWidget {
   final CampeonatoModel campeonato;
 
@@ -317,7 +530,7 @@ class _InfoStats extends StatelessWidget {
       children: [
         StatCard(
           title: 'Formato',
-          value: _shortTipoTexto(campeonato.tipoCampeonato),
+          value: Etiquetas.tipoCampeonatoCorto(campeonato.tipoCampeonato),
           icon: Icons.account_tree_outlined,
           subtitle: 'Competencia',
           color: AppColors.primary,
@@ -332,7 +545,7 @@ class _InfoStats extends StatelessWidget {
         StatCard(
           title: 'En cancha',
           value: '${config.cantidadJugadoresEnCancha}',
-          icon: Icons.sports_soccer,
+          icon: deporteIcono(campeonato.deporteEfectivo),
           subtitle: 'Jugadores',
           color: AppColors.info,
         ),
@@ -423,9 +636,7 @@ class _ModulesGrid extends StatelessWidget {
       ),
       _ModuleItem(
         title: 'Resultados',
-        description: campeonato.estado == CampeonatoEstado.inscripcion
-            ? 'Disponible cuando el campeonato esté activo.'
-            : 'Registrar marcador final, tipo de resultado y goles.',
+        description: 'Registrar marcador final, tipo de resultado y goles.',
         icon: Icons.fact_check_outlined,
         enabled: campeonato.estado != CampeonatoEstado.inscripcion,
         tag: 'Competencia',
@@ -497,23 +708,47 @@ class _ModulesGrid extends StatelessWidget {
       ),
     ];
 
+    final enInscripcion = campeonato.estado == CampeonatoEstado.inscripcion;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const AppSectionHeader(
           title: 'Módulos del campeonato',
-          subtitle: 'Gestiona toda la información desde este campeonato.',
+          subtitle: 'Ordenados según la etapa del campeonato en que se usan.',
         ),
-        const SizedBox(height: 14),
-        AppResponsiveGrid(
-          mobileColumns: 1,
-          tabletColumns: 2,
-          desktopColumns: 4,
-          spacing: 16,
-          children: modules.map((module) {
-            return _ModuleCard(module: module);
-          }).toList(),
-        ),
+        if (enInscripcion) ...[
+          const SizedBox(height: 12),
+          const AppInfoBox(
+            icon: Icons.lock_outline_rounded,
+            text:
+                'Resultados, llaves e igualación se habilitan cuando actives el campeonato.',
+          ),
+        ],
+        for (final (titulo, tags) in _secciones)
+          if (modules.any((m) => tags.contains(m.tag))) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 20, bottom: 10),
+              child: Text(
+                titulo.toUpperCase(),
+                style: AppTextStyles.small.copyWith(
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.1,
+                ),
+              ),
+            ),
+            AppResponsiveGrid(
+              mobileColumns: 1,
+              tabletColumns: 2,
+              desktopColumns: 4,
+              spacing: 16,
+              children: modules
+                  .where((m) => tags.contains(m.tag))
+                  .map((module) => _ModuleCard(module: module))
+                  .toList(),
+            ),
+          ],
       ],
     );
   }
@@ -620,7 +855,7 @@ class _FormatSummaryCard extends StatelessWidget {
       _ConfigItem(
         icon: Icons.account_tree_outlined,
         label: 'Tipo de campeonato',
-        value: _tipoTexto(campeonato.tipoCampeonato),
+        value: Etiquetas.tipoCampeonato(campeonato.tipoCampeonato),
       ),
       _ConfigItem(
         icon: Icons.table_chart_outlined,
@@ -695,9 +930,9 @@ class _FormatSummaryCard extends StatelessWidget {
             }).toList(),
           ),
           const SizedBox(height: 16),
-          _InfoBox(
+          AppInfoBox(
             icon: Icons.info_outline,
-            text: _descripcionFormato(campeonato.tipoCampeonato),
+            text: Etiquetas.descripcionFormato(campeonato.tipoCampeonato),
           ),
         ],
       ),
@@ -760,43 +995,6 @@ class _ConfigTile extends StatelessWidget {
   }
 }
 
-class _InfoBox extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _InfoBox({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.infoLight,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.info.withValues(alpha: 0.16)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppColors.info, size: 21),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.info,
-                fontWeight: FontWeight.w600,
-                height: 1.45,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ModuleItem {
   final String title;
   final String description;
@@ -815,6 +1013,15 @@ class _ModuleItem {
   });
 }
 
+/// Las etapas en que se agrupan los módulos, en el orden en que se usan.
+/// La [_ModuleItem.tag] de cada módulo dice a cuál pertenece.
+const _secciones = <(String titulo, List<String> tags)>[
+  ('Inscripción', ['Inscripción', 'Planillas']),
+  ('Competencia', ['Programación', 'Competencia']),
+  ('Consulta', ['Público']),
+  ('Control y documentos', ['Control', 'Documentos']),
+];
+
 class _ConfigItem {
   final IconData icon;
   final String label;
@@ -825,106 +1032,6 @@ class _ConfigItem {
     required this.label,
     required this.value,
   });
-}
-
-String _estadoTexto(String estado) {
-  switch (estado) {
-    case CampeonatoEstado.inscripcion:
-      return 'Inscripción';
-    case CampeonatoEstado.activo:
-      return 'Activo';
-    case CampeonatoEstado.finalizado:
-      return 'Finalizado';
-    default:
-      return _formatLabel(estado);
-  }
-}
-
-AppBadgeType _estadoBadgeType(String estado) {
-  switch (estado) {
-    case CampeonatoEstado.inscripcion:
-      return AppBadgeType.info;
-    case CampeonatoEstado.activo:
-      return AppBadgeType.success;
-    case CampeonatoEstado.finalizado:
-      return AppBadgeType.neutral;
-    default:
-      return AppBadge.typeFromEstado(estado);
-  }
-}
-
-String _tipoTexto(String tipo) {
-  switch (tipo) {
-    case TipoCampeonato.soloIda:
-      return 'Liga solo ida';
-    case TipoCampeonato.idaVuelta:
-      return 'Liga ida y vuelta';
-    case TipoCampeonato.eliminacionDirecta:
-      return 'Eliminación directa';
-    case TipoCampeonato.faseGrupos:
-      return 'Fase de grupos';
-    case TipoCampeonato.gruposEliminacion:
-      return 'Grupos + eliminación';
-    case TipoCampeonato.ligaFinal:
-      return 'Liga + final';
-    case TipoCampeonato.ligaPlayoffs:
-      return 'Liga + playoffs';
-    default:
-      return _formatLabel(tipo);
-  }
-}
-
-String _shortTipoTexto(String tipo) {
-  switch (tipo) {
-    case TipoCampeonato.soloIda:
-      return 'Solo ida';
-    case TipoCampeonato.idaVuelta:
-      return 'Ida/vuelta';
-    case TipoCampeonato.eliminacionDirecta:
-      return 'Eliminación';
-    case TipoCampeonato.faseGrupos:
-      return 'Grupos';
-    case TipoCampeonato.gruposEliminacion:
-      return 'Grupos + llaves';
-    case TipoCampeonato.ligaFinal:
-      return 'Liga + final';
-    case TipoCampeonato.ligaPlayoffs:
-      return 'Playoffs';
-    default:
-      return _formatLabel(tipo);
-  }
-}
-
-String _modalidadTexto(String modalidad) {
-  switch (modalidad) {
-    case ModalidadDeporte.futsal:
-      return 'Futsal';
-    case ModalidadDeporte.futbol7:
-      return 'Fútbol 7';
-    case ModalidadDeporte.futbol11:
-      return 'Fútbol 11';
-    case ModalidadDeporte.volleySala:
-      return 'Vóley sala';
-    case ModalidadDeporte.volleyMixto:
-      return 'Vóley mixto';
-    case ModalidadDeporte.basket5:
-      return 'Básquet 5';
-    case ModalidadDeporte.basket3x3:
-      return 'Básquet 3x3';
-    default:
-      return _formatLabel(modalidad);
-  }
-}
-
-IconData _deporteIcono(String deporte) {
-  switch (deporte) {
-    case DeporteTipo.volley:
-      return Icons.sports_volleyball_outlined;
-    case DeporteTipo.basket:
-      return Icons.sports_basketball_outlined;
-    default:
-      return Icons.sports_soccer;
-  }
 }
 
 String _vueltasSubtitle(CampeonatoModel campeonato) {
@@ -946,61 +1053,16 @@ String _vueltasSubtitle(CampeonatoModel campeonato) {
   return 'Formato liga';
 }
 
+/// La ronda inicial guardada en la configuración. Además de las rondas
+/// del cuadro puede valer "llaves" (se deduce de los clasificados) o
+/// "no_aplica"; el resto lo nombra [RondaLlave.nombre].
 String _rondaTexto(String ronda) {
   switch (ronda) {
-    case 'final':
-      return 'Final';
-    case 'semifinal':
-      return 'Semifinales';
-    case 'cuartos':
-      return 'Cuartos de final';
-    case 'octavos':
-      return 'Octavos de final';
-    case 'dieciseisavos':
-      return 'Dieciseisavos de final';
     case 'llaves':
       return 'Llaves eliminatorias';
     case 'no_aplica':
       return 'No aplica';
     default:
-      return _formatLabel(ronda);
+      return RondaLlave.nombre(ronda);
   }
-}
-
-String _descripcionFormato(String tipo) {
-  switch (tipo) {
-    case TipoCampeonato.soloIda:
-      return 'Todos los equipos juegan entre sí una sola vez. La tabla de posiciones define el orden final.';
-    case TipoCampeonato.idaVuelta:
-      return 'Todos los equipos juegan entre sí dos veces, invirtiendo la localía en la segunda vuelta.';
-    case TipoCampeonato.ligaFinal:
-      return 'Primero se juega una liga general. Luego los dos mejores disputan una final.';
-    case TipoCampeonato.ligaPlayoffs:
-      return 'Primero se juega una liga general. Luego los mejores clasifican a una fase final.';
-    case TipoCampeonato.faseGrupos:
-      return 'Los equipos se dividen en grupos. Cada grupo maneja su propia tabla de posiciones.';
-    case TipoCampeonato.gruposEliminacion:
-      return 'Primero se juega una fase de grupos. Luego los clasificados pasan a llaves eliminatorias.';
-    case TipoCampeonato.eliminacionDirecta:
-      return 'Los equipos juegan llaves eliminatorias. El perdedor queda fuera del campeonato.';
-    default:
-      return 'Formato personalizado guardado para este campeonato.';
-  }
-}
-
-String _formatLabel(String value) {
-  final clean = value.trim();
-
-  if (clean.isEmpty) return 'No definido';
-
-  return clean
-      .replaceAll('_', ' ')
-      .split(' ')
-      .where((word) => word.trim().isNotEmpty)
-      .map((word) {
-        if (word.length == 1) return word.toUpperCase();
-
-        return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
-      })
-      .join(' ');
 }

@@ -16,6 +16,8 @@ import 'package:futsal/models/partido_model.dart';
 import 'package:futsal/models/tabla_posicion_model.dart';
 import 'package:futsal/screens/reciclaje/app_badge.dart';
 import 'package:futsal/screens/reciclaje/app_bracket_view.dart';
+import 'package:futsal/screens/reciclaje/app_campeonato_admin_card.dart';
+import 'package:futsal/screens/reciclaje/app_info_box.dart';
 import 'package:futsal/screens/reciclaje/app_card.dart';
 import 'package:futsal/screens/reciclaje/app_hero_card.dart';
 import 'package:futsal/screens/reciclaje/app_match_card.dart';
@@ -427,6 +429,60 @@ void main() {
                 onTap: () {},
               );
             }),
+          ),
+        );
+
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+
+  group('AppCampeonatoAdminCard sin overflow', () {
+    for (final entry in _anchosReferencia.entries) {
+      testWidgets('en ${entry.key}', (tester) async {
+        await _pumpAt(
+          tester,
+          entry.value,
+          AppResponsiveGrid(
+            mobileColumns: 1,
+            tabletColumns: 2,
+            desktopColumns: 3,
+            children: [
+              AppCampeonatoAdminCard(
+                campeonato: _campeonatoDePrueba(),
+                onAdministrar: () {},
+                onVerPublico: () {},
+              ),
+              AppCampeonatoAdminCard(
+                campeonato: _campeonatoDePrueba(),
+                onAdministrar: () {},
+              ),
+            ],
+          ),
+        );
+
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+
+  group('AppCampeonatosStats y AppInfoBox sin overflow', () {
+    for (final entry in _anchosReferencia.entries) {
+      testWidgets('en ${entry.key}', (tester) async {
+        await _pumpAt(
+          tester,
+          entry.value,
+          Column(
+            children: [
+              AppCampeonatosStats(
+                campeonatos: [_campeonatoDePrueba(), _campeonatoDePrueba()],
+              ),
+              const AppInfoBox(
+                title: 'Formato',
+                text:
+                    'Primero se juega una fase de grupos. Luego los clasificados pasan a llaves eliminatorias.',
+              ),
+            ],
           ),
         );
 

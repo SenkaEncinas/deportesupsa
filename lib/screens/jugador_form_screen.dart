@@ -229,7 +229,7 @@ class _JugadorFormScreenState extends State<JugadorFormScreen> {
       AppSnackbars.success(context, 'Jugador eliminado correctamente.');
     } catch (e) {
       if (!mounted) return;
-      AppSnackbars.error(context, e.toString());
+      AppSnackbars.error(context, mensajeDeError(e));
     }
   }
 
@@ -624,7 +624,7 @@ class _JugadorFormScreenState extends State<JugadorFormScreen> {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text(snapshot.error.toString()));
+            return Center(child: Text(mensajeDeError(snapshot.error!)));
           }
 
           final data = snapshot.data!;

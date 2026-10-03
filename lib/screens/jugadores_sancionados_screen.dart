@@ -19,6 +19,7 @@ import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/stat_card.dart';
 import '../utils/fechas.dart';
+import '../utils/mensajes.dart';
 
 enum _FiltroSancion { todas, amarillas, rojas }
 
@@ -218,7 +219,7 @@ class _JugadoresSancionadosScreenState
                     return AppEmptyState(
                       icon: Icons.error_outline,
                       title: 'Error al cargar sanciones',
-                      message: snapshot.error.toString(),
+                      message: mensajeDeError(snapshot.error!),
                     );
                   }
 

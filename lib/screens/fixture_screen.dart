@@ -29,6 +29,8 @@ import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import 'reciclaje/stat_card.dart';
 import '../utils/mensajes.dart';
+import '../utils/etiquetas.dart';
+import 'reciclaje/app_info_box.dart';
 
 /// Filtros disponibles para la lista de partidos del fixture.
 enum _FixtureFiltro { todos, sinProgramar, programados, manuales, automaticos }
@@ -73,7 +75,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
       if (!mounted) return;
       AppSnackbars.success(
         context,
-        'Fixture generado respetando el formato "${_tipoTexto(campeonato.tipoCampeonato)}".',
+        'Fixture generado respetando el formato "${Etiquetas.tipoCampeonato(campeonato.tipoCampeonato)}".',
       );
     } catch (e) {
       if (!mounted) return;
@@ -354,7 +356,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
                 return AppEmptyState(
                   icon: Icons.error_outline,
                   title: 'Error al cargar fixture',
-                  message: snapshot.error.toString(),
+                  message: mensajeDeError(snapshot.error!),
                 );
               }
 
@@ -386,8 +388,8 @@ class _FixtureScreenState extends State<FixtureScreen> {
                   subtitle: campeonato == null
                       ? 'Cruces y programación de partidos.'
                       : campeonato.tieneFasesSeparadas
-                      ? '${campeonato.nombre} · ${_tipoTexto(campeonato.tipoCampeonato)} · ${campeonato.estaEnFaseDeGrupos ? 'Fase de grupos' : 'Fase eliminatoria'}'
-                      : '${campeonato.nombre} · ${_tipoTexto(campeonato.tipoCampeonato)}',
+                      ? '${campeonato.nombre} · ${Etiquetas.tipoCampeonato(campeonato.tipoCampeonato)} · ${campeonato.estaEnFaseDeGrupos ? 'Fase de grupos' : 'Fase eliminatoria'}'
+                      : '${campeonato.nombre} · ${Etiquetas.tipoCampeonato(campeonato.tipoCampeonato)}',
                   actions: [
                     AppButton.secondary(
                       text: 'Volver',
@@ -466,7 +468,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
                                   ? 'Puedes generar el fixture completo o agregar cruces manuales uno por uno.'
                                   : _usaGrupos(campeonato)
                                   ? 'Antes de generar el fixture, revisa "Grupos" para inscribir a cada equipo en su grupo. Si no lo haces, se repartirán automáticamente.'
-                                  : 'El botón "Generar fixture" creará los cruces según el formato "${_tipoTexto(campeonato.tipoCampeonato)}". También puedes agregar cruces manuales uno por uno.',
+                                  : 'El botón "Generar fixture" creará los cruces según el formato "${Etiquetas.tipoCampeonato(campeonato.tipoCampeonato)}". También puedes agregar cruces manuales uno por uno.',
                               buttonText: puedeEditarFixture
                                   ? 'Agregar cruce manual'
                                   : null,
@@ -568,7 +570,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
                             if (campeonato != null &&
                                 _esFormatoDosFases(campeonato)) ...[
                               const SizedBox(height: 16),
-                              _InfoBox(text: _mensajeDosFases(campeonato)),
+                              AppInfoBox(text: _mensajeDosFases(campeonato)),
                             ],
                             const SizedBox(height: 20),
                             if (filtrados.isEmpty)
@@ -682,7 +684,7 @@ class _FixturePartidoCard extends StatelessWidget {
       runSpacing: 8,
       children: [
         AppBadge(
-          text: _estadoTexto(partido.estado),
+          text: Etiquetas.estadoPartido(partido.estado),
           type: AppBadge.typeFromEstado(partido.estado),
         ),
         AppBadge(
@@ -735,42 +737,6 @@ class _FixturePartidoCard extends StatelessWidget {
               const SizedBox(width: 14),
               boton,
             ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoBox extends StatelessWidget {
-  final String text;
-
-  const _InfoBox({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.infoLight,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.info.withValues(alpha: 0.16)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline, color: AppColors.info, size: 21),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.info,
-                fontWeight: FontWeight.w600,
-                height: 1.45,
-              ),
-            ),
           ),
         ],
       ),
@@ -870,7 +836,7 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (widget.restringirAGrupo) ...[
-                _InfoBox(
+                AppInfoBox(
                   text: _privilegio
                       ? 'Privilegio activado: puedes cruzar equipos de cualquier grupo. El partido queda fuera de los grupos y no suma para la tabla.'
                       : 'Todavía es fase de grupos: solo puedes cruzar equipos del mismo grupo. Actíva "Privilegio" para un partido especial entre grupos distintos.',
@@ -1054,40 +1020,4 @@ class _CruceManualResult {
     this.grupoId,
     this.privilegio = false,
   });
-}
-
-String _tipoTexto(String tipo) {
-  switch (tipo) {
-    case TipoCampeonato.soloIda:
-      return 'Liga solo ida';
-    case TipoCampeonato.idaVuelta:
-      return 'Liga ida y vuelta';
-    case TipoCampeonato.eliminacionDirecta:
-      return 'Eliminación directa';
-    case TipoCampeonato.faseGrupos:
-      return 'Fase de grupos';
-    case TipoCampeonato.gruposEliminacion:
-      return 'Grupos + eliminación';
-    case TipoCampeonato.ligaFinal:
-      return 'Liga + final';
-    case TipoCampeonato.ligaPlayoffs:
-      return 'Liga + playoffs';
-    default:
-      return tipo.replaceAll('_', ' ');
-  }
-}
-
-String _estadoTexto(String estado) {
-  switch (estado) {
-    case PartidoEstado.pendienteProgramacion:
-      return 'Sin programar';
-    case PartidoEstado.programado:
-      return 'Programado';
-    case PartidoEstado.finalizado:
-      return 'Finalizado';
-    case PartidoEstado.suspendido:
-      return 'Suspendido';
-    default:
-      return estado.replaceAll('_', ' ');
-  }
 }

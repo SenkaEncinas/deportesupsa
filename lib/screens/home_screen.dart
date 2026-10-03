@@ -19,6 +19,7 @@ import 'reciclaje/app_section_header.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/championship_public_card.dart';
 import 'reciclaje/responsive.dart';
+import '../utils/mensajes.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -111,7 +112,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return AppEmptyState(
                   icon: Icons.error_outline,
                   title: 'No se pudo cargar la información',
-                  message: snapshot.error.toString(),
+                  message: mensajeDeError(snapshot.error!),
                 );
               }
 

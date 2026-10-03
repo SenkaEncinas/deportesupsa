@@ -318,6 +318,17 @@ class PartidoModel {
   /// no sea un pase directo.
   bool get admiteResultado => tieneEquiposDefinidos && !esBye;
 
+  /// Se puede jugar y todavía no tiene resultado cargado.
+  bool get faltaResultado => admiteResultado && !resultadoRegistrado;
+
+  /// Ya pasó su fecha y sigue sin resultado: es lo primero que el admin
+  /// tiene que ponerse al día.
+  bool faltaResultadoAl(DateTime ahora) =>
+      faltaResultado && fechaHora != null && fechaHora!.isBefore(ahora);
+
+  /// Se puede jugar pero todavía no tiene fecha y hora.
+  bool get faltaProgramar => admiteResultado && estaPendienteProgramacion;
+
   /// Es un cruce de la primera ronda del cuadro: sus equipos no salen de
   /// una llave anterior, así que se pueden cargar a mano aunque el cruce
   /// se haya creado vacío.

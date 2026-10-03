@@ -6,6 +6,7 @@ import 'app_card.dart';
 import 'app_colors.dart';
 import 'app_match_card.dart';
 import 'app_text_styles.dart';
+import '../../utils/etiquetas.dart';
 
 class ChampionshipPublicCard extends StatelessWidget {
   final CampeonatoModel campeonato;
@@ -47,11 +48,11 @@ class ChampionshipPublicCard extends StatelessWidget {
             runSpacing: 8,
             children: [
               AppBadge(
-                text: estadoTexto(campeonato.estado),
+                text: Etiquetas.estadoCampeonato(campeonato.estado),
                 type: badgeType(campeonato.estado),
               ),
               AppBadge(
-                text: formatLabel(campeonato.modalidad),
+                text: Etiquetas.modalidad(campeonato.modalidad),
                 type: AppBadgeType.primary,
               ),
             ],
@@ -77,7 +78,7 @@ class ChampionshipPublicCard extends StatelessWidget {
           const SizedBox(height: 8),
           _InfoRow(
             icon: Icons.account_tree_outlined,
-            text: formatLabel(campeonato.tipoCampeonato),
+            text: Etiquetas.tipoCampeonato(campeonato.tipoCampeonato),
           ),
           const SizedBox(height: 8),
           _InfoRow(
@@ -106,19 +107,6 @@ class ChampionshipPublicCard extends StatelessWidget {
     );
   }
 
-  static String estadoTexto(String estado) {
-    switch (estado) {
-      case CampeonatoEstado.inscripcion:
-        return 'Inscripción';
-      case CampeonatoEstado.activo:
-        return 'Activo';
-      case CampeonatoEstado.finalizado:
-        return 'Finalizado';
-      default:
-        return formatLabel(estado);
-    }
-  }
-
   static AppBadgeType badgeType(String estado) {
     switch (estado) {
       case CampeonatoEstado.inscripcion:
@@ -130,23 +118,6 @@ class ChampionshipPublicCard extends StatelessWidget {
       default:
         return AppBadge.typeFromEstado(estado);
     }
-  }
-
-  static String formatLabel(String value) {
-    final clean = value.trim();
-
-    if (clean.isEmpty) return 'No definido';
-
-    return clean
-        .replaceAll('_', ' ')
-        .split(' ')
-        .where((word) => word.trim().isNotEmpty)
-        .map((word) {
-          if (word.length == 1) return word.toUpperCase();
-
-          return '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}';
-        })
-        .join(' ');
   }
 }
 

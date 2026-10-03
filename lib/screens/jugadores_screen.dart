@@ -19,6 +19,8 @@ import 'reciclaje/app_table_container.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
+import '../utils/mensajes.dart';
+import '../utils/etiquetas.dart';
 
 /// Borra un jugador para siempre, con confirmación: pensado para corregir
 /// un error de carga (jugador cargado en el equipo equivocado), no para
@@ -54,7 +56,7 @@ Future<void> _eliminarJugador(
     AppSnackbars.success(context, 'Jugador eliminado correctamente.');
   } catch (e) {
     if (!context.mounted) return;
-    AppSnackbars.error(context, e.toString());
+    AppSnackbars.error(context, mensajeDeError(e));
   }
 }
 
@@ -126,7 +128,7 @@ class _JugadoresScreenState extends State<JugadoresScreen> {
                 return AppEmptyState(
                   icon: Icons.error_outline,
                   title: 'Error al cargar jugadores',
-                  message: snapshot.error.toString(),
+                  message: mensajeDeError(snapshot.error!),
                 );
               }
 
@@ -231,7 +233,9 @@ class _JugadoresScreenState extends State<JugadoresScreen> {
                                           Text(jugador.nombreCompleto),
                                           Text(jugador.equipoNombre),
                                           AppBadge(
-                                            text: jugador.estado,
+                                            text: Etiquetas.formatear(
+                                              jugador.estado,
+                                            ),
                                             type: AppBadge.typeFromEstado(
                                               jugador.estado,
                                             ),
@@ -361,7 +365,7 @@ class _JugadoresListaMobile extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     AppBadge(
-                      text: jugador.estado,
+                      text: Etiquetas.formatear(jugador.estado),
                       type: AppBadge.typeFromEstado(jugador.estado),
                     ),
                   ],

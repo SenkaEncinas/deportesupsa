@@ -15,6 +15,9 @@ import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import '../utils/mensajes.dart';
+import '../utils/etiquetas.dart';
+import 'reciclaje/app_match_card.dart';
+import 'reciclaje/app_info_box.dart';
 
 class CampeonatoFormScreen extends StatefulWidget {
   const CampeonatoFormScreen({super.key});
@@ -718,7 +721,9 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                                     .map((modalidad) {
                                       return DropdownMenuItem(
                                         value: modalidad,
-                                        child: Text(_modalidadTexto(modalidad)),
+                                        child: Text(
+                                          Etiquetas.modalidad(modalidad),
+                                        ),
                                       );
                                     })
                                     .toList(),
@@ -731,7 +736,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                                 label: 'Jugadores en cancha',
                                 controller: _jugadoresCanchaController,
                                 keyboardType: TextInputType.number,
-                                prefixIcon: _deporteIcono(_deporte),
+                                prefixIcon: deporteIcono(_deporte),
                                 validator: _numberValidator,
                               ),
                               AppTextField(
@@ -791,11 +796,10 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            _InfoBox(
+                            AppInfoBox(
                               title: 'Vóley',
-                              message:
+                              text:
                                   'Los sets se ganan por diferencia de 2 puntos. No existen empates: gana quien alcance los sets necesarios.',
-                              secondary: true,
                             ),
                           ],
                           if (_esBasket) ...[
@@ -812,11 +816,10 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            _InfoBox(
+                            AppInfoBox(
                               title: 'Básquet',
-                              message:
+                              text:
                                   'No se permite empate final: si el marcador queda igualado se juega prórroga hasta definir un ganador.',
-                              secondary: true,
                             ),
                           ],
                           const SizedBox(height: 28),
@@ -875,17 +878,17 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                             },
                           ),
                           const SizedBox(height: 24),
-                          _InfoBox(
+                          AppInfoBox(
+                            tone: AppInfoBoxTone.primary,
                             title: 'Estado inicial',
-                            message:
+                            text:
                                 'El campeonato se creará en estado inscripción. En ese estado podrás registrar equipos y jugadores antes de activarlo.',
                           ),
                           const SizedBox(height: 12),
-                          _InfoBox(
+                          AppInfoBox(
                             title: 'Fixture',
-                            message:
-                                'Por ahora esta configuración queda guardada. En el siguiente paso ajustaremos el generador de fixture para que respete cada formato.',
-                            secondary: true,
+                            text:
+                                'Cuando el campeonato tenga sus equipos, el fixture se genera desde el módulo Fixture respetando este formato.',
                           ),
                         ],
                       ),
@@ -985,12 +988,12 @@ class _HeroText extends StatelessWidget {
               icon: Icons.add_circle_outline,
             ),
             AppBadge(
-              text: _deporteTexto(deporte),
+              text: Etiquetas.deporte(deporte),
               type: AppBadgeType.warning,
-              icon: _deporteIcono(deporte),
+              icon: deporteIcono(deporte),
             ),
             AppBadge(
-              text: _tipoTexto(tipoCampeonato),
+              text: Etiquetas.tipoCampeonato(tipoCampeonato),
               type: AppBadgeType.primary,
               icon: Icons.account_tree_outlined,
             ),
@@ -1095,7 +1098,7 @@ class _DynamicFormatSection extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            _descripcionFormato(tipoCampeonato),
+            Etiquetas.descripcionFormato(tipoCampeonato),
             style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 18),
@@ -1607,66 +1610,6 @@ class _ResponsiveFields extends StatelessWidget {
   }
 }
 
-class _InfoBox extends StatelessWidget {
-  final String title;
-  final String message;
-  final bool secondary;
-
-  const _InfoBox({
-    required this.title,
-    required this.message,
-    this.secondary = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: secondary ? AppColors.infoLight : AppColors.primaryLight,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: secondary
-              ? AppColors.info.withValues(alpha: 0.16)
-              : AppColors.primary.withValues(alpha: 0.16),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            secondary ? Icons.info_outline : Icons.verified_outlined,
-            color: secondary ? AppColors.info : AppColors.primary,
-            size: 22,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: AppTextStyles.body.copyWith(
-                  color: secondary ? AppColors.info : AppColors.primaryDark,
-                  height: 1.45,
-                ),
-                children: [
-                  TextSpan(
-                    text: '$title: ',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                  TextSpan(
-                    text: message,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SectionTitle extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -1809,90 +1752,5 @@ class _DeporteSelector extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-String _modalidadTexto(String modalidad) {
-  switch (modalidad) {
-    case ModalidadDeporte.futsal:
-      return 'Futsal';
-    case ModalidadDeporte.futbol7:
-      return 'Fútbol 7';
-    case ModalidadDeporte.futbol11:
-      return 'Fútbol 11';
-    case ModalidadDeporte.volleySala:
-      return 'Vóley sala';
-    case ModalidadDeporte.volleyMixto:
-      return 'Vóley mixto';
-    case ModalidadDeporte.basket5:
-      return 'Básquet 5';
-    case ModalidadDeporte.basket3x3:
-      return 'Básquet 3x3';
-    default:
-      return modalidad.replaceAll('_', ' ');
-  }
-}
-
-IconData _deporteIcono(String deporte) {
-  switch (deporte) {
-    case DeporteTipo.volley:
-      return Icons.sports_volleyball_outlined;
-    case DeporteTipo.basket:
-      return Icons.sports_basketball_outlined;
-    default:
-      return Icons.sports_soccer;
-  }
-}
-
-String _deporteTexto(String deporte) {
-  switch (deporte) {
-    case DeporteTipo.volley:
-      return 'Vóley';
-    case DeporteTipo.basket:
-      return 'Básquet';
-    default:
-      return 'Fútbol / Futsal';
-  }
-}
-
-String _tipoTexto(String tipo) {
-  switch (tipo) {
-    case TipoCampeonato.soloIda:
-      return 'Liga solo ida';
-    case TipoCampeonato.idaVuelta:
-      return 'Liga ida y vuelta';
-    case TipoCampeonato.eliminacionDirecta:
-      return 'Eliminación directa';
-    case TipoCampeonato.faseGrupos:
-      return 'Fase de grupos';
-    case TipoCampeonato.gruposEliminacion:
-      return 'Grupos + eliminación';
-    case TipoCampeonato.ligaFinal:
-      return 'Liga + final';
-    case TipoCampeonato.ligaPlayoffs:
-      return 'Liga + playoffs';
-    default:
-      return tipo.replaceAll('_', ' ');
-  }
-}
-
-String _descripcionFormato(String tipo) {
-  switch (tipo) {
-    case TipoCampeonato.soloIda:
-      return 'Todos los equipos juegan entre sí una sola vez. Se genera tabla de posiciones.';
-    case TipoCampeonato.idaVuelta:
-      return 'Todos los equipos juegan entre sí dos veces, invirtiendo localía en la segunda vuelta.';
-    case TipoCampeonato.ligaFinal:
-      return 'Se juega una liga general y los dos mejores disputan una final.';
-    case TipoCampeonato.ligaPlayoffs:
-      return 'Se juega una liga general y luego los mejores clasifican a una fase final.';
-    case TipoCampeonato.faseGrupos:
-      return 'Los equipos se dividen en grupos. Cada grupo tiene su propia tabla de posiciones.';
-    case TipoCampeonato.gruposEliminacion:
-      return 'Primero se juega fase de grupos y luego los clasificados pasan a llaves eliminatorias.';
-    case TipoCampeonato.eliminacionDirecta:
-      return 'Los equipos juegan llaves de eliminación. El perdedor queda fuera.';
-    default:
-      return 'Formato personalizado.';
   }
 }

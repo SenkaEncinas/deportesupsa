@@ -14,6 +14,7 @@ import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
+import '../utils/mensajes.dart';
 
 class RankingGoleadoresScreen extends StatefulWidget {
   final String campeonatoId;
@@ -66,7 +67,7 @@ class _RankingGoleadoresScreenState extends State<RankingGoleadoresScreen> {
                 return AppEmptyState(
                   icon: Icons.error_outline,
                   title: 'Error al cargar ranking',
-                  message: snapshot.error.toString(),
+                  message: mensajeDeError(snapshot.error!),
                 );
               }
 

@@ -20,6 +20,7 @@ import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import '../utils/mensajes.dart';
+import 'reciclaje/app_info_box.dart';
 
 class ResultadoFormScreen extends StatefulWidget {
   final String campeonatoId;
@@ -714,7 +715,8 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
                           activeThumbColor: AppColors.primary,
                           contentPadding: EdgeInsets.zero,
                         ),
-                        _InfoBox(
+                        AppInfoBox(
+                          tone: AppInfoBoxTone.primary,
                           text:
                               'El básquet no permite empate: registra los puntos finales con un ganador.',
                         ),
@@ -965,7 +967,8 @@ class _SetsSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (sets.isEmpty)
-          _InfoBox(
+          AppInfoBox(
+            tone: AppInfoBoxTone.primary,
             text:
                 'Agrega cada set con los puntos de ambos equipos. Ejemplo: 25-20, 23-25, 15-12.',
           )
@@ -1080,7 +1083,8 @@ class _GolesSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (goles.isEmpty)
-          _InfoBox(
+          AppInfoBox(
+            tone: AppInfoBoxTone.primary,
             text:
                 'Agrega los goles por jugador. La suma debe coincidir con el resultado final.',
           )
@@ -1198,7 +1202,8 @@ class _TarjetasSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (tarjetas.isEmpty)
-          _InfoBox(
+          AppInfoBox(
+            tone: AppInfoBoxTone.primary,
             text:
                 'Aquí puedes registrar amarillas y rojas por jugador. Si no hubo tarjetas, deja esta sección vacía.',
           )
@@ -1351,7 +1356,8 @@ class _SancionesSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (sanciones.isEmpty)
-          _InfoBox(
+          AppInfoBox(
+            tone: AppInfoBoxTone.primary,
             text:
                 'Solo si hubo un problema de mesa o una sanción a algún jugador. Si no pasó nada, deja esta sección vacía.',
           )
@@ -1457,31 +1463,6 @@ class _SancionesSection extends StatelessWidget {
             }),
           ),
       ],
-    );
-  }
-}
-
-class _InfoBox extends StatelessWidget {
-  final String text;
-
-  const _InfoBox({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primaryLight,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Text(
-        text,
-        style: AppTextStyles.body.copyWith(
-          color: AppColors.primaryDark,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     );
   }
 }

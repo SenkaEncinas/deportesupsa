@@ -32,6 +32,7 @@ import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/championship_public_card.dart';
 import 'reciclaje/responsive.dart';
 import 'reciclaje/stat_card.dart';
+import '../utils/etiquetas.dart';
 
 class ChampionshipDetailScreen extends StatelessWidget {
   final CampeonatoModel campeonato;
@@ -115,7 +116,7 @@ class _ChampionshipContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final estadoTexto = ChampionshipPublicCard.estadoTexto(campeonato.estado);
+    final estadoTexto = Etiquetas.estadoCampeonato(campeonato.estado);
 
     // En fase eliminatoria la vista pública se reduce a la llave, la
     // tabla de la fase de grupos y, en fútbol, los goleadores: los
@@ -390,7 +391,7 @@ class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
 
   @override
   Widget build(BuildContext context) {
-    final estadoTexto = ChampionshipPublicCard.estadoTexto(campeonato.estado);
+    final estadoTexto = Etiquetas.estadoCampeonato(campeonato.estado);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -887,9 +888,7 @@ class _StatsSection extends StatelessWidget {
             title: 'Partidos',
             value: '${partidos.length}',
             icon: Icons.sports_soccer,
-            subtitle: ChampionshipPublicCard.formatLabel(
-              campeonato.tipoCampeonato,
-            ),
+            subtitle: Etiquetas.tipoCampeonato(campeonato.tipoCampeonato),
             color: AppColors.secondary,
           );
         },
