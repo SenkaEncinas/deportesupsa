@@ -6,55 +6,40 @@ import 'app_badge.dart';
 import 'app_button.dart';
 import 'app_card.dart';
 import 'app_colors.dart';
+import 'app_fase_badge.dart';
 import 'app_match_card.dart';
 import 'app_responsive_grid.dart';
 import 'app_text_styles.dart';
-import 'championship_public_card.dart';
 import 'responsive.dart';
 import 'stat_card.dart';
 
-/// Tarjeta de un campeonato en el lado administrativo (panel principal y
-/// listado de campeonatos).
+/// Tarjeta de un campeonato: la usan la portada pública, el panel del
+/// administrador y el listado de campeonatos.
 ///
-/// Las dos pantallas tenían su propia copia, casi igual. Además el
-/// botón "Gestionar" del panel llevaba al listado de campeonatos y no al
-/// campeonato tocado, así que había que buscarlo de nuevo.
-class AppCampeonatoAdminCard extends StatelessWidget {
+/// Había dos copias casi iguales (la pública y la del admin) que solo
+/// cambiaban en el pie. Ahora es una sola: con [admin] en true el pie
+/// trae el botón "Administrar" (y "Ver público" si se pasa
+/// [onVerPublico]); si no, el enlace "Ver campeonato".
+class AppCampeonatoCard extends StatelessWidget {
   final CampeonatoModel campeonato;
-  final VoidCallback onAdministrar;
-
-  /// Si se pasa, aparece un segundo botón para ver la página pública.
+  final VoidCallback onTap;
+  final bool admin;
   final VoidCallback? onVerPublico;
 
-  const AppCampeonatoAdminCard({
+  const AppCampeonatoCard({
     super.key,
     required this.campeonato,
-    required this.onAdministrar,
+    required this.onTap,
+    this.admin = false,
     this.onVerPublico,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-
-    final administrar = AppButton.primary(
-      text: 'Administrar',
-      icon: Icons.settings_outlined,
-      expanded: true,
-      onPressed: onAdministrar,
-    );
-
-    final verPublico = onVerPublico == null
-        ? null
-        : AppButton.secondary(
-            text: 'Ver público',
-            icon: Icons.visibility_outlined,
-            expanded: true,
-            onPressed: onVerPublico,
-          );
+    final descripcion = campeonato.descripcion.trim();
 
     return AppCard(
-      onTap: onAdministrar,
+      onTap: onTap,
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,29 +79,25 @@ class AppCampeonatoAdminCard extends StatelessWidget {
             children: [
               AppBadge(
                 text: Etiquetas.estadoCampeonato(campeonato.estado),
-                type: ChampionshipPublicCard.badgeType(campeonato.estado),
+                type: AppBadge.tipoEstadoCampeonato(campeonato.estado),
               ),
               AppBadge(
                 text: Etiquetas.modalidad(campeonato.modalidad),
                 type: AppBadgeType.primary,
               ),
-              if (campeonato.tieneFasesSeparadas &&
-                  campeonato.estado == CampeonatoEstado.activo)
-                AppBadge(
-                  text: campeonato.estaEnFaseDeGrupos
-                      ? 'Fase de grupos'
-                      : 'Fase eliminatoria',
-                  type: campeonato.estaEnFaseDeGrupos
-                      ? AppBadgeType.info
-                      : AppBadgeType.warning,
-                ),
+              if (campeonato.estado == CampeonatoEstado.activo)
+                AppFaseBadge(campeonato: campeonato),
             ],
           ),
-          if (campeonato.descripcion.trim().isNotEmpty) ...[
+          // El público ve un texto de ayuda si no hay descripción; el
+          // admin no lo necesita.
+          if (descripcion.isNotEmpty || !admin) ...[
             const SizedBox(height: 14),
             Text(
-              campeonato.descripcion,
-              maxLines: 2,
+              descripcion.isEmpty
+                  ? 'Consulta fixture, resultados, tabla de posiciones y ranking de goleadores.'
+                  : descripcion,
+              maxLines: admin ? 2 : 3,
               overflow: TextOverflow.ellipsis,
               style: AppTextStyles.body.copyWith(
                 color: AppColors.textSecondary,
@@ -145,22 +126,68 @@ class AppCampeonatoAdminCard extends StatelessWidget {
                 : campeonato.cancha,
           ),
           const SizedBox(height: 16),
-          if (verPublico == null)
-            administrar
-          else if (isMobile)
-            Column(
-              children: [administrar, const SizedBox(height: 10), verPublico],
-            )
+          if (admin)
+            _AccionesAdmin(onAdministrar: onTap, onVerPublico: onVerPublico)
           else
             Row(
               children: [
-                Expanded(child: administrar),
-                const SizedBox(width: 10),
-                Expanded(child: verPublico),
+                Text(
+                  'Ver campeonato',
+                  style: AppTextStyles.button.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  color: AppColors.primary,
+                  size: 18,
+                ),
               ],
             ),
         ],
       ),
+    );
+  }
+}
+
+class _AccionesAdmin extends StatelessWidget {
+  final VoidCallback onAdministrar;
+  final VoidCallback? onVerPublico;
+
+  const _AccionesAdmin({required this.onAdministrar, this.onVerPublico});
+
+  @override
+  Widget build(BuildContext context) {
+    final administrar = AppButton.primary(
+      text: 'Administrar',
+      icon: Icons.settings_outlined,
+      expanded: true,
+      onPressed: onAdministrar,
+    );
+
+    final verPublico = onVerPublico;
+    if (verPublico == null) return administrar;
+
+    final publico = AppButton.secondary(
+      text: 'Ver público',
+      icon: Icons.visibility_outlined,
+      expanded: true,
+      onPressed: verPublico,
+    );
+
+    if (Responsive.isMobile(context)) {
+      return Column(
+        children: [administrar, const SizedBox(height: 10), publico],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: administrar),
+        const SizedBox(width: 10),
+        Expanded(child: publico),
+      ],
     );
   }
 }

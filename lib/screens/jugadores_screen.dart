@@ -21,6 +21,7 @@ import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import '../utils/mensajes.dart';
 import '../utils/etiquetas.dart';
+import 'historial_jugador_screen.dart';
 
 /// Borra un jugador para siempre, con confirmación: pensado para corregir
 /// un error de carga (jugador cargado en el equipo equivocado), no para
@@ -58,6 +59,25 @@ Future<void> _eliminarJugador(
     if (!context.mounted) return;
     AppSnackbars.error(context, mensajeDeError(e));
   }
+}
+
+/// Los cambios registrados de un jugador (altas, ediciones, cambios de
+/// estado), que el servicio guarda en cada edición.
+void _abrirHistorial(
+  BuildContext context,
+  String campeonatoId,
+  JugadorModel jugador,
+) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => HistorialJugadorScreen(
+        campeonatoId: campeonatoId,
+        jugadorId: jugador.id,
+        jugadorNombre: jugador.nombreCompleto,
+      ),
+    ),
+  );
 }
 
 class JugadoresScreen extends StatefulWidget {
@@ -244,6 +264,19 @@ class _JugadoresScreenState extends State<JugadoresScreen> {
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               TextButton(
+                                                onPressed: () =>
+                                                    _abrirHistorial(
+                                                      context,
+                                                      campeonatoId,
+                                                      jugador,
+                                                    ),
+                                                child: Text(
+                                                  'Historial',
+                                                  style:
+                                                      AppTextStyles.bodyMedium,
+                                                ),
+                                              ),
+                                              TextButton(
                                                 onPressed:
                                                     campeonato?.estado ==
                                                         CampeonatoEstado
@@ -408,11 +441,21 @@ class _JugadoresListaMobile extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (puedeEditar || puedeEliminar) ...[
+                ...[
                   const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      TextButton(
+                        onPressed: () =>
+                            _abrirHistorial(context, campeonatoId, jugador),
+                        child: Text(
+                          'Historial',
+                          style: AppTextStyles.small.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                       if (puedeEliminar)
                         TextButton(
                           onPressed: () => _eliminarJugador(

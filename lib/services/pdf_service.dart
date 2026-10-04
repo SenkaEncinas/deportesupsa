@@ -789,29 +789,36 @@ class PdfService {
   }
 
   pw.Widget _flyerPartidoRow(PartidoModel partido) {
+    return _flyerFila(
+      partido: partido,
+      etiqueta: 'HORARIO',
+      valor: _horaTexto(partido.fechaHora),
+      centro: _flyerEquiposVs(partido),
+    );
+  }
+
+  /// Una fila del flyer: a la izquierda una píldora con su etiqueta
+  /// (HORARIO o MARCADOR), al medio los equipos y a la derecha el grupo.
+  /// La comparten el flyer de programación y el de resultados, que antes
+  /// repetían la tabla entera.
+  pw.Widget _flyerFila({
+    required PartidoModel partido,
+    required String etiqueta,
+    required String valor,
+    required pw.Widget centro,
+    double tamanoValor = 8,
+  }) {
     final grupo = _grupoCortoPdf(partido.grupoId);
 
     return pw.Table(
       defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
-      columnWidths: const {
-        0: pw.FixedColumnWidth(48),
-        1: pw.FlexColumnWidth(),
-        2: pw.FixedColumnWidth(38),
-      },
+      columnWidths: _flyerColumnas,
       children: [
         pw.TableRow(
           children: [
             pw.Column(
               children: [
-                pw.Text(
-                  'HORARIO',
-                  style: pw.TextStyle(
-                    color: _grisMedio,
-                    fontSize: 5.5,
-                    fontWeight: pw.FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
-                ),
+                _flyerEtiqueta(etiqueta),
                 pw.SizedBox(height: 3),
                 pw.Container(
                   width: 40,
@@ -822,10 +829,11 @@ class PdfService {
                   ),
                   alignment: pw.Alignment.center,
                   child: pw.Text(
-                    _horaTexto(partido.fechaHora),
+                    valor,
+                    maxLines: 1,
                     style: pw.TextStyle(
                       color: PdfColors.white,
-                      fontSize: 8,
+                      fontSize: tamanoValor,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
@@ -834,21 +842,13 @@ class PdfService {
             ),
             pw.Padding(
               padding: const pw.EdgeInsets.symmetric(horizontal: 6),
-              child: _flyerEquiposVs(partido),
+              child: centro,
             ),
             grupo == null
                 ? pw.SizedBox()
                 : pw.Column(
                     children: [
-                      pw.Text(
-                        'GRUPO',
-                        style: pw.TextStyle(
-                          color: _grisMedio,
-                          fontSize: 5.5,
-                          fontWeight: pw.FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                      _flyerEtiqueta('GRUPO'),
                       pw.SizedBox(height: 3),
                       pw.Container(
                         padding: const pw.EdgeInsets.symmetric(
@@ -873,6 +873,26 @@ class PdfService {
           ],
         ),
       ],
+    );
+  }
+
+  /// Anchos de las tres columnas de una fila del flyer; los goleadores
+  /// debajo de un resultado usan los mismos para quedar alineados.
+  static const _flyerColumnas = {
+    0: pw.FixedColumnWidth(48),
+    1: pw.FlexColumnWidth(),
+    2: pw.FixedColumnWidth(38),
+  };
+
+  pw.Widget _flyerEtiqueta(String texto) {
+    return pw.Text(
+      texto,
+      style: pw.TextStyle(
+        color: _grisMedio,
+        fontSize: 5.5,
+        fontWeight: pw.FontWeight.bold,
+        letterSpacing: 0.5,
+      ),
     );
   }
 
@@ -1226,7 +1246,6 @@ class PdfService {
 
   pw.Widget _flyerResultadoRow(PdfResultadoPartidoItem item) {
     final partido = item.partido;
-    final grupo = _grupoCortoPdf(partido.grupoId);
     final marcador =
         partido.definidoPorPenales &&
             partido.penalesLocal != null &&
@@ -1251,132 +1270,51 @@ class PdfService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        pw.Table(
-          defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
-          columnWidths: const {
-            0: pw.FixedColumnWidth(48),
-            1: pw.FlexColumnWidth(),
-            2: pw.FixedColumnWidth(38),
-          },
-          children: [
-            pw.TableRow(
+        _flyerFila(
+          partido: partido,
+          etiqueta: 'MARCADOR',
+          valor: marcador,
+          tamanoValor: partido.definidoPorPenales ? 6 : 9,
+          centro: pw.RichText(
+            textAlign: pw.TextAlign.center,
+            text: pw.TextSpan(
               children: [
-                pw.Column(
-                  children: [
-                    pw.Text(
-                      'MARCADOR',
-                      style: pw.TextStyle(
-                        color: _grisMedio,
-                        fontSize: 5.5,
-                        fontWeight: pw.FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    pw.SizedBox(height: 3),
-                    pw.Container(
-                      width: 40,
-                      padding: const pw.EdgeInsets.symmetric(vertical: 4),
-                      decoration: pw.BoxDecoration(
-                        color: _verdeOscuro,
-                        borderRadius: pw.BorderRadius.circular(6),
-                      ),
-                      alignment: pw.Alignment.center,
-                      child: pw.Text(
-                        marcador,
-                        maxLines: 1,
-                        style: pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: partido.definidoPorPenales ? 6 : 9,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                pw.Padding(
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 6),
-                  child: pw.RichText(
-                    textAlign: pw.TextAlign.center,
-                    text: pw.TextSpan(
-                      children: [
-                        pw.TextSpan(
-                          text: partido.equipoLocalNombre,
-                          style: pw.TextStyle(
-                            color: _flyerVerdeTeal,
-                            fontSize: 9.5,
-                            fontWeight: pw.FontWeight.bold,
-                            decoration: pw.TextDecoration.underline,
-                            decorationColor: _flyerVerdeTeal,
-                          ),
-                        ),
-                        pw.TextSpan(
-                          text: '  vs.  ',
-                          style: pw.TextStyle(
-                            color: _grisTexto,
-                            fontSize: 9,
-                            fontWeight: pw.FontWeight.bold,
-                          ),
-                        ),
-                        pw.TextSpan(
-                          text: partido.equipoVisitanteNombre,
-                          style: pw.TextStyle(
-                            color: _flyerVerdeTeal,
-                            fontSize: 9.5,
-                            fontWeight: pw.FontWeight.bold,
-                            decoration: pw.TextDecoration.underline,
-                            decorationColor: _flyerVerdeTeal,
-                          ),
-                        ),
-                      ],
-                    ),
+                pw.TextSpan(
+                  text: partido.equipoLocalNombre,
+                  style: pw.TextStyle(
+                    color: _flyerVerdeTeal,
+                    fontSize: 9.5,
+                    fontWeight: pw.FontWeight.bold,
+                    decoration: pw.TextDecoration.underline,
+                    decorationColor: _flyerVerdeTeal,
                   ),
                 ),
-                grupo == null
-                    ? pw.SizedBox()
-                    : pw.Column(
-                        children: [
-                          pw.Text(
-                            'GRUPO',
-                            style: pw.TextStyle(
-                              color: _grisMedio,
-                              fontSize: 5.5,
-                              fontWeight: pw.FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          pw.SizedBox(height: 3),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 3,
-                            ),
-                            decoration: pw.BoxDecoration(
-                              color: _flyerGrupoPill,
-                              borderRadius: pw.BorderRadius.circular(999),
-                            ),
-                            child: pw.Text(
-                              '"$grupo"',
-                              style: pw.TextStyle(
-                                color: _grisTexto,
-                                fontSize: 7.5,
-                                fontWeight: pw.FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                pw.TextSpan(
+                  text: '  vs.  ',
+                  style: pw.TextStyle(
+                    color: _grisTexto,
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.TextSpan(
+                  text: partido.equipoVisitanteNombre,
+                  style: pw.TextStyle(
+                    color: _flyerVerdeTeal,
+                    fontSize: 9.5,
+                    fontWeight: pw.FontWeight.bold,
+                    decoration: pw.TextDecoration.underline,
+                    decorationColor: _flyerVerdeTeal,
+                  ),
+                ),
               ],
             ),
-          ],
+          ),
         ),
         if (golesLocal.isNotEmpty || golesVisitante.isNotEmpty) ...[
           pw.SizedBox(height: 4),
           pw.Table(
-            columnWidths: const {
-              0: pw.FixedColumnWidth(48),
-              1: pw.FlexColumnWidth(),
-              2: pw.FixedColumnWidth(38),
-            },
+            columnWidths: _flyerColumnas,
             children: [
               pw.TableRow(
                 children: [
@@ -1711,7 +1649,8 @@ class PdfService {
     final visitanteOrdenado = [...jugadoresVisitante]
       ..sort((a, b) => a.nombreCompleto.compareTo(b.nombreCompleto));
 
-    // Hoja 1: la planilla oficial de control (goles, tarjetas, firmas).
+    // Hoja 1: la planilla oficial de control (anotación, faltas o
+    // tarjetas según el deporte, y firmas).
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.letter.landscape,
@@ -1729,7 +1668,7 @@ class PdfService {
                 partido: partido,
                 logos: logos,
               ),
-              _planillaEquiposHeader(partido),
+              _planillaEquiposHeader(campeonato, partido),
               _planillaJugadoresTable(
                 local: localOrdenado,
                 visitante: visitanteOrdenado,
@@ -1830,9 +1769,7 @@ class PdfService {
     required _PdfLogos logos,
   }) {
     final faseTexto = campeonato.tieneFasesSeparadas
-        ? (campeonato.estaEnFaseDeGrupos
-              ? 'FASE DE GRUPOS'
-              : 'FASE ELIMINATORIA')
+        ? campeonato.nombreFaseActual.toUpperCase()
         : 'FASE DE GRUPOS';
 
     return pw.Table(
@@ -3154,6 +3091,25 @@ class PdfService {
     );
   }
 
+  /// Barra negra con el título de cada bloque de la planilla de vóley
+  /// ("SET 1", "EQUIPOS"...), como en el papel oficial.
+  pw.Widget _barraTituloVoley(String titulo) {
+    return pw.Container(
+      color: PdfColors.black,
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Text(
+        titulo,
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(
+          color: PdfColors.white,
+          fontSize: 8,
+          fontWeight: pw.FontWeight.bold,
+          letterSpacing: 1,
+        ),
+      ),
+    );
+  }
+
   /// Un bloque "SET N" de la planilla de control: dos mitades (equipo A
   /// y equipo B) con formación inicial y grilla de anotación numerada
   /// (marcador punto a punto), calcado del papel oficial. Se arma con
@@ -3169,20 +3125,7 @@ class PdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          pw.Container(
-            color: PdfColors.black,
-            padding: const pw.EdgeInsets.symmetric(vertical: 2),
-            child: pw.Text(
-              'SET $numeroSet',
-              textAlign: pw.TextAlign.center,
-              style: pw.TextStyle(
-                color: PdfColors.white,
-                fontSize: 8,
-                fontWeight: pw.FontWeight.bold,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
+          _barraTituloVoley('SET $numeroSet'),
           pw.Table(
             columnWidths: const {
               0: pw.FlexColumnWidth(),
@@ -3485,20 +3428,7 @@ class PdfService {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          pw.Container(
-            color: PdfColors.black,
-            padding: const pw.EdgeInsets.symmetric(vertical: 2),
-            child: pw.Text(
-              'EQUIPOS',
-              textAlign: pw.TextAlign.center,
-              style: pw.TextStyle(
-                color: PdfColors.white,
-                fontSize: 8,
-                fontWeight: pw.FontWeight.bold,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
+          _barraTituloVoley('EQUIPOS'),
           pw.Table(
             columnWidths: const {
               0: pw.FlexColumnWidth(),
@@ -4074,9 +4004,6 @@ class PdfService {
                     style: const pw.TextStyle(fontSize: 8),
                   ),
                   pw.Text(
-                    // La planilla usa el deporte del campeonato. La versión
-                    // específica para vóley (sets) y básquet (faltas) queda
-                    // preparada para una siguiente fase.
                     _deporteLabel(campeonato),
                     style: pw.TextStyle(
                       fontSize: 11,
@@ -4135,7 +4062,20 @@ class PdfService {
     );
   }
 
-  pw.Widget _planillaEquiposHeader(PartidoModel partido) {
+  /// Encabezado de la tabla de jugadores. Fútbol anota tarjetas y goles
+  /// por tiempo; básquet, faltas (personales y técnicas) y puntos por
+  /// mitad. Antes básquet imprimía las columnas de fútbol.
+  pw.Widget _planillaEquiposHeader(
+    CampeonatoModel campeonato,
+    PartidoModel partido,
+  ) {
+    final basket = campeonato.esBasket;
+    final control = basket ? 'FALTAS' : 'TARJETAS';
+    final anotacion = basket ? 'PUNTOS' : 'GOLES';
+    final sub = basket
+        ? const ['PER', 'TÉC', '1°M', '2°M']
+        : const ['TA', 'TR', '1T', '2T'];
+
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey700, width: 0.8),
       columnWidths: const {
@@ -4161,18 +4101,18 @@ class PdfService {
               'EQUIPO: ${partido.equipoLocalNombre.toUpperCase()}',
               bold: true,
             ),
-            _smallCell('TARJETAS', bold: true),
+            _smallCell(control, bold: true),
             _smallCell('', bold: true),
-            _smallCell('GOLES', bold: true),
+            _smallCell(anotacion, bold: true),
             _smallCell('', bold: true),
             _smallCell('N°', bold: true),
             _smallCell(
               'EQUIPO: ${partido.equipoVisitanteNombre.toUpperCase()}',
               bold: true,
             ),
-            _smallCell('TARJETAS', bold: true),
+            _smallCell(control, bold: true),
             _smallCell('', bold: true),
-            _smallCell('GOLES', bold: true),
+            _smallCell(anotacion, bold: true),
             _smallCell('', bold: true),
           ],
         ),
@@ -4181,16 +4121,10 @@ class PdfService {
           children: [
             _smallCell('', bold: true),
             _smallCell('NOMBRE Y APELLIDO', bold: true),
-            _smallCell('TA', bold: true),
-            _smallCell('TR', bold: true),
-            _smallCell('1T', bold: true),
-            _smallCell('2T', bold: true),
+            for (final texto in sub) _smallCell(texto, bold: true),
             _smallCell('', bold: true),
             _smallCell('NOMBRE Y APELLIDO', bold: true),
-            _smallCell('TA', bold: true),
-            _smallCell('TR', bold: true),
-            _smallCell('1T', bold: true),
-            _smallCell('2T', bold: true),
+            for (final texto in sub) _smallCell(texto, bold: true),
           ],
         ),
       ],

@@ -82,6 +82,21 @@ class AppBadge extends StatelessWidget {
     }
   }
 
+  /// Color del estado de un campeonato: inscripción en celeste, activo
+  /// en verde y finalizado en gris.
+  static AppBadgeType tipoEstadoCampeonato(String estado) {
+    switch (estado) {
+      case 'inscripcion':
+        return AppBadgeType.info;
+      case 'activo':
+        return AppBadgeType.success;
+      case 'finalizado':
+        return AppBadgeType.neutral;
+      default:
+        return typeFromEstado(estado);
+    }
+  }
+
   static AppBadgeType typeFromEstado(String estado) {
     switch (estado) {
       case 'activo':

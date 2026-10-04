@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/campeonato_model.dart';
@@ -7,6 +5,7 @@ import '../models/equipo_model.dart';
 import '../models/partido_model.dart';
 import '../models/ranking_goleador_model.dart';
 import '../models/tabla_posicion_model.dart';
+import '../utils/stream_compartido.dart';
 import '../utils/tabla_calculo.dart';
 
 class PublicHomeService {
@@ -42,26 +41,6 @@ class PublicHomeService {
 
           return campeonatos;
         });
-  }
-
-  Stream<CampeonatoModel?> streamCampeonatoPrincipal() {
-    return streamCampeonatosPublicos().map((campeonatos) {
-      if (campeonatos.isEmpty) return null;
-
-      for (final campeonato in campeonatos) {
-        if (campeonato.estado == CampeonatoEstado.activo) {
-          return campeonato;
-        }
-      }
-
-      for (final campeonato in campeonatos) {
-        if (campeonato.estado == CampeonatoEstado.inscripcion) {
-          return campeonato;
-        }
-      }
-
-      return campeonatos.first;
-    });
   }
 
   Stream<List<EquipoModel>> streamEquipos(String campeonatoId) {
@@ -122,48 +101,43 @@ class PublicHomeService {
   /// para que el partido de hoy siga a la vista mientras se juega: sale
   /// de la lista cuando se carga su resultado y deja de estar
   /// programado.
-  Stream<List<PartidoModel>> streamProximosPartidos(String campeonatoId) {
-    final rango = rangoProximos(DateTime.now());
+  ///
+  /// Se calcula sobre la lista de partidos que la pantalla ya tiene
+  /// abierta, en vez de hacer otra consulta a Firestore.
+  static List<PartidoModel> proximos(
+    List<PartidoModel> partidos,
+    DateTime ahora,
+  ) {
+    final rango = rangoProximos(ahora);
 
-    return _campeonatos
-        .doc(campeonatoId)
-        .collection('partidos')
-        .where('estado', isEqualTo: PartidoEstado.programado)
-        .where(
-          'fechaHora',
-          isGreaterThanOrEqualTo: Timestamp.fromDate(rango.desde),
-        )
-        .where('fechaHora', isLessThan: Timestamp.fromDate(rango.hasta))
-        .orderBy('fechaHora')
-        .snapshots()
-        .map((snap) {
-          return snap.docs.map((doc) {
-            return PartidoModel.fromMap(doc.id, doc.data());
-          }).toList();
-        });
+    return partidos.where((partido) {
+      final fecha = partido.fechaHora;
+      return partido.estado == PartidoEstado.programado &&
+          fecha != null &&
+          !fecha.isBefore(rango.desde) &&
+          fecha.isBefore(rango.hasta);
+    }).toList()..sort((a, b) => a.fechaHora!.compareTo(b.fechaHora!));
   }
 
-  Stream<List<PartidoModel>> streamUltimosResultados(String campeonatoId) {
-    return _campeonatos
-        .doc(campeonatoId)
-        .collection('partidos')
-        .where('estado', isEqualTo: PartidoEstado.finalizado)
-        .snapshots()
-        .map((snap) {
-          final partidos = snap.docs.map((doc) {
-            return PartidoModel.fromMap(doc.id, doc.data());
-          }).toList();
+  /// Los últimos 5 resultados cargados, el más reciente primero. Igual
+  /// que [proximos], sale de la lista de partidos ya abierta.
+  static List<PartidoModel> ultimosResultados(List<PartidoModel> partidos) {
+    DateTime fecha(PartidoModel p) =>
+        p.fechaActualizacion ?? p.fechaHora ?? DateTime(1900);
 
-          partidos.sort((a, b) {
-            final fechaA =
-                a.fechaActualizacion ?? a.fechaHora ?? DateTime(1900);
-            final fechaB =
-                b.fechaActualizacion ?? b.fechaHora ?? DateTime(1900);
-            return fechaB.compareTo(fechaA);
-          });
+    return (partidos
+            .where((partido) => partido.estado == PartidoEstado.finalizado)
+            .toList()
+          ..sort((a, b) => fecha(b).compareTo(fecha(a))))
+        .take(5)
+        .toList();
+  }
 
-          return partidos.take(5).toList();
-        });
+  Stream<CampeonatoModel?> streamCampeonato(String campeonatoId) {
+    return _campeonatos.doc(campeonatoId).snapshots().map((doc) {
+      final data = doc.data();
+      return data == null ? null : CampeonatoModel.fromMap(doc.id, data);
+    });
   }
 
   /// La tabla de posiciones, calculada en vivo.
@@ -178,85 +152,34 @@ class PublicHomeService {
   /// quedaba mostrando números viejos indefinidamente. La colección
   /// sigue existiendo, pero como registro, no como fuente de verdad.
   Stream<List<TablaPosicionModel>> streamTabla(String campeonatoId) {
-    return _combinar3(
-      _campeonatos.doc(campeonatoId).snapshots().map((doc) {
-        final data = doc.data();
-        return data == null ? null : CampeonatoModel.fromMap(doc.id, data);
-      }),
+    return tablaDesde(
+      streamCampeonato(campeonatoId),
       streamEquipos(campeonatoId),
       streamPartidos(campeonatoId),
-      (campeonato, equipos, partidos) {
-        if (campeonato == null) return <TablaPosicionModel>[];
-
-        return TablaCalculo.calcular(
-          campeonato: campeonato,
-          equipos: equipos,
-          partidos: partidos,
-        );
-      },
     );
   }
 
-  /// Combina tres streams: emite cada vez que cambia cualquiera de
-  /// ellos, una vez que los tres dieron al menos un valor.
-  ///
-  /// Dart no trae un `combineLatest` y no vale la pena sumar una
-  /// dependencia por esto.
-  static Stream<R> _combinar3<A, B, C, R>(
-    Stream<A> a,
-    Stream<B> b,
-    Stream<C> c,
-    R Function(A, B, C) combinar,
+  /// La tabla armada a partir de las tres fuentes que la definen. La usa
+  /// [streamTabla] y también [DatosCampeonato], que le pasa las fuentes
+  /// que ya tiene abiertas en vez de abrir otras.
+  static Stream<List<TablaPosicionModel>> tablaDesde(
+    Stream<CampeonatoModel?> campeonato,
+    Stream<List<EquipoModel>> equipos,
+    Stream<List<PartidoModel>> partidos,
   ) {
-    late final StreamController<R> control;
-    final subs = <StreamSubscription<dynamic>>[];
+    return combinarUltimos3(campeonato, equipos, partidos, (
+      campeonato,
+      equipos,
+      partidos,
+    ) {
+      if (campeonato == null) return <TablaPosicionModel>[];
 
-    late A ultimoA;
-    late B ultimoB;
-    late C ultimoC;
-    var hayA = false;
-    var hayB = false;
-    var hayC = false;
-
-    void emitir() {
-      if (hayA && hayB && hayC) {
-        control.add(combinar(ultimoA, ultimoB, ultimoC));
-      }
-    }
-
-    control = StreamController<R>(
-      onListen: () {
-        subs.add(
-          a.listen((valor) {
-            ultimoA = valor;
-            hayA = true;
-            emitir();
-          }, onError: control.addError),
-        );
-        subs.add(
-          b.listen((valor) {
-            ultimoB = valor;
-            hayB = true;
-            emitir();
-          }, onError: control.addError),
-        );
-        subs.add(
-          c.listen((valor) {
-            ultimoC = valor;
-            hayC = true;
-            emitir();
-          }, onError: control.addError),
-        );
-      },
-      onCancel: () async {
-        for (final sub in subs) {
-          await sub.cancel();
-        }
-        subs.clear();
-      },
-    );
-
-    return control.stream;
+      return TablaCalculo.calcular(
+        campeonato: campeonato,
+        equipos: equipos,
+        partidos: partidos,
+      );
+    });
   }
 
   Stream<List<RankingGoleadorModel>> streamRankingGoleadores(

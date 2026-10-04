@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/campeonato_model.dart';
 import '../models/equipo_model.dart';
 import '../models/partido_model.dart';
+import '../services/auth_service.dart';
 import '../services/campeonato_service.dart';
 import '../services/equipo_service.dart';
 import '../services/partido_service.dart';
@@ -20,6 +21,7 @@ import 'resultados_screen.dart';
 import 'tabla_posiciones_screen.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_button.dart';
+import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_dialogs.dart';
@@ -37,8 +39,8 @@ import '../utils/mensajes.dart';
 import '../utils/etiquetas.dart';
 import '../utils/llaves.dart';
 import 'reciclaje/app_match_card.dart';
-import 'reciclaje/championship_public_card.dart';
 import 'reciclaje/app_info_box.dart';
+import 'reciclaje/app_fondo.dart';
 
 class DetalleCampeonatoScreen extends StatefulWidget {
   final String campeonatoId;
@@ -137,6 +139,35 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
     }
   }
 
+  Future<void> _editarDatos(CampeonatoModel campeonato) async {
+    final datos = await showDialog<_DatosEditados>(
+      context: context,
+      builder: (_) => _EditarCampeonatoDialog(campeonato: campeonato),
+    );
+
+    if (datos == null || !mounted) return;
+
+    try {
+      final admin = await AuthService().requireAdmin();
+
+      await _service.actualizarDatosCampeonato(
+        campeonatoId: campeonato.id,
+        nombre: datos.nombre,
+        descripcion: datos.descripcion,
+        temporada: datos.temporada,
+        cancha: datos.cancha,
+        usuarioId: admin.id,
+        usuarioNombre: admin.nombre,
+      );
+
+      if (!mounted) return;
+      AppSnackbars.success(context, 'Datos del campeonato actualizados.');
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbars.error(context, mensajeDeError(e));
+    }
+  }
+
   void _goTo(Widget screen) {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
@@ -145,189 +176,167 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFEAF5F1),
-              AppColors.background,
-              AppColors.background,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: StreamBuilder<CampeonatoModel?>(
-            stream: _campeonatoStream,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const AppLoading(message: 'Cargando campeonato...');
-              }
+    return AppFondo(
+      child: StreamBuilder<CampeonatoModel?>(
+        stream: _campeonatoStream,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const AppLoading(message: 'Cargando campeonato...');
+          }
 
-              if (snapshot.hasError) {
-                return AppEmptyState(
-                  icon: Icons.error_outline,
-                  title: 'Error al cargar campeonato',
-                  message: mensajeDeError(snapshot.error!),
-                );
-              }
+          if (snapshot.hasError) {
+            return AppEmptyState(
+              icon: Icons.error_outline,
+              title: 'Error al cargar campeonato',
+              message: mensajeDeError(snapshot.error!),
+            );
+          }
 
-              final campeonato = snapshot.data;
+          final campeonato = snapshot.data;
 
-              if (campeonato == null) {
-                return const AppEmptyState(
-                  icon: Icons.warning_amber_rounded,
-                  title: 'Campeonato no encontrado',
-                  message: 'El campeonato seleccionado no existe.',
-                );
-              }
+          if (campeonato == null) {
+            return const AppEmptyState(
+              icon: Icons.warning_amber_rounded,
+              title: 'Campeonato no encontrado',
+              message: 'El campeonato seleccionado no existe.',
+            );
+          }
 
-              return SingleChildScrollView(
-                child: AppPage(
-                  title: campeonato.nombre,
-                  subtitle: campeonato.descripcion.trim().isEmpty
-                      ? 'Detalle administrativo del campeonato.'
-                      : campeonato.descripcion,
-                  actions: [
-                    AppButton.secondary(
-                      text: 'Volver',
-                      icon: Icons.arrow_back_rounded,
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                    if (campeonato.estado == CampeonatoEstado.inscripcion)
-                      AppButton.primary(
-                        text: isMobile ? 'Activar' : 'Activar campeonato',
-                        icon: Icons.play_arrow_rounded,
-                        loading: _loadingEstado,
-                        onPressed: _activarCampeonato,
+          return SingleChildScrollView(
+            child: AppPage(
+              title: campeonato.nombre,
+              subtitle: campeonato.descripcion.trim().isEmpty
+                  ? 'Detalle administrativo del campeonato.'
+                  : campeonato.descripcion,
+              actions: [
+                AppButton.secondary(
+                  text: 'Volver',
+                  icon: Icons.arrow_back_rounded,
+                  onPressed: () => Navigator.pop(context),
+                ),
+                AppButton.secondary(
+                  text: isMobile ? 'Editar' : 'Editar datos',
+                  icon: Icons.edit_outlined,
+                  onPressed: () => _editarDatos(campeonato),
+                ),
+                if (campeonato.estado == CampeonatoEstado.inscripcion)
+                  AppButton.primary(
+                    text: isMobile ? 'Activar' : 'Activar campeonato',
+                    icon: Icons.play_arrow_rounded,
+                    loading: _loadingEstado,
+                    onPressed: _activarCampeonato,
+                  ),
+                if (campeonato.estado == CampeonatoEstado.activo)
+                  AppButton.danger(
+                    text: isMobile ? 'Finalizar' : 'Finalizar campeonato',
+                    icon: Icons.flag_outlined,
+                    loading: _loadingEstado,
+                    onPressed: _finalizarCampeonato,
+                  ),
+              ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppHeroCard(
+                    title: campeonato.nombre,
+                    description: campeonato.descripcion.trim().isEmpty
+                        ? 'Gestiona equipos, jugadores, fixture, resultados, tabla, goleadores y documentos del campeonato.'
+                        : campeonato.descripcion,
+                    badges: [
+                      AppBadge(
+                        text: Etiquetas.estadoCampeonato(campeonato.estado),
+                        type: AppBadge.tipoEstadoCampeonato(campeonato.estado),
+                        icon: Icons.verified_outlined,
                       ),
-                    if (campeonato.estado == CampeonatoEstado.activo)
-                      AppButton.danger(
-                        text: isMobile ? 'Finalizar' : 'Finalizar campeonato',
+                      AppBadge(
+                        text: Etiquetas.modalidad(campeonato.modalidad),
+                        type: AppBadgeType.warning,
+                        icon: deporteIcono(campeonato.deporteEfectivo),
+                      ),
+                      AppBadge(
+                        text: Etiquetas.tipoCampeonato(
+                          campeonato.tipoCampeonato,
+                        ),
+                        type: AppBadgeType.primary,
+                        icon: Icons.account_tree_outlined,
+                      ),
+                    ],
+                    infoItems: [
+                      AppHeroInfoItem(
+                        icon: Icons.calendar_today_outlined,
+                        label: 'Temporada',
+                        value: campeonato.temporada,
+                      ),
+                      AppHeroInfoItem(
+                        icon: deporteIcono(campeonato.deporteEfectivo),
+                        label: 'Modalidad',
+                        value: Etiquetas.modalidad(campeonato.modalidad),
+                      ),
+                      AppHeroInfoItem(
+                        icon: Icons.place_outlined,
+                        label: 'Cancha',
+                        value: campeonato.cancha,
+                      ),
+                      AppHeroInfoItem(
                         icon: Icons.flag_outlined,
-                        loading: _loadingEstado,
-                        onPressed: _finalizarCampeonato,
+                        label: 'Estado',
+                        value: Etiquetas.estadoCampeonato(campeonato.estado),
                       ),
-                  ],
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppHeroCard(
-                        title: campeonato.nombre,
-                        description: campeonato.descripcion.trim().isEmpty
-                            ? 'Gestiona equipos, jugadores, fixture, resultados, tabla, goleadores y documentos del campeonato.'
-                            : campeonato.descripcion,
-                        badges: [
-                          AppBadge(
-                            text: Etiquetas.estadoCampeonato(campeonato.estado),
-                            type: ChampionshipPublicCard.badgeType(
-                              campeonato.estado,
-                            ),
-                            icon: Icons.verified_outlined,
-                          ),
-                          AppBadge(
-                            text: Etiquetas.modalidad(campeonato.modalidad),
-                            type: AppBadgeType.warning,
-                            icon: deporteIcono(campeonato.deporteEfectivo),
-                          ),
-                          AppBadge(
-                            text: Etiquetas.tipoCampeonato(
-                              campeonato.tipoCampeonato,
-                            ),
-                            type: AppBadgeType.primary,
-                            icon: Icons.account_tree_outlined,
-                          ),
-                        ],
-                        infoItems: [
-                          AppHeroInfoItem(
-                            icon: Icons.calendar_today_outlined,
-                            label: 'Temporada',
-                            value: campeonato.temporada,
-                          ),
-                          AppHeroInfoItem(
-                            icon: deporteIcono(campeonato.deporteEfectivo),
-                            label: 'Modalidad',
-                            value: Etiquetas.modalidad(campeonato.modalidad),
-                          ),
-                          AppHeroInfoItem(
-                            icon: Icons.place_outlined,
-                            label: 'Cancha',
-                            value: campeonato.cancha,
-                          ),
-                          AppHeroInfoItem(
-                            icon: Icons.flag_outlined,
-                            label: 'Estado',
-                            value: Etiquetas.estadoCampeonato(
-                              campeonato.estado,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      _PendientesCard(
-                        campeonato: campeonato,
-                        partidosStream: _partidosStream,
-                        equiposStream: _equiposStream,
-                        onEquipos: () =>
-                            _goTo(EquiposScreen(campeonatoId: campeonato.id)),
-                        onFixture: () =>
-                            _goTo(FixtureScreen(campeonatoId: campeonato.id)),
-                        onResultados: () => _goTo(
-                          ResultadosScreen(campeonatoId: campeonato.id),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _InfoStats(campeonato: campeonato),
-                      const SizedBox(height: 22),
-                      _ModulesGrid(
-                        campeonato: campeonato,
-                        onEquipos: () =>
-                            _goTo(EquiposScreen(campeonatoId: campeonato.id)),
-                        onJugadores: () =>
-                            _goTo(JugadoresScreen(campeonatoId: campeonato.id)),
-                        onGrupos: () =>
-                            _goTo(GruposScreen(campeonatoId: campeonato.id)),
-                        onFixture: () =>
-                            _goTo(FixtureScreen(campeonatoId: campeonato.id)),
-                        onResultados: () => _goTo(
-                          ResultadosScreen(campeonatoId: campeonato.id),
-                        ),
-                        onTabla: () => _goTo(
-                          TablaPosicionesScreen(campeonatoId: campeonato.id),
-                        ),
-                        onRanking: () => _goTo(
-                          RankingGoleadoresScreen(campeonatoId: campeonato.id),
-                        ),
-                        onSancionados: () => _goTo(
-                          JugadoresSancionadosScreen(
-                            campeonatoId: campeonato.id,
-                          ),
-                        ),
-                        onIgualacion: () => _goTo(
-                          IgualacionScreen(campeonatoId: campeonato.id),
-                        ),
-                        onLlaves: () =>
-                            _goTo(LlavesScreen(campeonatoId: campeonato.id)),
-                        onPdfs: () =>
-                            _goTo(PdfsScreen(campeonatoId: campeonato.id)),
-                        onAuditoria: () =>
-                            _goTo(AuditoriaScreen(campeonatoId: campeonato.id)),
-                      ),
-                      const SizedBox(height: 22),
-                      _FormatSummaryCard(campeonato: campeonato),
-                      const SizedBox(height: 30),
                     ],
                   ),
-                ),
-              );
-            },
-          ),
-        ),
+                  const SizedBox(height: 20),
+                  _PendientesCard(
+                    campeonato: campeonato,
+                    partidosStream: _partidosStream,
+                    equiposStream: _equiposStream,
+                    onEquipos: () =>
+                        _goTo(EquiposScreen(campeonatoId: campeonato.id)),
+                    onFixture: () =>
+                        _goTo(FixtureScreen(campeonatoId: campeonato.id)),
+                    onResultados: () =>
+                        _goTo(ResultadosScreen(campeonatoId: campeonato.id)),
+                  ),
+                  const SizedBox(height: 20),
+                  _InfoStats(campeonato: campeonato),
+                  const SizedBox(height: 22),
+                  _ModulesGrid(
+                    campeonato: campeonato,
+                    onEquipos: () =>
+                        _goTo(EquiposScreen(campeonatoId: campeonato.id)),
+                    onJugadores: () =>
+                        _goTo(JugadoresScreen(campeonatoId: campeonato.id)),
+                    onGrupos: () =>
+                        _goTo(GruposScreen(campeonatoId: campeonato.id)),
+                    onFixture: () =>
+                        _goTo(FixtureScreen(campeonatoId: campeonato.id)),
+                    onResultados: () =>
+                        _goTo(ResultadosScreen(campeonatoId: campeonato.id)),
+                    onTabla: () => _goTo(
+                      TablaPosicionesScreen(campeonatoId: campeonato.id),
+                    ),
+                    onRanking: () => _goTo(
+                      RankingGoleadoresScreen(campeonatoId: campeonato.id),
+                    ),
+                    onSancionados: () => _goTo(
+                      JugadoresSancionadosScreen(campeonatoId: campeonato.id),
+                    ),
+                    onIgualacion: () =>
+                        _goTo(IgualacionScreen(campeonatoId: campeonato.id)),
+                    onLlaves: () =>
+                        _goTo(LlavesScreen(campeonatoId: campeonato.id)),
+                    onPdfs: () =>
+                        _goTo(PdfsScreen(campeonatoId: campeonato.id)),
+                    onAuditoria: () =>
+                        _goTo(AuditoriaScreen(campeonatoId: campeonato.id)),
+                  ),
+                  const SizedBox(height: 22),
+                  _FormatSummaryCard(campeonato: campeonato),
+                  const SizedBox(height: 30),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -593,11 +602,6 @@ class _ModulesGrid extends StatelessWidget {
     required this.onAuditoria,
   });
 
-  bool get _usaGrupos {
-    return campeonato.tipoCampeonato == TipoCampeonato.faseGrupos ||
-        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
-  }
-
   @override
   Widget build(BuildContext context) {
     final modules = [
@@ -617,7 +621,7 @@ class _ModulesGrid extends StatelessWidget {
         tag: 'Planillas',
         onTap: onJugadores,
       ),
-      if (_usaGrupos)
+      if (campeonato.usaGrupos)
         _ModuleItem(
           title: 'Grupos',
           description: 'Inscribir equipos en cada grupo antes del fixture.',
@@ -671,15 +675,18 @@ class _ModulesGrid extends StatelessWidget {
           tag: 'Competencia',
           onTap: onLlaves,
         ),
-      _ModuleItem(
-        title: 'Igualación',
-        description:
-            'Sumar puntos a los grupos con menos equipos para compararlos parejo.',
-        icon: Icons.balance_outlined,
-        enabled: campeonato.estado != CampeonatoEstado.inscripcion,
-        tag: 'Competencia',
-        onTap: onIgualacion,
-      ),
+      // La igualación compensa a los grupos con menos equipos: en una
+      // liga o una eliminación directa no hay grupos que comparar.
+      if (campeonato.usaGrupos)
+        _ModuleItem(
+          title: 'Igualación',
+          description:
+              'Sumar puntos a los grupos con menos equipos para compararlos parejo.',
+          icon: Icons.balance_outlined,
+          enabled: campeonato.estado != CampeonatoEstado.inscripcion,
+          tag: 'Competencia',
+          onTap: onIgualacion,
+        ),
       _ModuleItem(
         title: 'Sancionados',
         description: campeonato.esFutbol
@@ -1038,8 +1045,7 @@ String _vueltasSubtitle(CampeonatoModel campeonato) {
   final tipo = campeonato.tipoCampeonato;
   final config = campeonato.configuracion;
 
-  if (tipo == TipoCampeonato.faseGrupos ||
-      tipo == TipoCampeonato.gruposEliminacion) {
+  if (campeonato.usaGrupos) {
     return config.idaYVueltaEnGrupos ? 'En grupos' : 'Una vuelta';
   }
 
@@ -1064,5 +1070,132 @@ String _rondaTexto(String ronda) {
       return 'No aplica';
     default:
       return RondaLlave.nombre(ronda);
+  }
+}
+
+class _DatosEditados {
+  final String nombre;
+  final String descripcion;
+  final String temporada;
+  final String cancha;
+
+  const _DatosEditados({
+    required this.nombre,
+    required this.descripcion,
+    required this.temporada,
+    required this.cancha,
+  });
+}
+
+/// Corregir nombre, descripción, temporada o cancha. El formato y el
+/// deporte quedan fijos: cambiarlos con partidos cargados rompería el
+/// fixture y la tabla.
+class _EditarCampeonatoDialog extends StatefulWidget {
+  final CampeonatoModel campeonato;
+
+  const _EditarCampeonatoDialog({required this.campeonato});
+
+  @override
+  State<_EditarCampeonatoDialog> createState() =>
+      _EditarCampeonatoDialogState();
+}
+
+class _EditarCampeonatoDialogState extends State<_EditarCampeonatoDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final _nombre = TextEditingController(text: widget.campeonato.nombre);
+  late final _descripcion = TextEditingController(
+    text: widget.campeonato.descripcion,
+  );
+  late final _temporada = TextEditingController(
+    text: widget.campeonato.temporada,
+  );
+  late final _cancha = TextEditingController(text: widget.campeonato.cancha);
+
+  @override
+  void dispose() {
+    _nombre.dispose();
+    _descripcion.dispose();
+    _temporada.dispose();
+    _cancha.dispose();
+    super.dispose();
+  }
+
+  void _guardar() {
+    if (!_formKey.currentState!.validate()) return;
+
+    Navigator.pop(
+      context,
+      _DatosEditados(
+        nombre: _nombre.text,
+        descripcion: _descripcion.text,
+        temporada: _temporada.text,
+        cancha: _cancha.text,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      surfaceTintColor: Colors.transparent,
+      title: Text('Editar campeonato', style: AppTextStyles.heading3),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppTextField(
+                  label: 'Nombre',
+                  controller: _nombre,
+                  prefixIcon: Icons.emoji_events_outlined,
+                  validator: (valor) => (valor ?? '').trim().isEmpty
+                      ? 'El nombre es obligatorio.'
+                      : null,
+                ),
+                const SizedBox(height: 14),
+                AppTextField(
+                  label: 'Descripción',
+                  controller: _descripcion,
+                  maxLines: 3,
+                  prefixIcon: Icons.notes_outlined,
+                ),
+                const SizedBox(height: 14),
+                AppTextField(
+                  label: 'Temporada',
+                  controller: _temporada,
+                  prefixIcon: Icons.calendar_today_outlined,
+                ),
+                const SizedBox(height: 14),
+                AppTextField(
+                  label: 'Cancha',
+                  controller: _cancha,
+                  prefixIcon: Icons.place_outlined,
+                ),
+                const SizedBox(height: 14),
+                const AppInfoBox(
+                  text:
+                      'El formato, el deporte y las reglas no se pueden cambiar una vez creado el campeonato.',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        AppButton.ghost(
+          text: 'Cancelar',
+          onPressed: () => Navigator.pop(context),
+        ),
+        AppButton.primary(
+          text: 'Guardar',
+          icon: Icons.check_rounded,
+          onPressed: _guardar,
+        ),
+      ],
+    );
   }
 }

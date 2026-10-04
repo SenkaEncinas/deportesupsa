@@ -16,7 +16,7 @@ import 'package:futsal/models/partido_model.dart';
 import 'package:futsal/models/tabla_posicion_model.dart';
 import 'package:futsal/screens/reciclaje/app_badge.dart';
 import 'package:futsal/screens/reciclaje/app_bracket_view.dart';
-import 'package:futsal/screens/reciclaje/app_campeonato_admin_card.dart';
+import 'package:futsal/screens/reciclaje/app_campeonato_card.dart';
 import 'package:futsal/screens/reciclaje/app_info_box.dart';
 import 'package:futsal/screens/reciclaje/app_card.dart';
 import 'package:futsal/screens/reciclaje/app_hero_card.dart';
@@ -24,7 +24,6 @@ import 'package:futsal/screens/reciclaje/app_match_card.dart';
 import 'package:futsal/screens/reciclaje/app_responsive_grid.dart';
 import 'package:futsal/screens/reciclaje/app_section_header.dart';
 import 'package:futsal/screens/reciclaje/app_standing_card.dart';
-import 'package:futsal/screens/reciclaje/championship_public_card.dart';
 
 const _anchosReferencia = <String, Size>{
   'mobile (375px)': Size(375, 812),
@@ -158,16 +157,13 @@ Future<void> _pumpAt(WidgetTester tester, Size size, Widget child) async {
 }
 
 void main() {
-  group('ChampionshipPublicCard sin overflow', () {
+  group('AppCampeonatoCard (público) sin overflow', () {
     for (final entry in _anchosReferencia.entries) {
       testWidgets('en ${entry.key}', (tester) async {
         await _pumpAt(
           tester,
           entry.value,
-          ChampionshipPublicCard(
-            campeonato: _campeonatoDePrueba(),
-            onTap: () {},
-          ),
+          AppCampeonatoCard(campeonato: _campeonatoDePrueba(), onTap: () {}),
         );
 
         // Un RenderFlex overflow se reporta como excepción del framework.
@@ -424,7 +420,7 @@ void main() {
             tabletColumns: 2,
             desktopColumns: 3,
             children: List.generate(6, (index) {
-              return ChampionshipPublicCard(
+              return AppCampeonatoCard(
                 campeonato: _campeonatoDePrueba(),
                 onTap: () {},
               );
@@ -437,7 +433,7 @@ void main() {
     }
   });
 
-  group('AppCampeonatoAdminCard sin overflow', () {
+  group('AppCampeonatoCard (admin) sin overflow', () {
     for (final entry in _anchosReferencia.entries) {
       testWidgets('en ${entry.key}', (tester) async {
         await _pumpAt(
@@ -448,14 +444,16 @@ void main() {
             tabletColumns: 2,
             desktopColumns: 3,
             children: [
-              AppCampeonatoAdminCard(
+              AppCampeonatoCard(
+                admin: true,
                 campeonato: _campeonatoDePrueba(),
-                onAdministrar: () {},
+                onTap: () {},
                 onVerPublico: () {},
               ),
-              AppCampeonatoAdminCard(
+              AppCampeonatoCard(
+                admin: true,
                 campeonato: _campeonatoDePrueba(),
-                onAdministrar: () {},
+                onTap: () {},
               ),
             ],
           ),

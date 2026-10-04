@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../models/campeonato_model.dart';
+import '../../models/tabla_posicion_model.dart';
 import '../../utils/clasificacion.dart';
 import '../../utils/fixture_grouping.dart';
 import 'app_badge.dart';
@@ -47,6 +49,7 @@ class _AppClasificadosCardState extends State<AppClasificadosCard> {
   Widget build(BuildContext context) {
     final ronda = FixtureGrouping.rondaSegunEquipos(widget.totalEsperado);
     final faltan = widget.totalEsperado - widget.clasificados.length;
+    final deLiga = widget.clasificados.any((c) => c.deLiga);
 
     return AppCard(
       child: Column(
@@ -60,11 +63,12 @@ class _AppClasificadosCardState extends State<AppClasificadosCard> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Expanded(
+                Expanded(
                   child: AppSectionHeader(
                     title: 'Clasificados a la fase final',
-                    subtitle:
-                        'Directos por grupo y mejores terceros, en vivo según los resultados actuales.',
+                    subtitle: deLiga
+                        ? 'Los mejores de la tabla de la liga, en vivo según los resultados actuales.'
+                        : 'Directos por grupo y mejores terceros, en vivo según los resultados actuales.',
                   ),
                 ),
                 if (widget.totalEsperado >= 2) ...[
@@ -79,7 +83,7 @@ class _AppClasificadosCardState extends State<AppClasificadosCard> {
             const SizedBox(height: 14),
             if (widget.clasificados.isEmpty)
               Text(
-                'Todavía no hay clasificados definidos: se calculan a medida que se juegan los partidos de grupos.',
+                'Todavía no hay clasificados definidos: se calculan a medida que se juegan los partidos.',
                 style: AppTextStyles.body.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -114,7 +118,10 @@ List<Widget> _filasPorBloque(List<ClasificadoInfo> clasificados) {
 
   for (var i = 0; i < clasificados.length; i++) {
     final clasificado = clasificados[i];
-    final bloque = clasificado.porMejorTercero
+    // En una liga todos los clasificados forman un solo bloque.
+    final bloque = clasificado.deLiga
+        ? 0
+        : clasificado.porMejorTercero
         ? -1
         : clasificado.posicionEnGrupo;
 
@@ -147,6 +154,7 @@ List<Widget> _filasPorBloque(List<ClasificadoInfo> clasificados) {
 }
 
 String _tituloBloque(ClasificadoInfo clasificado) {
+  if (clasificado.deLiga) return 'MEJORES DE LA LIGA';
   if (clasificado.porMejorTercero) return 'MEJORES TERCEROS';
 
   switch (clasificado.posicionEnGrupo) {
@@ -236,7 +244,7 @@ class _ClasificadoRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${equipo.posicion}° de grupo · ${equipo.puntos} pts · DIF ${equipo.diferenciaGoles >= 0 ? '+' : ''}${equipo.diferenciaGoles}',
+                  '${equipo.posicion}° ${clasificado.deLiga ? 'de la liga' : 'de grupo'} · ${equipo.puntos} pts · DIF ${equipo.diferenciaGoles >= 0 ? '+' : ''}${equipo.diferenciaGoles}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.small.copyWith(
@@ -263,6 +271,51 @@ class _ClasificadoRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// [AppClasificadosCard] alimentada en vivo por la tabla del campeonato.
+///
+/// La usaban la vista pública y la pantalla de grupos, cada una con su
+/// copia, y las dos abrían la consulta a la tabla dentro de `build`: cada
+/// redibujado (cambiar de pestaña, escribir en un buscador) la volvía a
+/// abrir. Acá se abre una sola vez.
+class AppClasificadosEnVivo extends StatefulWidget {
+  final CampeonatoModel campeonato;
+
+  /// Se llama una sola vez, al crear el widget.
+  final Stream<List<TablaPosicionModel>> Function() tabla;
+  final bool colapsable;
+
+  const AppClasificadosEnVivo({
+    super.key,
+    required this.campeonato,
+    required this.tabla,
+    this.colapsable = true,
+  });
+
+  @override
+  State<AppClasificadosEnVivo> createState() => _AppClasificadosEnVivoState();
+}
+
+class _AppClasificadosEnVivoState extends State<AppClasificadosEnVivo> {
+  late final Stream<List<TablaPosicionModel>> _tabla = widget.tabla();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<TablaPosicionModel>>(
+      stream: _tabla,
+      builder: (context, snapshot) {
+        return AppClasificadosCard(
+          clasificados: Clasificacion.paraCampeonato(
+            campeonato: widget.campeonato,
+            tabla: snapshot.data ?? const [],
+          ),
+          totalEsperado: widget.campeonato.totalClasificados,
+          colapsable: widget.colapsable,
+        );
+      },
     );
   }
 }

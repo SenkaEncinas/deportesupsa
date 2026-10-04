@@ -1,3 +1,4 @@
+import '../models/campeonato_model.dart';
 import '../models/tabla_posicion_model.dart';
 import 'tabla_calculo.dart';
 
@@ -11,10 +12,15 @@ class ClasificadoInfo {
   final bool porMejorTercero;
   final int posicionEnGrupo;
 
+  /// Clasificó por su puesto en la tabla de una liga (liga + final o
+  /// playoffs), no por su grupo.
+  final bool deLiga;
+
   const ClasificadoInfo({
     required this.equipo,
     required this.porMejorTercero,
     required this.posicionEnGrupo,
+    this.deLiga = false,
   });
 }
 
@@ -38,6 +44,39 @@ class ClasificadoInfo {
 /// lista cruza contra el último.
 class Clasificacion {
   Clasificacion._();
+
+  /// Los clasificados según el formato del campeonato: por grupos (ver
+  /// [calcular]) o, en "liga + final" y "liga + playoffs", los mejores
+  /// de la tabla general. Es lo que usan la llave, la vista pública y la
+  /// pantalla de grupos.
+  static List<ClasificadoInfo> paraCampeonato({
+    required CampeonatoModel campeonato,
+    required List<TablaPosicionModel> tabla,
+  }) {
+    if (campeonato.usaGrupos) {
+      return calcular(
+        tabla: tabla,
+        clasificanPorGrupo: campeonato.configuracion.clasificanPorGrupo,
+        mejoresTerceros: campeonato.configuracion.mejoresTerceros,
+      );
+    }
+
+    if (!campeonato.tieneFasesSeparadas) return const [];
+
+    final ordenada = [...tabla]..sort(TablaCalculo.comparar);
+
+    return ordenada
+        .take(campeonato.totalClasificados)
+        .map(
+          (equipo) => ClasificadoInfo(
+            equipo: equipo,
+            porMejorTercero: false,
+            posicionEnGrupo: equipo.posicion,
+            deLiga: true,
+          ),
+        )
+        .toList();
+  }
 
   static List<ClasificadoInfo> calcular({
     required List<TablaPosicionModel> tabla,

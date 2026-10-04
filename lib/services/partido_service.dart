@@ -149,8 +149,8 @@ class PartidoService {
   ///
   /// - Liga solo ida / ida y vuelta: round-robin.
   /// - Liga + final / liga + playoffs: genera solo la fase de liga; la
-  ///   fase final se crea con cruce manual cuando exista tabla final
-  ///   (preparado para generación automática en una siguiente fase).
+  ///   final o los playoffs se generan desde "Llaves" al activar la fase
+  ///   eliminatoria, con los mejores de la tabla.
   /// - Fase de grupos / grupos + eliminación: genera la fase de grupos;
   ///   la eliminatoria se crea después con los clasificados.
   /// - Eliminación directa: genera la primera ronda con cruces aleatorios.
@@ -376,9 +376,6 @@ class PartidoService {
     }
   }
 
-  /// Eliminación directa: primera ronda con cruces aleatorios.
-  /// Las rondas siguientes se agregan con cruce manual cuando existan
-  /// ganadores (preparado para generación automática en una fase futura).
   /// Eliminación directa desde el arranque: se arma el mismo cuadro
   /// completo que en grupos+eliminación, solo que la "siembra" es el
   /// orden de los equipos (sorteado si el campeonato es aleatorio) en
@@ -578,10 +575,13 @@ class PartidoService {
     await _resultadoService.recalcularTablaYRanking(campeonatoId);
   }
 
-  /// Partidos que forman la llave eliminatoria: los que no tienen grupo
-  /// y no son partidos de privilegio (esos quedan fuera a propósito).
-  List<PartidoModel> soloDeLlave(List<PartidoModel> partidos) {
-    return partidos.where((p) => p.esDeFaseFinal).toList();
+  /// Partidos de la fase final del campeonato (ver
+  /// [CampeonatoModel.esDeFaseFinal]).
+  List<PartidoModel> soloDeLlave(
+    CampeonatoModel campeonato,
+    List<PartidoModel> partidos,
+  ) {
+    return partidos.where(campeonato.esDeFaseFinal).toList();
   }
 
   /// Genera el **cuadro completo** de la fase eliminatoria: la primera
@@ -639,12 +639,21 @@ class PartidoService {
       );
     }
 
+    final campeonatoDoc = await _campeonato(campeonatoId).get();
+    if (!campeonatoDoc.exists || campeonatoDoc.data() == null) {
+      throw Exception('El campeonato no existe.');
+    }
+    final campeonato = CampeonatoModel.fromMap(
+      campeonatoDoc.id,
+      campeonatoDoc.data()!,
+    );
+
     final existentesSnap = await _partidos(campeonatoId).get();
     final existentes = existentesSnap.docs
         .map((doc) => PartidoModel.fromMap(doc.id, doc.data()))
         .toList();
 
-    final deLlave = soloDeLlave(existentes);
+    final deLlave = soloDeLlave(campeonato, existentes);
 
     // No se pisa una llave que ya se empezó a jugar.
     final conResultado = deLlave.where((p) => p.resultadoRegistrado).toList();
@@ -684,12 +693,19 @@ class PartidoService {
     // La jornada más alta entre los cruces que cargó el admin: el cuadro
     // generado empieza a contar desde ahí. Sin cruces manuales da 0 y la
     // numeración queda igual que siempre.
-    final jornadaBase = deLlave
-        .where((partido) => !partido.generadoPorSistema)
-        .fold<int>(
-          0,
-          (mayor, partido) => partido.jornada > mayor ? partido.jornada : mayor,
-        );
+    //
+    // En una liga la fase final no tiene grupo propio, así que arranca
+    // después de la última jornada de la liga: si no, la final quedaba
+    // mezclada con la jornada 1 en el fixture.
+    final jornadaBase =
+        (campeonato.usaGrupos
+                ? deLlave.where((partido) => !partido.generadoPorSistema)
+                : existentes.where((partido) => !partido.esDeLlave))
+            .fold<int>(
+              0,
+              (mayor, partido) =>
+                  partido.jornada > mayor ? partido.jornada : mayor,
+            );
 
     for (final cruce in estructura) {
       // La jornada arranca después de lo que ya haya cargado el admin a
@@ -888,35 +904,5 @@ class PartidoService {
       'estado': PartidoEstado.programado,
       'fechaActualizacion': FieldValue.serverTimestamp(),
     });
-  }
-
-  Future<void> suspenderPartido({
-    required String campeonatoId,
-    required String partidoId,
-    required String observacion,
-  }) async {
-    if (observacion.trim().isEmpty) {
-      throw Exception(
-        'La observación es obligatoria para suspender un partido.',
-      );
-    }
-
-    await _partidos(campeonatoId).doc(partidoId).update({
-      'estado': PartidoEstado.suspendido,
-      'observacionResultado': observacion.trim(),
-      'fechaActualizacion': FieldValue.serverTimestamp(),
-    });
-  }
-
-  Future<void> reprogramarPartido({
-    required String campeonatoId,
-    required String partidoId,
-    required DateTime nuevaFechaHora,
-  }) async {
-    await programarPartido(
-      campeonatoId: campeonatoId,
-      partidoId: partidoId,
-      fechaHora: nuevaFechaHora,
-    );
   }
 }

@@ -5,8 +5,8 @@ import '../models/equipo_model.dart';
 import '../models/partido_model.dart';
 import '../models/ranking_goleador_model.dart';
 import '../models/tabla_posicion_model.dart';
+import '../services/datos_campeonato.dart';
 import '../services/public_home_service.dart';
-import '../utils/clasificacion.dart';
 import '../utils/fixture_grouping.dart';
 import '../utils/tabla_calculo.dart';
 import 'reciclaje/app_badge.dart';
@@ -29,12 +29,13 @@ import 'reciclaje/app_skeleton.dart';
 import 'reciclaje/app_standing_card.dart';
 import 'reciclaje/app_table_container.dart';
 import 'reciclaje/app_text_styles.dart';
-import 'reciclaje/championship_public_card.dart';
 import 'reciclaje/responsive.dart';
 import 'reciclaje/stat_card.dart';
 import '../utils/etiquetas.dart';
+import 'reciclaje/app_fase_badge.dart';
+import 'reciclaje/app_fondo.dart';
 
-class ChampionshipDetailScreen extends StatelessWidget {
+class ChampionshipDetailScreen extends StatefulWidget {
   final CampeonatoModel campeonato;
 
   /// Solo para los tests, que necesitan apuntar a un Firestore de
@@ -48,56 +49,55 @@ class ChampionshipDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<ChampionshipDetailScreen> createState() =>
+      _ChampionshipDetailScreenState();
+}
+
+class _ChampionshipDetailScreenState extends State<ChampionshipDetailScreen> {
+  /// Una sola conexión por dato para toda la pantalla (ver
+  /// [DatosCampeonato]).
+  late final DatosCampeonato datos = DatosCampeonato(
+    widget.service ?? PublicHomeService(),
+    widget.campeonato.id,
+  );
+
+  CampeonatoModel get campeonato => widget.campeonato;
+
+  @override
+  void dispose() {
+    datos.cerrar();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final service = this.service ?? PublicHomeService();
     final isMobile = Responsive.isMobile(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFEAF5F1),
-              AppColors.background,
-              AppColors.background,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: isMobile
-              ? _MobileChampionshipView(
-                  service: service,
-                  campeonato: campeonato,
-                )
-              : SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      AppPage(
-                        title: campeonato.nombre,
-                        subtitle: 'Información pública del campeonato.',
-                        actions: [
-                          AppButton.secondary(
-                            text: 'Volver',
-                            icon: Icons.arrow_back_rounded,
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ],
-                        child: _ChampionshipContent(
-                          service: service,
-                          campeonato: campeonato,
-                        ),
+    return AppFondo(
+      child: isMobile
+          ? _MobileChampionshipView(datos: datos, campeonato: campeonato)
+          : SingleChildScrollView(
+              child: Column(
+                children: [
+                  AppPage(
+                    title: campeonato.nombre,
+                    subtitle: 'Información pública del campeonato.',
+                    actions: [
+                      AppButton.secondary(
+                        text: 'Volver',
+                        icon: Icons.arrow_back_rounded,
+                        onPressed: () => Navigator.pop(context),
                       ),
-                      const AppPublicFooter(),
                     ],
+                    child: _ChampionshipContent(
+                      datos: datos,
+                      campeonato: campeonato,
+                    ),
                   ),
-                ),
-        ),
-      ),
+                  const AppPublicFooter(),
+                ],
+              ),
+            ),
     );
   }
 }
@@ -109,10 +109,10 @@ class ChampionshipDetailScreen extends StatelessWidget {
 /// cancha, modalidad...) solo se muestra el logo de la UPSA: esa info ya
 /// la vio el usuario al entrar al campeonato, no hace falta repetirla.
 class _ChampionshipContent extends StatelessWidget {
-  final PublicHomeService service;
+  final DatosCampeonato datos;
   final CampeonatoModel campeonato;
 
-  const _ChampionshipContent({required this.service, required this.campeonato});
+  const _ChampionshipContent({required this.datos, required this.campeonato});
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +122,7 @@ class _ChampionshipContent extends StatelessWidget {
     // tabla de la fase de grupos y, en fútbol, los goleadores: los
     // próximos partidos y las estadísticas ya no aportan nada.
     if (campeonato.estaEnFaseEliminatoria) {
-      return _ContenidoEliminatoria(service: service, campeonato: campeonato);
+      return _ContenidoEliminatoria(datos: datos, campeonato: campeonato);
     }
 
     return Column(
@@ -134,47 +134,40 @@ class _ChampionshipContent extends StatelessWidget {
             const SizedBox(width: 12),
             AppBadge(
               text: estadoTexto,
-              type: ChampionshipPublicCard.badgeType(campeonato.estado),
-              icon: Icons.sports_soccer,
+              type: AppBadge.tipoEstadoCampeonato(campeonato.estado),
+              icon: deporteIcono(campeonato.deporteEfectivo),
             ),
             if (campeonato.tieneFasesSeparadas) ...[
               const SizedBox(width: 8),
-              AppBadge(
-                text: campeonato.estaEnFaseDeGrupos
-                    ? 'Fase de grupos'
-                    : 'Fase eliminatoria',
-                type: campeonato.estaEnFaseDeGrupos
-                    ? AppBadgeType.info
-                    : AppBadgeType.warning,
-                icon: campeonato.estaEnFaseDeGrupos
-                    ? Icons.grid_view_rounded
-                    : Icons.bolt_outlined,
-              ),
+              AppFaseBadge(campeonato: campeonato),
             ],
           ],
         ),
         const SizedBox(height: 20),
         _StatsSection(
-          service: service,
+          datos: datos,
           campeonato: campeonato,
           estadoTexto: estadoTexto,
         ),
         const SizedBox(height: 24),
         AppResponsivePair(
           first: _NextMatchesSection(
-            service: service,
-            campeonatoId: campeonato.id,
+            datos: datos,
             deporte: campeonato.deporteEfectivo,
           ),
           second: _LastResultsSection(
-            service: service,
-            campeonatoId: campeonato.id,
+            datos: datos,
             deporte: campeonato.deporteEfectivo,
           ),
         ),
         const SizedBox(height: 24),
-        _FixtureSection(service: service, campeonato: campeonato),
-        const SizedBox(height: 24),
+        // Fuera de la eliminatoria, el cuadro solo existe en la
+        // eliminación directa. En una liga o en la fase de grupos esta
+        // sección solo decía "Todavía no hay partidos de fase final".
+        if (campeonato.muestraLlave) ...[
+          _FixtureSection(datos: datos, campeonato: campeonato),
+          const SizedBox(height: 24),
+        ],
         // Vóley y básquet no registran goles/puntos por jugador: sin esa
         // sección, la tabla usa todo el ancho en vez de dejar un hueco
         // al lado.
@@ -182,17 +175,21 @@ class _ChampionshipContent extends StatelessWidget {
           AppResponsivePair(
             firstFlex: 3,
             secondFlex: 2,
-            first: _TableSection(service: service, campeonato: campeonato),
-            second: _ScorersSection(service: service, campeonato: campeonato),
+            first: _TableSection(datos: datos, campeonato: campeonato),
+            second: _ScorersSection(datos: datos, campeonato: campeonato),
           )
         else
-          _TableSection(service: service, campeonato: campeonato),
+          _TableSection(datos: datos, campeonato: campeonato),
         // Desplegada, debajo de la tabla: muestra en vivo quién va
         // clasificando y en qué puesto de siembra, para que nadie tenga
         // que deducirlo de la tabla general.
-        if (campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion) ...[
+        if (campeonato.tieneFasesSeparadas) ...[
           const SizedBox(height: 24),
-          _ClasificadosSection(service: service, campeonato: campeonato),
+          AppClasificadosEnVivo(
+            campeonato: campeonato,
+            tabla: () => datos.tabla,
+            colapsable: false,
+          ),
         ],
         const SizedBox(height: 28),
       ],
@@ -211,14 +208,14 @@ class _ChampionshipContent extends StatelessWidget {
 /// La usan escritorio y móvil, así que lo que aparece en la pantalla
 /// principal es lo mismo en los dos.
 class _PrincipalEliminatoria extends StatelessWidget {
-  final PublicHomeService service;
+  final DatosCampeonato datos;
   final CampeonatoModel campeonato;
 
   /// En móvil el título de la sección ya dice "Llaves eliminatorias".
   final bool conEncabezado;
 
   const _PrincipalEliminatoria({
-    required this.service,
+    required this.datos,
     required this.campeonato,
     this.conEncabezado = true,
   });
@@ -226,7 +223,7 @@ class _PrincipalEliminatoria extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _FixtureSection(
-      service: service,
+      datos: datos,
       campeonato: campeonato,
       conEncabezado: conEncabezado,
     );
@@ -242,13 +239,10 @@ class _PrincipalEliminatoria extends StatelessWidget {
 /// Los partidos de la fase final no modifican esa tabla: no tienen
 /// grupo y el cálculo los ignora.
 class _ContenidoEliminatoria extends StatefulWidget {
-  final PublicHomeService service;
+  final DatosCampeonato datos;
   final CampeonatoModel campeonato;
 
-  const _ContenidoEliminatoria({
-    required this.service,
-    required this.campeonato,
-  });
+  const _ContenidoEliminatoria({required this.datos, required this.campeonato});
 
   @override
   State<_ContenidoEliminatoria> createState() => _ContenidoEliminatoriaState();
@@ -259,7 +253,7 @@ class _ContenidoEliminatoriaState extends State<_ContenidoEliminatoria> {
   _VistaTabla _vistaTabla = _VistaTabla.general;
 
   CampeonatoModel get campeonato => widget.campeonato;
-  PublicHomeService get service => widget.service;
+  DatosCampeonato get datos => widget.datos;
 
   void _ir(_SeccionPublica seccion, {_VistaTabla? vistaTabla}) {
     setState(() {
@@ -300,22 +294,23 @@ class _ContenidoEliminatoriaState extends State<_ContenidoEliminatoria> {
                   // grupos" desde la barra se aplique aunque la sección
                   // ya estuviera abierta.
                   key: ValueKey(_vistaTabla),
-                  service: service,
+                  datos: datos,
                   campeonato: campeonato,
                   vistaInicial: _vistaTabla,
                 ),
                 if (campeonato.esFutbol) ...[
                   const SizedBox(height: 24),
-                  _ScorersSection(service: service, campeonato: campeonato),
+                  _ScorersSection(datos: datos, campeonato: campeonato),
                 ],
               ],
             ),
-            _SeccionPublica.clasificados => _ClasificadosSection(
-              service: service,
+            _SeccionPublica.clasificados => AppClasificadosEnVivo(
               campeonato: campeonato,
+              tabla: () => datos.tabla,
+              colapsable: false,
             ),
             _SeccionPublica.llaves || _SeccionPublica.resumen =>
-              _PrincipalEliminatoria(service: service, campeonato: campeonato),
+              _PrincipalEliminatoria(datos: datos, campeonato: campeonato),
           },
         ),
       ],
@@ -346,11 +341,11 @@ enum _SeccionPublica { resumen, llaves, tabla, clasificados }
 /// en cambio, la eliminatoria reemplazaba toda la vista y el sidebar
 /// desaparecía, así que de un día para el otro se navegaba distinto.
 class _MobileChampionshipView extends StatefulWidget {
-  final PublicHomeService service;
+  final DatosCampeonato datos;
   final CampeonatoModel campeonato;
 
   const _MobileChampionshipView({
-    required this.service,
+    required this.datos,
     required this.campeonato,
   });
 
@@ -367,7 +362,7 @@ class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
   _VistaTabla _vistaTablaInicial = _VistaTabla.general;
 
   CampeonatoModel get campeonato => widget.campeonato;
-  PublicHomeService get service => widget.service;
+  DatosCampeonato get datos => widget.datos;
 
   void _ir(_SeccionPublica seccion, {_VistaTabla? vistaTabla}) {
     setState(() {
@@ -446,28 +441,18 @@ class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
                 children: [
                   AppBadge(
                     text: estadoTexto,
-                    type: ChampionshipPublicCard.badgeType(campeonato.estado),
-                    icon: Icons.sports_soccer,
+                    type: AppBadge.tipoEstadoCampeonato(campeonato.estado),
+                    icon: deporteIcono(campeonato.deporteEfectivo),
                   ),
                   if (campeonato.tieneFasesSeparadas)
-                    AppBadge(
-                      text: campeonato.estaEnFaseDeGrupos
-                          ? 'Fase de grupos'
-                          : 'Fase eliminatoria',
-                      type: campeonato.estaEnFaseDeGrupos
-                          ? AppBadgeType.info
-                          : AppBadgeType.warning,
-                      icon: campeonato.estaEnFaseDeGrupos
-                          ? Icons.grid_view_rounded
-                          : Icons.bolt_outlined,
-                    ),
+                    AppFaseBadge(campeonato: campeonato),
                 ],
               ),
               const SizedBox(height: 10),
               // Los chips de partidos/goles son de la fase de grupos: en
               // eliminatoria la llave ya cuenta esa historia mejor.
               if (!campeonato.estaEnFaseEliminatoria) ...[
-                _MobileTopStats(service: service, campeonato: campeonato),
+                _MobileTopStats(datos: datos, campeonato: campeonato),
                 const SizedBox(height: 18),
               ] else
                 const SizedBox(height: 8),
@@ -476,14 +461,12 @@ class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _NextMatchesSection(
-                      service: service,
-                      campeonatoId: campeonato.id,
+                      datos: datos,
                       deporte: campeonato.deporteEfectivo,
                     ),
                     const SizedBox(height: 16),
                     _LastResultsSection(
-                      service: service,
-                      campeonatoId: campeonato.id,
+                      datos: datos,
                       deporte: campeonato.deporteEfectivo,
                     ),
                   ],
@@ -492,7 +475,7 @@ class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
                 // debajo el fixture con los resultados. La tabla y los
                 // clasificados se abren desde el menú.
                 _SeccionPublica.llaves => _PrincipalEliminatoria(
-                  service: service,
+                  datos: datos,
                   campeonato: campeonato,
                   conEncabezado: false,
                 ),
@@ -501,19 +484,20 @@ class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
                   children: [
                     _TableSection(
                       key: ValueKey(_vistaTablaInicial),
-                      service: service,
+                      datos: datos,
                       campeonato: campeonato,
                       vistaInicial: _vistaTablaInicial,
                     ),
                     if (campeonato.esFutbol) ...[
                       const SizedBox(height: 20),
-                      _ScorersSection(service: service, campeonato: campeonato),
+                      _ScorersSection(datos: datos, campeonato: campeonato),
                     ],
                   ],
                 ),
-                _SeccionPublica.clasificados => _ClasificadosSection(
-                  service: service,
+                _SeccionPublica.clasificados => AppClasificadosEnVivo(
                   campeonato: campeonato,
+                  tabla: () => datos.tabla,
+                  colapsable: false,
                 ),
               },
               // El footer va fuera del padding lateral para que la
@@ -534,10 +518,10 @@ class _MobileChampionshipViewState extends State<_MobileChampionshipView> {
 /// en vez de las `StatCard` grandes de escritorio: en móvil esa info es
 /// secundaria al fixture/resultados, así que ocupa una sola línea.
 class _MobileTopStats extends StatelessWidget {
-  final PublicHomeService service;
+  final DatosCampeonato datos;
   final CampeonatoModel campeonato;
 
-  const _MobileTopStats({required this.service, required this.campeonato});
+  const _MobileTopStats({required this.datos, required this.campeonato});
 
   @override
   Widget build(BuildContext context) {
@@ -546,7 +530,7 @@ class _MobileTopStats extends StatelessWidget {
       runSpacing: 8,
       children: [
         StreamBuilder<List<EquipoModel>>(
-          stream: service.streamEquipos(campeonato.id),
+          stream: datos.equipos,
           builder: (context, snapshot) {
             return _MiniStatChip(
               icon: Icons.groups_2_outlined,
@@ -557,7 +541,7 @@ class _MobileTopStats extends StatelessWidget {
           },
         ),
         StreamBuilder<List<PartidoModel>>(
-          stream: service.streamPartidos(campeonato.id),
+          stream: datos.partidos,
           builder: (context, snapshot) {
             return _MiniStatChip(
               icon: Icons.sports_soccer,
@@ -569,7 +553,7 @@ class _MobileTopStats extends StatelessWidget {
         ),
         if (campeonato.esFutbol)
           StreamBuilder<List<PartidoModel>>(
-            stream: service.streamPartidos(campeonato.id),
+            stream: datos.partidos,
             builder: (context, snapshot) {
               final totalGoles = (snapshot.data ?? [])
                   .where((p) => p.resultadoRegistrado)
@@ -589,7 +573,7 @@ class _MobileTopStats extends StatelessWidget {
           )
         else
           StreamBuilder<List<PartidoModel>>(
-            stream: service.streamPartidos(campeonato.id),
+            stream: datos.partidos,
             builder: (context, snapshot) {
               final finalizados = (snapshot.data ?? [])
                   .where((p) => p.resultadoRegistrado)
@@ -736,17 +720,6 @@ class _MenuSecciones extends StatelessWidget {
     this.conResumen = true,
   });
 
-  bool get _usaGrupos =>
-      campeonato.tipoCampeonato == TipoCampeonato.faseGrupos ||
-      campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
-
-  /// La llave solo se ofrece cuando hay algo que mostrar: o el
-  /// campeonato ya entró en fase eliminatoria, o es de eliminación
-  /// directa y la llave es todo el torneo.
-  bool get _tieneLlave =>
-      campeonato.estaEnFaseEliminatoria ||
-      campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
-
   bool _tablaElegida(_VistaTabla vista) =>
       seccionActual == _SeccionPublica.tabla && vistaTabla == vista;
 
@@ -755,7 +728,7 @@ class _MenuSecciones extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_tieneLlave)
+        if (campeonato.muestraLlave)
           _DrawerItem(
             icon: Icons.account_tree_outlined,
             label: 'Llaves eliminatorias',
@@ -776,7 +749,7 @@ class _MenuSecciones extends StatelessWidget {
           onTap: () =>
               onSelect(_SeccionPublica.tabla, vistaTabla: _VistaTabla.general),
         ),
-        if (_usaGrupos)
+        if (campeonato.usaGrupos)
           _DrawerItem(
             icon: Icons.grid_view_rounded,
             label: 'Tabla por grupos',
@@ -786,7 +759,7 @@ class _MenuSecciones extends StatelessWidget {
               vistaTabla: _VistaTabla.porGrupos,
             ),
           ),
-        if (campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion)
+        if (campeonato.tieneFasesSeparadas)
           _DrawerItem(
             icon: Icons.emoji_events_outlined,
             label: 'Clasificados a la fase final',
@@ -854,12 +827,12 @@ class _DrawerItem extends StatelessWidget {
 }
 
 class _StatsSection extends StatelessWidget {
-  final PublicHomeService service;
+  final DatosCampeonato datos;
   final CampeonatoModel campeonato;
   final String estadoTexto;
 
   const _StatsSection({
-    required this.service,
+    required this.datos,
     required this.campeonato,
     required this.estadoTexto,
   });
@@ -868,7 +841,7 @@ class _StatsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final cards = <Widget>[
       StreamBuilder(
-        stream: service.streamEquipos(campeonato.id),
+        stream: datos.equipos,
         builder: (context, snapshot) {
           return StatCard(
             title: 'Equipos',
@@ -880,7 +853,7 @@ class _StatsSection extends StatelessWidget {
         },
       ),
       StreamBuilder<List<PartidoModel>>(
-        stream: service.streamPartidos(campeonato.id),
+        stream: datos.partidos,
         builder: (context, snapshot) {
           final partidos = snapshot.data ?? [];
 
@@ -903,7 +876,7 @@ class _StatsSection extends StatelessWidget {
       // subcontaba el total real del campeonato.
       if (campeonato.esFutbol)
         StreamBuilder<List<PartidoModel>>(
-          stream: service.streamPartidos(campeonato.id),
+          stream: datos.partidos,
           builder: (context, snapshot) {
             final partidos = snapshot.data ?? [];
             final totalGoles = partidos
@@ -925,7 +898,7 @@ class _StatsSection extends StatelessWidget {
         )
       else
         StreamBuilder<List<PartidoModel>>(
-          stream: service.streamPartidos(campeonato.id),
+          stream: datos.partidos,
           builder: (context, snapshot) {
             final finalizados = (snapshot.data ?? [])
                 .where((p) => p.resultadoRegistrado)
@@ -959,21 +932,16 @@ class _StatsSection extends StatelessWidget {
 }
 
 class _NextMatchesSection extends StatelessWidget {
-  final PublicHomeService service;
-  final String campeonatoId;
+  final DatosCampeonato datos;
   final String deporte;
 
-  const _NextMatchesSection({
-    required this.service,
-    required this.campeonatoId,
-    required this.deporte,
-  });
+  const _NextMatchesSection({required this.datos, required this.deporte});
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
       child: StreamBuilder<List<PartidoModel>>(
-        stream: service.streamProximosPartidos(campeonatoId),
+        stream: datos.proximos,
         builder: (context, snapshot) {
           final partidos = snapshot.data ?? [];
 
@@ -1112,21 +1080,16 @@ class _BloqueSemana extends StatelessWidget {
 }
 
 class _LastResultsSection extends StatelessWidget {
-  final PublicHomeService service;
-  final String campeonatoId;
+  final DatosCampeonato datos;
   final String deporte;
 
-  const _LastResultsSection({
-    required this.service,
-    required this.campeonatoId,
-    required this.deporte,
-  });
+  const _LastResultsSection({required this.datos, required this.deporte});
 
   @override
   Widget build(BuildContext context) {
     return AppCard(
       child: StreamBuilder<List<PartidoModel>>(
-        stream: service.streamUltimosResultados(campeonatoId),
+        stream: datos.ultimosResultados,
         builder: (context, snapshot) {
           final partidos = snapshot.data ?? [];
 
@@ -1176,7 +1139,7 @@ class _LastResultsSection extends StatelessWidget {
 ///   final...): una llave visual con `AppBracketView`, mucho más clara
 ///   que una lista de texto una vez que el torneo llega a esa etapa.
 class _FixtureSection extends StatelessWidget {
-  final PublicHomeService service;
+  final DatosCampeonato datos;
   final CampeonatoModel campeonato;
 
   /// En móvil la sección ya viene titulada por la pantalla (el nombre
@@ -1185,21 +1148,15 @@ class _FixtureSection extends StatelessWidget {
   final bool conEncabezado;
 
   const _FixtureSection({
-    required this.service,
+    required this.datos,
     required this.campeonato,
     this.conEncabezado = true,
   });
 
-  bool get _esEliminacionPura =>
-      campeonato.tipoCampeonato == TipoCampeonato.eliminacionDirecta;
-
-  bool get _esGruposEliminacion =>
-      campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<PartidoModel>>(
-      stream: service.streamPartidos(campeonato.id),
+      stream: datos.partidos,
       builder: (context, snapshot) {
         final partidos = snapshot.data ?? [];
 
@@ -1227,9 +1184,7 @@ class _FixtureSection extends StatelessWidget {
         // visual de la fase eliminatoria.
         // Los partidos con privilegio también van sin grupo, pero no son
         // parte de la fase final: se filtran aparte.
-        final deFaseFinal = (_esEliminacionPura || _esGruposEliminacion)
-            ? partidos.where((p) => p.esDeFaseFinal).toList()
-            : <PartidoModel>[];
+        final deFaseFinal = partidos.where(campeonato.esDeFaseFinal).toList();
 
         final rondasLlave = FixtureGrouping.rondasEliminatorias(deFaseFinal);
 
@@ -1340,51 +1295,10 @@ class _PartidosFaseFinalSection extends StatelessWidget {
   }
 }
 
-/// Quién clasifica a la fase final y en qué puesto de siembra: los 1ros
-/// de grupo, después los 2dos y al final los mejores terceros. Se
-/// calcula en vivo y solo aplica al formato "grupos + eliminación".
-///
-/// Va siempre desplegada. Estuvo colapsada al final de la página, y la
-/// gente se guiaba por la tabla general, que ordena solo por puntos y no
-/// dice en qué llave cae cada uno.
-class _ClasificadosSection extends StatelessWidget {
-  final PublicHomeService service;
-  final CampeonatoModel campeonato;
-
-  const _ClasificadosSection({required this.service, required this.campeonato});
-
-  @override
-  Widget build(BuildContext context) {
-    final config = campeonato.configuracion;
-    final total =
-        config.cantidadGrupos * config.clasificanPorGrupo +
-        config.mejoresTerceros;
-
-    return StreamBuilder<List<TablaPosicionModel>>(
-      stream: service.streamTabla(campeonato.id),
-      builder: (context, snapshot) {
-        final tabla = snapshot.data ?? [];
-
-        final clasificados = Clasificacion.calcular(
-          tabla: tabla,
-          clasificanPorGrupo: config.clasificanPorGrupo,
-          mejoresTerceros: config.mejoresTerceros,
-        );
-
-        return AppClasificadosCard(
-          clasificados: clasificados,
-          totalEsperado: total,
-          colapsable: false,
-        );
-      },
-    );
-  }
-}
-
 enum _VistaTabla { general, porGrupos }
 
 class _TableSection extends StatefulWidget {
-  final PublicHomeService service;
+  final DatosCampeonato datos;
   final CampeonatoModel campeonato;
 
   /// Vista con la que arranca ("General" o "Por grupos"): el drawer de
@@ -1395,7 +1309,7 @@ class _TableSection extends StatefulWidget {
 
   const _TableSection({
     super.key,
-    required this.service,
+    required this.datos,
     required this.campeonato,
     this.vistaInicial = _VistaTabla.general,
   });
@@ -1665,7 +1579,7 @@ class _TableSectionState extends State<_TableSection> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<TablaPosicionModel>>(
-      stream: widget.service.streamTabla(campeonato.id),
+      stream: widget.datos.tabla,
       builder: (context, snapshot) {
         final tabla = snapshot.data ?? [];
 
@@ -1831,10 +1745,10 @@ class _PositionCell extends StatelessWidget {
 }
 
 class _ScorersSection extends StatelessWidget {
-  final PublicHomeService service;
+  final DatosCampeonato datos;
   final CampeonatoModel campeonato;
 
-  const _ScorersSection({required this.service, required this.campeonato});
+  const _ScorersSection({required this.datos, required this.campeonato});
 
   @override
   Widget build(BuildContext context) {
@@ -1843,7 +1757,7 @@ class _ScorersSection extends StatelessWidget {
     // este widget ni se llama para esos deportes (ver el build principal).
     return AppCard(
       child: StreamBuilder<List<RankingGoleadorModel>>(
-        stream: service.streamRankingGoleadores(campeonato.id),
+        stream: datos.ranking,
         builder: (context, snapshot) {
           final ranking = snapshot.data ?? [];
 

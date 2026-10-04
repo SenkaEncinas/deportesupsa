@@ -69,6 +69,13 @@ Future<FakeFirebaseFirestore> _baseConCampeonato() async {
   return db;
 }
 
+/// El campeonato tal como está guardado, para las reglas que dependen
+/// del formato (qué partidos son de la fase final, por ejemplo).
+Future<CampeonatoModel> _campeonato(FakeFirebaseFirestore db) async {
+  final doc = await db.collection('campeonatos').doc(kCampeonato).get();
+  return CampeonatoModel.fromMap(doc.id, doc.data()!);
+}
+
 Future<List<PartidoModel>> _partidos(FakeFirebaseFirestore db) async {
   final snap = await db
       .collection('campeonatos')
@@ -680,7 +687,7 @@ void main() {
         final db = await armarADosManos();
         final deLlave = PartidoService(
           firestore: db,
-        ).soloDeLlave(await _partidos(db));
+        ).soloDeLlave(await _campeonato(db), await _partidos(db));
 
         final rondas = FixtureGrouping.rondasEliminatorias(deLlave);
 
@@ -798,7 +805,10 @@ void main() {
         idaYVuelta: false,
       );
 
-      final deLlave = servicio.soloDeLlave(await _partidos(db));
+      final deLlave = servicio.soloDeLlave(
+        await _campeonato(db),
+        await _partidos(db),
+      );
 
       expect(deLlave.length, 1);
       expect(
@@ -822,7 +832,10 @@ void main() {
         );
       }
 
-      final deLlave = servicio.soloDeLlave(await _partidos(db));
+      final deLlave = servicio.soloDeLlave(
+        await _campeonato(db),
+        await _partidos(db),
+      );
 
       expect(FixtureGrouping.rondasEliminatorias(deLlave), isEmpty);
       expect(FixtureGrouping.crucesSueltos(deLlave).length, 3);
@@ -846,7 +859,10 @@ void main() {
         sembrar: false,
       );
 
-      final deLlave = servicio.soloDeLlave(await _partidos(db));
+      final deLlave = servicio.soloDeLlave(
+        await _campeonato(db),
+        await _partidos(db),
+      );
       final rondas = FixtureGrouping.rondasEliminatorias(deLlave);
 
       expect(rondas.map((r) => r.key).toList(), ['Semifinales', 'Final']);

@@ -106,28 +106,49 @@ class CampeonatoService {
     }
   }
 
-  Future<void> actualizarCampeonato({
+  /// Corrige los datos descriptivos de un campeonato: nombre,
+  /// descripción, temporada y cancha. El formato, el deporte y la
+  /// configuración no se tocan acá: cambiarlos con partidos ya cargados
+  /// rompería el fixture y la tabla.
+  Future<void> actualizarDatosCampeonato({
     required String campeonatoId,
-    required Map<String, dynamic> data,
+    required String nombre,
+    required String descripcion,
+    required String temporada,
+    required String cancha,
+    required String usuarioId,
+    required String usuarioNombre,
   }) async {
-    data.remove('fechaInicio');
-    data.remove('fechaFin');
+    if (nombre.trim().isEmpty) {
+      throw Exception('El nombre del campeonato es obligatorio.');
+    }
 
     await _campeonatos.doc(campeonatoId).update({
-      ...data,
+      'nombre': nombre.trim(),
+      'descripcion': descripcion.trim(),
+      'temporada': temporada.trim(),
+      'cancha': cancha.trim(),
       'fechaActualizacion': FieldValue.serverTimestamp(),
     });
+
+    await _auditoriaService.registrar(
+      campeonatoId: campeonatoId,
+      usuarioId: usuarioId,
+      usuarioNombre: usuarioNombre,
+      accion: 'Editar campeonato',
+      modulo: 'Campeonato',
+      documentoAfectado: campeonatoId,
+      detalle: 'Se editaron los datos del campeonato ${nombre.trim()}.',
+    );
   }
 
-  /// Pasa un campeonato de "Grupos + eliminación" de la fase de grupos a
-  /// la fase eliminatoria: a partir de acá, "Agregar cruce manual" deja
-  /// de limitarse a equipos del mismo grupo, para poder armar las llaves
-  /// con los clasificados que decida el admin.
+  /// Pasa un campeonato de dos fases (grupos o liga + eliminatoria) a la
+  /// fase eliminatoria: a partir de acá se arman las llaves, y en
+  /// "grupos + eliminación" los cruces manuales dejan de limitarse a
+  /// equipos del mismo grupo.
   Future<void> activarFaseEliminatoria(CampeonatoModel campeonato) async {
     if (!campeonato.tieneFasesSeparadas) {
-      throw Exception(
-        'Solo los campeonatos de "Grupos + eliminación" tienen fase eliminatoria para activar.',
-      );
+      throw Exception('Este formato no tiene fase eliminatoria para activar.');
     }
 
     if (campeonato.estaEnFaseEliminatoria) {

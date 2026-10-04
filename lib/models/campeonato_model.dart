@@ -17,8 +17,8 @@ class DeporteTipo {
   static const List<String> todos = [futbol, volley, basket];
 }
 
-/// Modalidades por deporte. `volley_mixto` y `basket_3x3` quedan
-/// preparadas para una siguiente fase sin romper nada.
+/// Modalidades de cada deporte. Definen el texto que se muestra y la
+/// cantidad de jugadores en cancha que el formulario propone.
 class ModalidadDeporte {
   static const String futsal = 'futsal';
   static const String futbol7 = 'futbol_7';
@@ -460,7 +460,6 @@ class CampeonatoModel {
     };
   }
 
-  bool get estaEnInscripcion => estado == CampeonatoEstado.inscripcion;
   bool get estaActivo => estado == CampeonatoEstado.activo;
   bool get estaFinalizado => estado == CampeonatoEstado.finalizado;
 
@@ -489,12 +488,30 @@ class CampeonatoModel {
   /// los penales y no dejaba cerrar un empate.
   bool requiereGanador(PartidoModel partido) {
     if (!configuracion.permiteEmpate) return true;
+    return esDeFaseFinal(partido);
+  }
+
+  /// Si el partido es de la fase final (la eliminatoria) y no de la fase
+  /// regular. Es la única definición: la usan la tabla (la fase final no
+  /// suma puntos), los penales, la vista pública y la pantalla de llaves.
+  ///
+  /// - Grupos + eliminación: los que no tienen grupo (generados por el
+  ///   cuadro o cargados a mano).
+  /// - Liga + final / playoffs: la liga la arma el sistema y no tiene
+  ///   grupos, así que ahí la señal es otra: que sea del cuadro o que lo
+  ///   haya cargado el admin.
+  /// - Eliminación directa: todos.
+  ///
+  /// Los partidos con privilegio nunca son fase final: son amistosos o
+  /// partidos especiales fuera de la competencia.
+  bool esDeFaseFinal(PartidoModel partido) {
+    if (partido.privilegio) return false;
 
     switch (tipoCampeonato) {
       case TipoCampeonato.eliminacionDirecta:
         return true;
       case TipoCampeonato.gruposEliminacion:
-        return partido.esDeFaseFinal;
+        return !partido.tieneGrupo;
       case TipoCampeonato.ligaFinal:
       case TipoCampeonato.ligaPlayoffs:
         return partido.esDeLlave || !partido.generadoPorSistema;
@@ -502,9 +519,6 @@ class CampeonatoModel {
         return false;
     }
   }
-
-  bool get tieneIgualaciones =>
-      igualaciones.values.any((puntos) => puntos != 0);
 
   /// Reglas de puntaje que se aplican de verdad al armar la tabla.
   ///
@@ -544,26 +558,55 @@ class CampeonatoModel {
     return sistema;
   }
 
-  /// En fases eliminatorias, finales y playoffs no puede quedar empate.
-  bool get formatoEliminaEmpates =>
-      tipoCampeonato == TipoCampeonato.eliminacionDirecta;
-
-  /// Solo "Grupos + eliminación" tiene dos etapas separadas: mientras no
-  /// se active la fase eliminatoria a mano, los cruces manuales quedan
-  /// limitados a equipos del mismo grupo (ver [PartidoService]).
-  bool get tieneFasesSeparadas =>
+  /// Los equipos se reparten en grupos y cada grupo tiene su tabla.
+  bool get usaGrupos =>
+      tipoCampeonato == TipoCampeonato.faseGrupos ||
       tipoCampeonato == TipoCampeonato.gruposEliminacion;
+
+  /// Formatos con dos etapas: una fase regular (grupos o liga) y una
+  /// eliminatoria que el admin activa a mano cuando termina la primera.
+  bool get tieneFasesSeparadas =>
+      tipoCampeonato == TipoCampeonato.gruposEliminacion ||
+      tipoCampeonato == TipoCampeonato.ligaFinal ||
+      tipoCampeonato == TipoCampeonato.ligaPlayoffs;
 
   /// Si los cruces manuales deberían limitarse a equipos del mismo
   /// grupo: siempre en "fase de grupos" puro (no hay otra etapa), y en
   /// "grupos + eliminación" mientras no se active la fase eliminatoria.
   bool get debeRestringirCrucesAlGrupo =>
       tipoCampeonato == TipoCampeonato.faseGrupos ||
-      (tieneFasesSeparadas && faseActual != FaseCampeonato.eliminatoria);
+      (usaGrupos && estaEnFaseRegular);
 
-  bool get estaEnFaseDeGrupos =>
+  /// En la primera etapa de un formato de dos fases (grupos o liga).
+  bool get estaEnFaseRegular =>
       tieneFasesSeparadas && faseActual != FaseCampeonato.eliminatoria;
 
   bool get estaEnFaseEliminatoria =>
       tieneFasesSeparadas && faseActual == FaseCampeonato.eliminatoria;
+
+  /// Hay un cuadro eliminatorio para mostrar: el campeonato ya pasó a la
+  /// fase eliminatoria, o es de eliminación directa y el cuadro es todo
+  /// el torneo.
+  bool get muestraLlave =>
+      estaEnFaseEliminatoria ||
+      tipoCampeonato == TipoCampeonato.eliminacionDirecta;
+
+  /// Nombre de la primera etapa: "Fase de grupos" o "Fase de liga".
+  String get nombreFaseRegular => usaGrupos ? 'Fase de grupos' : 'Fase de liga';
+
+  /// Nombre de la etapa en curso de un formato de dos fases.
+  String get nombreFaseActual =>
+      estaEnFaseEliminatoria ? 'Fase eliminatoria' : nombreFaseRegular;
+
+  /// Cuántos equipos pasan a la fase final según la configuración:
+  /// los N por grupo más los mejores terceros, o los N mejores de la
+  /// liga (2 en "liga + final").
+  int get totalClasificados {
+    if (usaGrupos) {
+      return configuracion.cantidadGrupos * configuracion.clasificanPorGrupo +
+          configuracion.mejoresTerceros;
+    }
+    if (tipoCampeonato == TipoCampeonato.ligaFinal) return 2;
+    return configuracion.clasificadosPlayoffs;
+  }
 }

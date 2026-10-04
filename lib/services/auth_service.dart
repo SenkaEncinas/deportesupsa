@@ -14,8 +14,6 @@ class AuthService {
   CollectionReference<Map<String, dynamic>> get _admins =>
       _db.collection('admins');
 
-  Stream<User?> get authChanges => _auth.authStateChanges();
-
   User? get currentUser => _auth.currentUser;
 
   Future<UserCredential> login({
@@ -68,19 +66,6 @@ class AuthService {
     if (!doc.exists || doc.data() == null) return null;
 
     return AdminModel.fromMap(doc.id, doc.data()!);
-  }
-
-  Stream<AdminModel?> adminActualStream() {
-    return _auth.authStateChanges().asyncExpand((user) {
-      if (user == null) {
-        return Stream<AdminModel?>.value(null);
-      }
-
-      return _admins.doc(user.uid).snapshots().map((doc) {
-        if (!doc.exists || doc.data() == null) return null;
-        return AdminModel.fromMap(doc.id, doc.data()!);
-      });
-    });
   }
 
   Future<AdminModel> requireAdmin() async {

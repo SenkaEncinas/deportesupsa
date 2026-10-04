@@ -34,9 +34,7 @@ class TablaCalculo {
     required List<EquipoModel> equipos,
     required List<PartidoModel> partidos,
   }) {
-    final usaGrupos =
-        campeonato.tipoCampeonato == TipoCampeonato.faseGrupos ||
-        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
+    final usaGrupos = campeonato.usaGrupos;
 
     // Grupo de cada equipo: se deduce de cualquier partido (jugado o no)
     // que tenga grupoId, para que el equipo aparezca en su grupo desde
@@ -61,7 +59,7 @@ class TablaCalculo {
     final reglas = campeonato.reglasPuntuacionEfectivas;
 
     for (final partido in partidos) {
-      if (!_cuentaParaLaTabla(partido, usaGrupos)) continue;
+      if (!_cuentaParaLaTabla(campeonato, partido)) continue;
 
       final local = acumulados[partido.equipoLocalId];
       final visitante = acumulados[partido.equipoVisitanteId];
@@ -123,9 +121,13 @@ class TablaCalculo {
   }
 
   /// Un partido suma para la tabla si ya se jugó y pertenece a la fase
-  /// regular. En los formatos con grupos, los cruces de la fase final no
-  /// tienen grupo y quedan afuera: son eliminatoria, no puntos.
-  static bool _cuentaParaLaTabla(PartidoModel partido, bool usaGrupos) {
+  /// regular. Los de la fase final (el cuadro, la final de una liga) son
+  /// eliminatoria, no puntos. En los formatos con grupos tampoco suman
+  /// los partidos sin grupo, como los de privilegio.
+  static bool _cuentaParaLaTabla(
+    CampeonatoModel campeonato,
+    PartidoModel partido,
+  ) {
     if (partido.estado != PartidoEstado.finalizado ||
         !partido.resultadoRegistrado) {
       return false;
@@ -133,7 +135,8 @@ class TablaCalculo {
     if (partido.golesLocal == null || partido.golesVisitante == null) {
       return false;
     }
-    if (usaGrupos && !partido.tieneGrupo) {
+    if (campeonato.usaGrupos && !partido.tieneGrupo) return false;
+    if (campeonato.tieneFasesSeparadas && campeonato.esDeFaseFinal(partido)) {
       return false;
     }
     return true;

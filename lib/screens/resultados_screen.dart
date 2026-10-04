@@ -257,7 +257,7 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: _ResultadoCard(
                                     partido: partido,
-                                    esVolley: campeonato?.esVolley ?? false,
+                                    campeonato: campeonato,
                                     motivoBloqueo: motivo,
                                     onEditar: () =>
                                         _abrirFormulario(partido, campeonato),
@@ -278,7 +278,7 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
 
 class _ResultadoCard extends StatelessWidget {
   final PartidoModel partido;
-  final bool esVolley;
+  final CampeonatoModel? campeonato;
 
   /// Si no es null, el partido no se puede cargar y esto dice por qué.
   final String? motivoBloqueo;
@@ -286,7 +286,7 @@ class _ResultadoCard extends StatelessWidget {
 
   const _ResultadoCard({
     required this.partido,
-    required this.esVolley,
+    required this.campeonato,
     required this.motivoBloqueo,
     required this.onEditar,
   });
@@ -302,13 +302,15 @@ class _ResultadoCard extends StatelessWidget {
     if (partido.esDeLlave) {
       return '${RondaLlave.nombre(partido.rondaLlave!)} · Llave ${partido.llave}';
     }
-    if (partido.esDeFaseFinal) return 'Fase final';
+    if (campeonato?.esDeFaseFinal(partido) ?? false) return 'Fase final';
     return 'Jornada ${partido.jornada}';
   }
 
   String get _marcador {
     if (!partido.resultadoRegistrado) return '—';
-    return esVolley ? '${partido.marcadorTexto} sets' : partido.marcadorTexto;
+    return (campeonato?.esVolley ?? false)
+        ? '${partido.marcadorTexto} sets'
+        : partido.marcadorTexto;
   }
 
   @override

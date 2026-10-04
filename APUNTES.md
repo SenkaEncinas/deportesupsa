@@ -144,7 +144,16 @@ lado, se llaman; nunca se copian ni se reescriben:
 | Texto de un estado, formato, modalidad o deporte | `Etiquetas` (`lib/utils/etiquetas.dart`) |
 | ¿Le falta el resultado? ¿Le falta la fecha? | `PartidoModel.faltaResultado`, `.faltaResultadoAl()`, `.faltaProgramar` |
 | Recuadro de ayuda | `AppInfoBox` (`lib/screens/reciclaje/app_info_box.dart`) |
-| Tarjeta y números de campeonatos del admin | `AppCampeonatoAdminCard`, `AppCampeonatosStats` |
+| ¿Es de la fase final? (no suma a la tabla, exige ganador) | `CampeonatoModel.esDeFaseFinal()` |
+| ¿Usa grupos? ¿Tiene dos fases? ¿En cuál está? | `CampeonatoModel.usaGrupos`, `.tieneFasesSeparadas`, `.nombreFaseActual` |
+| Quiénes clasifican (por grupos o por liga) | `Clasificacion.paraCampeonato()` |
+| Tarjeta de campeonato (pública y admin) y sus números | `AppCampeonatoCard`, `AppCampeonatosStats` |
+| Buscador de campeonatos con filtros | `AppBuscadorCampeonatos` |
+| Etiqueta de la fase del campeonato | `AppFaseBadge` |
+| Fondo degradado de las pantallas | `AppFondo` |
+| Campos de formulario (desplegable, título de sección) | `AppDropdownField`, `AppFormSectionTitle` |
+| Datos en vivo de la página pública (una conexión por dato) | `DatosCampeonato` + `StreamCompartido` |
+| Próximos partidos / últimos resultados | `PublicHomeService.proximos()`, `.ultimosResultados()` |
 
 Por qué importa: la tabla general desempataba por sets mientras la del
 grupo desempataba por puntos, porque había **tres** copias del mismo
@@ -159,3 +168,15 @@ Las reglas permiten **lectura pública** y exigen sesión de admin para
 escribir. Para diagnosticar datos alcanza con un script de Node usando
 el SDK web y la config de `lib/firebase_options.dart`; para corregirlos
 hay que hacerlo desde la app con un admin logueado.
+
+## Liga + final y liga + playoffs
+
+Funcionan igual que "grupos + eliminación": se juega la liga, se usa
+"Activar fase eliminatoria" en Fixture y desde "Llaves" se genera la
+final (los 2 mejores) o los playoffs (los N configurados) con la tabla
+de la liga. La fase final no suma puntos a la tabla.
+
+Cómo se reconoce un partido de fase final en una liga: es del cuadro
+generado o lo cargó el admin a mano (la liga la arma siempre el
+sistema). Por eso, en estos formatos, un cruce manual cuenta como fase
+final aunque se cargue durante la liga.

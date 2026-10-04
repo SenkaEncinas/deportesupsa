@@ -270,11 +270,6 @@ class PartidoModel {
   /// El partido pertenece a un grupo de la fase de grupos.
   bool get tieneGrupo => grupoId != null && grupoId!.isNotEmpty;
 
-  /// Cruce de fase final: sin grupo y sin privilegio. Los de privilegio
-  /// también van sin grupo, pero son amistosos o partidos especiales y
-  /// no forman parte de la eliminatoria.
-  bool get esDeFaseFinal => !tieneGrupo && !privilegio;
-
   /// Ganó el local: se jugó, no fue empate y el ganador es el local.
   bool get ganoLocal =>
       resultadoRegistrado && !empate && ganadorId == equipoLocalId;

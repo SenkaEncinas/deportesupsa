@@ -11,8 +11,7 @@ import 'championship_detail_screen.dart';
 import 'detalle_campeonato_screen.dart';
 import 'home_screen.dart';
 import 'reciclaje/app_button.dart';
-import 'reciclaje/app_campeonato_admin_card.dart';
-import 'reciclaje/app_colors.dart';
+import 'reciclaje/app_campeonato_card.dart';
 import 'reciclaje/app_empty_state.dart';
 import 'reciclaje/app_hero_card.dart';
 import 'reciclaje/app_loading.dart';
@@ -22,6 +21,7 @@ import 'reciclaje/app_section_header.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/responsive.dart';
 import '../utils/mensajes.dart';
+import 'reciclaje/app_fondo.dart';
 
 /// Pantalla de inicio del administrador.
 ///
@@ -85,140 +85,120 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFEAF5F1),
-              AppColors.background,
-              AppColors.background,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: FutureBuilder<AdminModel?>(
-            future: _adminFuture,
-            builder: (context, adminSnapshot) {
-              final admin = adminSnapshot.data;
+    return AppFondo(
+      child: FutureBuilder<AdminModel?>(
+        future: _adminFuture,
+        builder: (context, adminSnapshot) {
+          final admin = adminSnapshot.data;
 
-              return StreamBuilder<List<CampeonatoModel>>(
-                stream: _campeonatosStream,
-                builder: (context, campeonatoSnapshot) {
-                  final campeonatos = campeonatoSnapshot.data ?? [];
+          return StreamBuilder<List<CampeonatoModel>>(
+            stream: _campeonatosStream,
+            builder: (context, campeonatoSnapshot) {
+              final campeonatos = campeonatoSnapshot.data ?? [];
 
-                  if (campeonatoSnapshot.connectionState ==
-                          ConnectionState.waiting &&
-                      campeonatos.isEmpty) {
-                    return const AppLoading(
-                      message: 'Cargando panel administrativo...',
-                    );
-                  }
+              if (campeonatoSnapshot.connectionState ==
+                      ConnectionState.waiting &&
+                  campeonatos.isEmpty) {
+                return const AppLoading(
+                  message: 'Cargando panel administrativo...',
+                );
+              }
 
-                  if (campeonatoSnapshot.hasError) {
-                    return AppEmptyState(
-                      icon: Icons.error_outline,
-                      title: 'No se pudo cargar el panel',
-                      message: mensajeDeError(campeonatoSnapshot.error!),
-                    );
-                  }
+              if (campeonatoSnapshot.hasError) {
+                return AppEmptyState(
+                  icon: Icons.error_outline,
+                  title: 'No se pudo cargar el panel',
+                  message: mensajeDeError(campeonatoSnapshot.error!),
+                );
+              }
 
-                  // Los finalizados no se gestionan día a día: el panel
-                  // muestra lo que está en curso y el resto queda en el
-                  // listado completo.
-                  final enCurso = campeonatos
-                      .where((c) => c.estado != CampeonatoEstado.finalizado)
-                      .toList();
+              // Los finalizados no se gestionan día a día: el panel
+              // muestra lo que está en curso y el resto queda en el
+              // listado completo.
+              final enCurso = campeonatos
+                  .where((c) => c.estado != CampeonatoEstado.finalizado)
+                  .toList();
 
-                  return SingleChildScrollView(
-                    child: AppPage(
-                      title: 'Panel administrativo',
-                      subtitle: admin == null
-                          ? 'Gestión de campeonatos universitarios.'
-                          : 'Hola, ${admin.nombre}.',
-                      actions: [
-                        AppButton.secondary(
-                          text: isMobile ? 'Pública' : 'Ver página pública',
-                          icon: Icons.visibility_outlined,
-                          onPressed: () => _abrir(const HomeScreen()),
-                        ),
-                        AppButton.danger(
-                          text: isMobile ? 'Salir' : 'Cerrar sesión',
-                          icon: Icons.logout,
-                          onPressed: _logout,
-                        ),
-                      ],
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AppHeroCard(
-                            title: 'Campeonatos UPSA',
-                            description:
-                                'Entra a un campeonato para cargar equipos, programar el fixture y registrar resultados.',
-                            side: _AccionesHero(
-                              onNuevo: () =>
-                                  _abrir(const CampeonatoFormScreen()),
-                              onVerTodos: () =>
-                                  _abrir(const CampeonatosScreen()),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          AppCampeonatosStats(campeonatos: campeonatos),
-                          const SizedBox(height: 24),
-                          AppSectionHeader(
-                            title: 'Campeonatos en curso',
-                            subtitle: campeonatos.length > enCurso.length
-                                ? 'Los finalizados están en "Ver todos".'
-                                : 'Toca uno para administrarlo.',
-                          ),
-                          const SizedBox(height: 14),
-                          if (enCurso.isEmpty)
-                            AppEmptyState(
-                              icon: Icons.emoji_events_outlined,
-                              title: 'No hay campeonatos en curso',
-                              message:
-                                  'Crea un campeonato para empezar a registrar equipos, fixture y resultados.',
-                              buttonText: 'Crear campeonato',
-                              onPressed: () =>
-                                  _abrir(const CampeonatoFormScreen()),
-                            )
-                          else
-                            AppResponsiveGrid(
-                              mobileColumns: 1,
-                              tabletColumns: 2,
-                              desktopColumns: 3,
-                              spacing: 16,
-                              children: enCurso.map((campeonato) {
-                                return AppCampeonatoAdminCard(
-                                  campeonato: campeonato,
-                                  onAdministrar: () => _abrir(
-                                    DetalleCampeonatoScreen(
-                                      campeonatoId: campeonato.id,
-                                    ),
-                                  ),
-                                  onVerPublico: () => _abrir(
-                                    ChampionshipDetailScreen(
-                                      campeonato: campeonato,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          const SizedBox(height: 30),
-                        ],
-                      ),
+              return SingleChildScrollView(
+                child: AppPage(
+                  title: 'Panel administrativo',
+                  subtitle: admin == null
+                      ? 'Gestión de campeonatos universitarios.'
+                      : 'Hola, ${admin.nombre}.',
+                  actions: [
+                    AppButton.secondary(
+                      text: isMobile ? 'Pública' : 'Ver página pública',
+                      icon: Icons.visibility_outlined,
+                      onPressed: () => _abrir(const HomeScreen()),
                     ),
-                  );
-                },
+                    AppButton.danger(
+                      text: isMobile ? 'Salir' : 'Cerrar sesión',
+                      icon: Icons.logout,
+                      onPressed: _logout,
+                    ),
+                  ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppHeroCard(
+                        title: 'Campeonatos UPSA',
+                        description:
+                            'Entra a un campeonato para cargar equipos, programar el fixture y registrar resultados.',
+                        side: _AccionesHero(
+                          onNuevo: () => _abrir(const CampeonatoFormScreen()),
+                          onVerTodos: () => _abrir(const CampeonatosScreen()),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      AppCampeonatosStats(campeonatos: campeonatos),
+                      const SizedBox(height: 24),
+                      AppSectionHeader(
+                        title: 'Campeonatos en curso',
+                        subtitle: campeonatos.length > enCurso.length
+                            ? 'Los finalizados están en "Ver todos".'
+                            : 'Toca uno para administrarlo.',
+                      ),
+                      const SizedBox(height: 14),
+                      if (enCurso.isEmpty)
+                        AppEmptyState(
+                          icon: Icons.emoji_events_outlined,
+                          title: 'No hay campeonatos en curso',
+                          message:
+                              'Crea un campeonato para empezar a registrar equipos, fixture y resultados.',
+                          buttonText: 'Crear campeonato',
+                          onPressed: () => _abrir(const CampeonatoFormScreen()),
+                        )
+                      else
+                        AppResponsiveGrid(
+                          mobileColumns: 1,
+                          tabletColumns: 2,
+                          desktopColumns: 3,
+                          spacing: 16,
+                          children: enCurso.map((campeonato) {
+                            return AppCampeonatoCard(
+                              admin: true,
+                              campeonato: campeonato,
+                              onTap: () => _abrir(
+                                DetalleCampeonatoScreen(
+                                  campeonatoId: campeonato.id,
+                                ),
+                              ),
+                              onVerPublico: () => _abrir(
+                                ChampionshipDetailScreen(
+                                  campeonato: campeonato,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 30),
+                    ],
+                  ),
+                ),
               );
             },
-          ),
-        ),
+          );
+        },
       ),
     );
   }

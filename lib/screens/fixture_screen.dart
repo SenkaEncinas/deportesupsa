@@ -173,13 +173,10 @@ class _FixtureScreenState extends State<FixtureScreen> {
       context: context,
       title: 'Activar fase eliminatoria',
       message:
-          'Activar no arma ninguna llave: solo habilita cruzar equipos de '
-          'grupos distintos con "Agregar cruce manual".\n\n'
-          'Los cruces los vas cargando vos, que es lo que hace falta cuando '
-          'los clasificados no son 8 ni 16 y el formato lo define el '
-          'reglamento. Cuando lleguen a una cantidad pareja (semifinales, '
-          'cuartos, octavos), desde "Llaves" generás el cuadro eligiendo por '
-          'qué ronda arranca.\n\n'
+          'Da por terminada la ${campeonato.nombreFaseRegular.toLowerCase()} '
+          'y pasa a la eliminatoria. Activar no arma ninguna llave: después '
+          'se abre "Llaves", donde generás el cuadro con los clasificados o '
+          'cargás los cruces a mano.\n\n'
           'Esta acción no se puede deshacer.',
       confirmText: 'Activar',
       danger: true,
@@ -195,11 +192,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
       await _campeonatoService.activarFaseEliminatoria(campeonato);
 
       if (!mounted) return;
-      AppSnackbars.success(
-        context,
-        'Fase eliminatoria activada: ya podés cruzar equipos de distintos '
-        'grupos.',
-      );
+      AppSnackbars.success(context, 'Fase eliminatoria activada.');
 
       // Se abre la pantalla de llaves, como siempre: activar la fase y
       // decidir qué hacer con las llaves es un mismo momento. Ahí se
@@ -311,29 +304,21 @@ class _FixtureScreenState extends State<FixtureScreen> {
     );
   }
 
-  bool _esFormatoDosFases(CampeonatoModel campeonato) {
-    return campeonato.tipoCampeonato == TipoCampeonato.ligaFinal ||
-        campeonato.tipoCampeonato == TipoCampeonato.ligaPlayoffs ||
-        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
-  }
-
-  bool _usaGrupos(CampeonatoModel campeonato) {
-    return campeonato.tipoCampeonato == TipoCampeonato.faseGrupos ||
-        campeonato.tipoCampeonato == TipoCampeonato.gruposEliminacion;
-  }
-
+  /// Qué hacer en cada etapa de un formato de dos fases.
   String _mensajeDosFases(CampeonatoModel campeonato) {
+    if (campeonato.estaEnFaseEliminatoria) {
+      return 'Fase eliminatoria activada: desde "Llaves" genera el cuadro con los clasificados (o arma los cruces a mano con "Agregar cruce manual"). Los ganadores avanzan solos al cargar cada resultado.';
+    }
+
+    final config = campeonato.configuracion;
+
     switch (campeonato.tipoCampeonato) {
       case TipoCampeonato.ligaFinal:
-        return 'Liga + final: cuando termine la liga y la tabla esté completa, crea la final con "Agregar cruce manual" usando a los mejores clasificados. La generación automática de la final queda preparada para una siguiente fase.';
+        return 'Fase de liga en curso. Cuando termine, usa "Activar fase eliminatoria" y genera la final desde "Llaves": la juegan los 2 mejores de la tabla. La final no suma puntos a la tabla de la liga.';
       case TipoCampeonato.ligaPlayoffs:
-        return 'Liga + playoffs: al terminar la fase de liga, crea las llaves de playoffs con "Agregar cruce manual" según la tabla final (${campeonato.configuracion.clasificadosPlayoffs} clasificados).';
-      case TipoCampeonato.gruposEliminacion:
-        return campeonato.estaEnFaseDeGrupos
-            ? 'Fase de grupos en curso: "Agregar cruce manual" solo deja cruzar equipos del mismo grupo. Cuando termine la fase de grupos, usa "Activar fase eliminatoria" y arma las llaves con los ${campeonato.configuracion.clasificanPorGrupo} mejores de cada grupo (y los mejores terceros, si aplica).'
-            : 'Fase eliminatoria activada: ya puedes cruzar equipos de cualquier grupo con "Agregar cruce manual" para armar octavos, cuartos, semifinal y final.';
+        return 'Fase de liga en curso. Cuando termine, usa "Activar fase eliminatoria" y genera los playoffs desde "Llaves" con los ${config.clasificadosPlayoffs} mejores de la tabla. Los playoffs no suman puntos a la tabla de la liga.';
       default:
-        return '';
+        return 'Fase de grupos en curso: "Agregar cruce manual" solo deja cruzar equipos del mismo grupo. Cuando termine, usa "Activar fase eliminatoria" y arma las llaves con los ${config.clasificanPorGrupo} mejores de cada grupo (y los mejores terceros, si aplica).';
     }
   }
 
@@ -388,7 +373,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
                   subtitle: campeonato == null
                       ? 'Cruces y programación de partidos.'
                       : campeonato.tieneFasesSeparadas
-                      ? '${campeonato.nombre} · ${Etiquetas.tipoCampeonato(campeonato.tipoCampeonato)} · ${campeonato.estaEnFaseDeGrupos ? 'Fase de grupos' : 'Fase eliminatoria'}'
+                      ? '${campeonato.nombre} · ${Etiquetas.tipoCampeonato(campeonato.tipoCampeonato)} · ${campeonato.nombreFaseActual}'
                       : '${campeonato.nombre} · ${Etiquetas.tipoCampeonato(campeonato.tipoCampeonato)}',
                   actions: [
                     AppButton.secondary(
@@ -397,7 +382,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
                       onPressed: () => Navigator.pop(context),
                     ),
                     if (campeonato != null &&
-                        _usaGrupos(campeonato) &&
+                        campeonato.usaGrupos &&
                         partidos.isEmpty)
                       AppButton.secondary(
                         text: 'Grupos',
@@ -422,9 +407,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
                         loading: _loading,
                         onPressed: () => _generarFixture(campeonato),
                       ),
-                    if (puedeEditarFixture &&
-                        campeonato.tieneFasesSeparadas &&
-                        campeonato.estaEnFaseDeGrupos)
+                    if (puedeEditarFixture && campeonato.estaEnFaseRegular)
                       AppButton.secondary(
                         text: 'Activar fase eliminatoria',
                         icon: Icons.bolt_outlined,
@@ -466,7 +449,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
                               title: 'No hay fixture generado',
                               message: campeonato == null
                                   ? 'Puedes generar el fixture completo o agregar cruces manuales uno por uno.'
-                                  : _usaGrupos(campeonato)
+                                  : campeonato.usaGrupos
                                   ? 'Antes de generar el fixture, revisa "Grupos" para inscribir a cada equipo en su grupo. Si no lo haces, se repartirán automáticamente.'
                                   : 'El botón "Generar fixture" creará los cruces según el formato "${Etiquetas.tipoCampeonato(campeonato.tipoCampeonato)}". También puedes agregar cruces manuales uno por uno.',
                               buttonText: puedeEditarFixture
@@ -568,7 +551,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
                               ],
                             ),
                             if (campeonato != null &&
-                                _esFormatoDosFases(campeonato)) ...[
+                                campeonato.tieneFasesSeparadas) ...[
                               const SizedBox(height: 16),
                               AppInfoBox(text: _mensajeDosFases(campeonato)),
                             ],

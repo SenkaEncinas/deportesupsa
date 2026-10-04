@@ -11,6 +11,7 @@ import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/mensajes.dart';
+import 'reciclaje/app_form_fields.dart';
 
 class EquipoFormScreen extends StatefulWidget {
   final String campeonatoId;
@@ -159,7 +160,7 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(
                 children: [
-                  _SectionTitle(
+                  AppFormSectionTitle(
                     title: 'Datos del equipo',
                     subtitle:
                         'La carrera y facultad quedan habilitadas, pero pueden dejarse vacías si no aplican.',
@@ -214,13 +215,13 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
                   ),
                   if (widget.isEditing) ...[
                     const SizedBox(height: 22),
-                    _SectionTitle(
+                    AppFormSectionTitle(
                       title: 'Estado y observación',
                       subtitle:
                           'La observación es obligatoria para dejar respaldo del cambio.',
                     ),
                     const SizedBox(height: 18),
-                    _DropdownField<String>(
+                    AppDropdownField<String>(
                       label: 'Estado del equipo',
                       value: _estado,
                       items: const [
@@ -288,71 +289,6 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final String title;
-  final String subtitle;
-
-  const _SectionTitle({required this.title, required this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(Icons.circle, color: AppColors.primary, size: 12),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: AppTextStyles.heading3),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: AppTextStyles.body.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DropdownField<T> extends StatelessWidget {
-  final String label;
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final void Function(T?) onChanged;
-
-  const _DropdownField({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTextStyles.label),
-        const SizedBox(height: 7),
-        DropdownButtonFormField<T>(
-          initialValue: value,
-          items: items,
-          onChanged: onChanged,
-          decoration: const InputDecoration(),
-          style: AppTextStyles.body,
-          dropdownColor: AppColors.surface,
-        ),
-      ],
     );
   }
 }

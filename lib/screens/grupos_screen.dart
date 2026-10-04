@@ -3,12 +3,10 @@ import 'package:flutter/material.dart';
 import '../models/campeonato_model.dart';
 import '../models/equipo_model.dart';
 import '../models/grupo_model.dart';
-import '../models/tabla_posicion_model.dart';
 import '../services/campeonato_service.dart';
 import '../services/equipo_service.dart';
 import '../services/grupo_service.dart';
 import '../services/public_home_service.dart';
-import '../utils/clasificacion.dart';
 import '../utils/fixture_grouping.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_button.dart';
@@ -169,6 +167,23 @@ class _GruposScreenState extends State<GruposScreen> {
       AppSnackbars.error(context, mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// Saca al equipo de su grupo y lo deja "sin grupo", para inscribirlo
+  /// de nuevo o dejarlo afuera (por ejemplo, si se cargó por error).
+  Future<void> _quitarEquipo(EquipoModel equipo) async {
+    try {
+      await _grupoService.quitarEquipoDeGrupos(
+        campeonatoId: widget.campeonatoId,
+        equipoId: equipo.id,
+      );
+
+      if (!mounted) return;
+      AppSnackbars.success(context, '${equipo.nombre} quedó sin grupo.');
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbars.error(context, mensajeDeError(e));
     }
   }
 
@@ -334,6 +349,7 @@ class _GruposScreenState extends State<GruposScreen> {
                                         equipo: equipo,
                                         grupos: grupos,
                                       ),
+                                      onQuitar: _quitarEquipo,
                                     );
                                   }).toList(),
                                 ),
@@ -341,9 +357,11 @@ class _GruposScreenState extends State<GruposScreen> {
                                     campeonato.tipoCampeonato ==
                                         TipoCampeonato.gruposEliminacion) ...[
                                   const SizedBox(height: 22),
-                                  _ClasificadosPreview(
-                                    service: _publicHomeService,
+                                  AppClasificadosEnVivo(
                                     campeonato: campeonato,
+                                    tabla: () => _publicHomeService.streamTabla(
+                                      campeonato.id,
+                                    ),
                                   ),
                                 ],
                               ],
@@ -366,6 +384,7 @@ class _GrupoCard extends StatelessWidget {
   final List<GrupoModel> otrosGrupos;
   final bool puedeEditar;
   final void Function(EquipoModel) onMover;
+  final void Function(EquipoModel) onQuitar;
 
   const _GrupoCard({
     required this.grupo,
@@ -373,6 +392,7 @@ class _GrupoCard extends StatelessWidget {
     required this.otrosGrupos,
     required this.puedeEditar,
     required this.onMover,
+    required this.onQuitar,
   });
 
   @override
@@ -435,6 +455,16 @@ class _GrupoCard extends StatelessWidget {
                             color: AppColors.primary,
                           ),
                           onPressed: () => onMover(equipo),
+                        ),
+                      if (puedeEditar)
+                        IconButton(
+                          tooltip: 'Quitar del grupo',
+                          icon: const Icon(
+                            Icons.person_remove_outlined,
+                            size: 20,
+                            color: AppColors.danger,
+                          ),
+                          onPressed: () => onQuitar(equipo),
                         ),
                     ],
                   ),
@@ -508,39 +538,6 @@ class _SinGrupoBox extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ClasificadosPreview extends StatelessWidget {
-  final PublicHomeService service;
-  final CampeonatoModel campeonato;
-
-  const _ClasificadosPreview({required this.service, required this.campeonato});
-
-  @override
-  Widget build(BuildContext context) {
-    final config = campeonato.configuracion;
-    final total =
-        config.cantidadGrupos * config.clasificanPorGrupo +
-        config.mejoresTerceros;
-
-    return StreamBuilder<List<TablaPosicionModel>>(
-      stream: service.streamTabla(campeonato.id),
-      builder: (context, snapshot) {
-        final tabla = snapshot.data ?? [];
-
-        final clasificados = Clasificacion.calcular(
-          tabla: tabla,
-          clasificanPorGrupo: config.clasificanPorGrupo,
-          mejoresTerceros: config.mejoresTerceros,
-        );
-
-        return AppClasificadosCard(
-          clasificados: clasificados,
-          totalEsperado: total,
-        );
-      },
     );
   }
 }

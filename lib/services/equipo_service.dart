@@ -43,17 +43,6 @@ class EquipoService {
     }).toList();
   }
 
-  Future<EquipoModel?> getEquipo({
-    required String campeonatoId,
-    required String equipoId,
-  }) async {
-    final doc = await _equipos(campeonatoId).doc(equipoId).get();
-
-    if (!doc.exists || doc.data() == null) return null;
-
-    return EquipoModel.fromMap(doc.id, doc.data()!);
-  }
-
   Future<String> crearEquipo({
     required String campeonatoId,
     required String nombre,
@@ -154,24 +143,6 @@ class EquipoService {
       documentoAfectado: equipoId,
       detalle: 'Se editó al equipo $nombreEquipo (${cambios.keys.join(', ')}).',
       observacion: observacion,
-    );
-  }
-
-  Future<void> cambiarEstadoEquipo({
-    required String campeonatoId,
-    required String equipoId,
-    required String estado,
-    required String observacion,
-    required String usuarioId,
-    required String usuarioNombre,
-  }) async {
-    await editarEquipo(
-      campeonatoId: campeonatoId,
-      equipoId: equipoId,
-      cambios: {'estado': estado},
-      observacion: observacion,
-      usuarioId: usuarioId,
-      usuarioNombre: usuarioNombre,
     );
   }
 }

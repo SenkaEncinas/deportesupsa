@@ -17,7 +17,7 @@ class TablaPosicionModel {
   final int posicion;
   final DateTime? fechaActualizacion;
 
-  // Campos preparados para vóley/básquet. En vóley, golesFavor/Contra
+  // Puntos jugados, el desempate de vóley y básquet. En vóley, golesFavor/Contra
   // guardan sets ganados/perdidos y estos campos guardan los puntos
   // jugados dentro de los sets. En básquet, guardan los puntos anotados.
   final int puntosFavor;

@@ -19,6 +19,7 @@ import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/mensajes.dart';
+import 'reciclaje/app_form_fields.dart';
 
 class JugadorFormScreen extends StatefulWidget {
   final String campeonatoId;
@@ -659,7 +660,8 @@ class _JugadorFormScreenState extends State<JugadorFormScreen> {
                   autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
                     children: [
-                      _DropdownField<String>(
+                      AppDropdownField<String>(
+                        requerido: true,
                         label: 'Equipo',
                         value: _equipoId,
                         enabled: !widget.isEditing,
@@ -705,7 +707,8 @@ class _JugadorFormScreenState extends State<JugadorFormScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        _DropdownField<String>(
+                        AppDropdownField<String>(
+                          requerido: true,
                           label: 'Estado',
                           value: _estado,
                           items: const [
@@ -1177,43 +1180,4 @@ class _ParseResult {
   final List<String> errores;
 
   const _ParseResult({required this.jugadores, required this.errores});
-}
-
-class _DropdownField<T> extends StatelessWidget {
-  final String label;
-  final T? value;
-  final List<DropdownMenuItem<T>> items;
-  final void Function(T?) onChanged;
-  final bool enabled;
-
-  const _DropdownField({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-    this.enabled = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTextStyles.label),
-        const SizedBox(height: 7),
-        DropdownButtonFormField<T>(
-          initialValue: value,
-          items: items,
-          onChanged: enabled ? onChanged : null,
-          decoration: const InputDecoration(),
-          style: AppTextStyles.body,
-          dropdownColor: AppColors.surface,
-          validator: (value) {
-            if (value == null) return 'Selecciona una opción.';
-            return null;
-          },
-        ),
-      ],
-    );
-  }
 }

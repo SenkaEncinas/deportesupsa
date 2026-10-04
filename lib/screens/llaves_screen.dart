@@ -83,16 +83,17 @@ class _LlavesScreenState extends State<LlavesScreen> {
     if (!mounted) return;
     setState(() => _loading = false);
 
-    final clasificados = Clasificacion.calcular(
+    final clasificados = Clasificacion.paraCampeonato(
+      campeonato: campeonato,
       tabla: tabla,
-      clasificanPorGrupo: campeonato.configuracion.clasificanPorGrupo,
-      mejoresTerceros: campeonato.configuracion.mejoresTerceros,
     );
 
     if (clasificados.length < 2) {
       AppSnackbars.error(
         context,
-        'Todavía no hay suficientes clasificados. Revisa la tabla y la configuración de "clasifican por grupo".',
+        campeonato.usaGrupos
+            ? 'Todavía no hay suficientes clasificados. Revisa la tabla y la configuración de "clasifican por grupo".'
+            : 'Todavía no hay suficientes clasificados: hace falta que la tabla de la liga tenga al menos 2 equipos.',
       );
       return;
     }
@@ -225,7 +226,10 @@ class _LlavesScreenState extends State<LlavesScreen> {
 
                   final partidos = partidosSnapshot.data ?? [];
 
-                  final deLlave = _partidoService.soloDeLlave(partidos);
+                  final deLlave = _partidoService.soloDeLlave(
+                    campeonato,
+                    partidos,
+                  );
                   final rondas = FixtureGrouping.rondasEliminatorias(deLlave);
                   // Cruces de fase final cargados a mano que todavía no
                   // entran en ningún cuadro. No se dibujan como llave
@@ -258,9 +262,7 @@ class _LlavesScreenState extends State<LlavesScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _AyudaCard(
-                            faseActivada: campeonato.estaEnFaseEliminatoria,
-                          ),
+                          _AyudaCard(campeonato: campeonato),
                           const SizedBox(height: 18),
                           if (rondas.isEmpty)
                             const AppInlineEmptyState(
@@ -309,9 +311,11 @@ class _LlavesScreenState extends State<LlavesScreen> {
 }
 
 class _AyudaCard extends StatelessWidget {
-  final bool faseActivada;
+  final CampeonatoModel campeonato;
 
-  const _AyudaCard({required this.faseActivada});
+  const _AyudaCard({required this.campeonato});
+
+  bool get faseActivada => campeonato.estaEnFaseEliminatoria;
 
   @override
   Widget build(BuildContext context) {
@@ -330,7 +334,7 @@ class _AyudaCard extends StatelessWidget {
                 child: Text(
                   faseActivada
                       ? 'Fase eliminatoria activa'
-                      : 'Todavía en fase de grupos',
+                      : 'Todavía en ${campeonato.nombreFaseRegular.toLowerCase()}',
                   style: AppTextStyles.heading3,
                 ),
               ),

@@ -18,6 +18,8 @@ import '../utils/mensajes.dart';
 import '../utils/etiquetas.dart';
 import 'reciclaje/app_match_card.dart';
 import 'reciclaje/app_info_box.dart';
+import 'reciclaje/app_fondo.dart';
+import 'reciclaje/app_form_fields.dart';
 
 class CampeonatoFormScreen extends StatefulWidget {
   const CampeonatoFormScreen({super.key});
@@ -590,313 +592,292 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
   Widget build(BuildContext context) {
     final isMobile = Responsive.isMobile(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFEAF5F1),
-              AppColors.background,
-              AppColors.background,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: AppPage(
-              title: 'Nuevo campeonato',
-              subtitle:
-                  'Configura la modalidad deportiva, el formato de competencia y las reglas base.',
-              actions: [
-                AppButton.secondary(
-                  text: isMobile ? 'Cancelar' : 'Cancelar',
-                  icon: Icons.close_rounded,
-                  onPressed: _loading ? null : () => Navigator.pop(context),
-                ),
-                AppButton.primary(
-                  text: 'Guardar',
-                  icon: Icons.save_outlined,
-                  loading: _loading,
-                  onPressed: _guardar,
-                ),
-              ],
-              child: Column(
-                children: [
-                  _HeroCard(tipoCampeonato: _tipoCampeonato, deporte: _deporte),
-                  const SizedBox(height: 20),
-                  AppCard(
-                    child: Form(
-                      key: _formKey,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      child: Column(
+    return AppFondo(
+      child: SingleChildScrollView(
+        child: AppPage(
+          title: 'Nuevo campeonato',
+          subtitle:
+              'Configura la modalidad deportiva, el formato de competencia y las reglas base.',
+          actions: [
+            AppButton.secondary(
+              text: isMobile ? 'Cancelar' : 'Cancelar',
+              icon: Icons.close_rounded,
+              onPressed: _loading ? null : () => Navigator.pop(context),
+            ),
+            AppButton.primary(
+              text: 'Guardar',
+              icon: Icons.save_outlined,
+              loading: _loading,
+              onPressed: _guardar,
+            ),
+          ],
+          child: Column(
+            children: [
+              _HeroCard(tipoCampeonato: _tipoCampeonato, deporte: _deporte),
+              const SizedBox(height: 20),
+              AppCard(
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: Column(
+                    children: [
+                      const AppFormSectionTitle(
+                        title: 'Datos generales',
+                        subtitle:
+                            'Estos datos se mostrarán en la pantalla pública del campeonato.',
+                      ),
+                      const SizedBox(height: 18),
+                      AppTextField(
+                        label: 'Nombre del campeonato',
+                        hint: 'Ejemplo: Campeonato UPSA Futsal 2026',
+                        controller: _nombreController,
+                        prefixIcon: Icons.emoji_events_outlined,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'El nombre es obligatorio.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      AppTextField(
+                        label: 'Descripción',
+                        hint:
+                            'Ejemplo: Campeonato universitario masculino organizado por la UPSA.',
+                        controller: _descripcionController,
+                        maxLines: 3,
+                        prefixIcon: Icons.description_outlined,
+                      ),
+                      const SizedBox(height: 16),
+                      _ResponsiveFields(
                         children: [
-                          const _SectionTitle(
-                            title: 'Datos generales',
-                            subtitle:
-                                'Estos datos se mostrarán en la pantalla pública del campeonato.',
-                          ),
-                          const SizedBox(height: 18),
                           AppTextField(
-                            label: 'Nombre del campeonato',
-                            hint: 'Ejemplo: Campeonato UPSA Futsal 2026',
-                            controller: _nombreController,
-                            prefixIcon: Icons.emoji_events_outlined,
+                            label: 'Temporada',
+                            hint: '2026',
+                            controller: _temporadaController,
+                            prefixIcon: Icons.calendar_today_outlined,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
-                                return 'El nombre es obligatorio.';
+                                return 'La temporada es obligatoria.';
                               }
                               return null;
                             },
                           ),
-                          const SizedBox(height: 16),
                           AppTextField(
-                            label: 'Descripción',
-                            hint:
-                                'Ejemplo: Campeonato universitario masculino organizado por la UPSA.',
-                            controller: _descripcionController,
-                            maxLines: 3,
-                            prefixIcon: Icons.description_outlined,
-                          ),
-                          const SizedBox(height: 16),
-                          _ResponsiveFields(
-                            children: [
-                              AppTextField(
-                                label: 'Temporada',
-                                hint: '2026',
-                                controller: _temporadaController,
-                                prefixIcon: Icons.calendar_today_outlined,
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'La temporada es obligatoria.';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              AppTextField(
-                                label: 'Cancha',
-                                hint: 'Cancha UPSA',
-                                controller: _canchaController,
-                                prefixIcon: Icons.place_outlined,
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
-                                    return 'La cancha es obligatoria.';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 28),
-                          const _SectionTitle(
-                            title: 'Deporte',
-                            subtitle:
-                                'Elige el deporte del campeonato. La modalidad y las reglas base se ajustan automáticamente.',
-                          ),
-                          const SizedBox(height: 18),
-                          _DeporteSelector(
-                            selected: _deporte,
-                            onSelected: _aplicarDeporte,
-                          ),
-                          const SizedBox(height: 28),
-                          const _SectionTitle(
-                            title: 'Configuración deportiva',
-                            subtitle:
-                                'Modalidad, jugadores en cancha y tamaño de plantilla por equipo.',
-                          ),
-                          const SizedBox(height: 18),
-                          _ResponsiveFields(
-                            children: [
-                              _DropdownField<String>(
-                                // La key fuerza a reconstruir el dropdown
-                                // cuando cambia el deporte seleccionado.
-                                key: ValueKey('modalidad_$_deporte'),
-                                label: 'Modalidad',
-                                value: _modalidad,
-                                items: ModalidadDeporte.porDeporte(_deporte)
-                                    .map((modalidad) {
-                                      return DropdownMenuItem(
-                                        value: modalidad,
-                                        child: Text(
-                                          Etiquetas.modalidad(modalidad),
-                                        ),
-                                      );
-                                    })
-                                    .toList(),
-                                onChanged: (value) {
-                                  if (value == null) return;
-                                  _aplicarModalidad(value);
-                                },
-                              ),
-                              AppTextField(
-                                label: 'Jugadores en cancha',
-                                controller: _jugadoresCanchaController,
-                                keyboardType: TextInputType.number,
-                                prefixIcon: deporteIcono(_deporte),
-                                validator: _numberValidator,
-                              ),
-                              AppTextField(
-                                label: 'Mínimo por equipo',
-                                controller: _minJugadoresController,
-                                keyboardType: TextInputType.number,
-                                prefixIcon: Icons.group_outlined,
-                                validator: _numberValidator,
-                              ),
-                              AppTextField(
-                                label: 'Máximo por equipo',
-                                controller: _maxJugadoresController,
-                                keyboardType: TextInputType.number,
-                                prefixIcon: Icons.groups_2_outlined,
-                                validator: _numberValidator,
-                              ),
-                            ],
-                          ),
-                          if (_esVolley) ...[
-                            const SizedBox(height: 16),
-                            _ResponsiveFields(
-                              children: [
-                                _DropdownField<int>(
-                                  label: 'Formato del partido',
-                                  value: _setsParaGanar,
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 2,
-                                      child: Text('Al mejor de 3 sets'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 3,
-                                      child: Text('Al mejor de 5 sets'),
-                                    ),
-                                  ],
-                                  onChanged: (value) {
-                                    if (value == null) return;
-                                    setState(() {
-                                      _setsParaGanar = value;
-                                    });
-                                  },
-                                ),
-                                AppTextField(
-                                  label: 'Puntos por set normal',
-                                  controller: _puntosSetNormalController,
-                                  keyboardType: TextInputType.number,
-                                  prefixIcon: Icons.scoreboard_outlined,
-                                  validator: _numberValidator,
-                                ),
-                                AppTextField(
-                                  label: 'Puntos set decisivo',
-                                  controller: _puntosSetDecisivoController,
-                                  keyboardType: TextInputType.number,
-                                  prefixIcon: Icons.flag_outlined,
-                                  validator: _numberValidator,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            AppInfoBox(
-                              title: 'Vóley',
-                              text:
-                                  'Los sets se ganan por diferencia de 2 puntos. No existen empates: gana quien alcance los sets necesarios.',
-                            ),
-                          ],
-                          if (_esBasket) ...[
-                            const SizedBox(height: 16),
-                            _ResponsiveFields(
-                              children: [
-                                AppTextField(
-                                  label: 'Cantidad de periodos',
-                                  controller: _periodosController,
-                                  keyboardType: TextInputType.number,
-                                  prefixIcon: Icons.timer_outlined,
-                                  validator: _numberValidator,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            AppInfoBox(
-                              title: 'Básquet',
-                              text:
-                                  'No se permite empate final: si el marcador queda igualado se juega prórroga hasta definir un ganador.',
-                            ),
-                          ],
-                          const SizedBox(height: 28),
-                          const _SectionTitle(
-                            title: 'Formato del campeonato',
-                            subtitle:
-                                'Elige cómo se organizarán los partidos. Esta información se usará luego para generar el fixture.',
-                          ),
-                          const SizedBox(height: 18),
-                          _FormatoSelector(
-                            formatos: _formatos,
-                            selected: _tipoCampeonato,
-                            onSelected: _aplicarFormato,
-                          ),
-                          const SizedBox(height: 24),
-                          _DynamicFormatSection(
-                            tipoCampeonato: _tipoCampeonato,
-                            esFutbol: _esFutbol,
-                            vueltasController: _vueltasController,
-                            cantidadGruposController: _cantidadGruposController,
-                            clasificanPorGrupoController:
-                                _clasificanPorGrupoController,
-                            mejoresTercerosController:
-                                _mejoresTercerosController,
-                            clasificadosPlayoffsController:
-                                _clasificadosPlayoffsController,
-                            generaCrucesAleatorios: _generaCrucesAleatorios,
-                            generaGruposAleatorios: _generaGruposAleatorios,
-                            permiteEmpate: _permiteEmpate,
-                            idaYVueltaEnGrupos: _idaYVueltaEnGrupos,
-                            incluyeTercerLugar: _incluyeTercerLugar,
-                            onGeneraCrucesChanged: (value) {
-                              setState(() {
-                                _generaCrucesAleatorios = value;
-                              });
+                            label: 'Cancha',
+                            hint: 'Cancha UPSA',
+                            controller: _canchaController,
+                            prefixIcon: Icons.place_outlined,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'La cancha es obligatoria.';
+                              }
+                              return null;
                             },
-                            onGeneraGruposChanged: (value) {
-                              setState(() {
-                                _generaGruposAleatorios = value;
-                              });
-                            },
-                            onPermiteEmpateChanged: (value) {
-                              setState(() {
-                                _permiteEmpate = value;
-                              });
-                            },
-                            onIdaYVueltaGruposChanged: (value) {
-                              setState(() {
-                                _idaYVueltaEnGrupos = value;
-                              });
-                            },
-                            onTercerLugarChanged: (value) {
-                              setState(() {
-                                _incluyeTercerLugar = value;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 24),
-                          AppInfoBox(
-                            tone: AppInfoBoxTone.primary,
-                            title: 'Estado inicial',
-                            text:
-                                'El campeonato se creará en estado inscripción. En ese estado podrás registrar equipos y jugadores antes de activarlo.',
-                          ),
-                          const SizedBox(height: 12),
-                          AppInfoBox(
-                            title: 'Fixture',
-                            text:
-                                'Cuando el campeonato tenga sus equipos, el fixture se genera desde el módulo Fixture respetando este formato.',
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 28),
+                      const AppFormSectionTitle(
+                        title: 'Deporte',
+                        subtitle:
+                            'Elige el deporte del campeonato. La modalidad y las reglas base se ajustan automáticamente.',
+                      ),
+                      const SizedBox(height: 18),
+                      _DeporteSelector(
+                        selected: _deporte,
+                        onSelected: _aplicarDeporte,
+                      ),
+                      const SizedBox(height: 28),
+                      const AppFormSectionTitle(
+                        title: 'Configuración deportiva',
+                        subtitle:
+                            'Modalidad, jugadores en cancha y tamaño de plantilla por equipo.',
+                      ),
+                      const SizedBox(height: 18),
+                      _ResponsiveFields(
+                        children: [
+                          AppDropdownField<String>(
+                            // La key fuerza a reconstruir el dropdown
+                            // cuando cambia el deporte seleccionado.
+                            key: ValueKey('modalidad_$_deporte'),
+                            label: 'Modalidad',
+                            value: _modalidad,
+                            items: ModalidadDeporte.porDeporte(_deporte).map((
+                              modalidad,
+                            ) {
+                              return DropdownMenuItem(
+                                value: modalidad,
+                                child: Text(Etiquetas.modalidad(modalidad)),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              if (value == null) return;
+                              _aplicarModalidad(value);
+                            },
+                          ),
+                          AppTextField(
+                            label: 'Jugadores en cancha',
+                            controller: _jugadoresCanchaController,
+                            keyboardType: TextInputType.number,
+                            prefixIcon: deporteIcono(_deporte),
+                            validator: _numberValidator,
+                          ),
+                          AppTextField(
+                            label: 'Mínimo por equipo',
+                            controller: _minJugadoresController,
+                            keyboardType: TextInputType.number,
+                            prefixIcon: Icons.group_outlined,
+                            validator: _numberValidator,
+                          ),
+                          AppTextField(
+                            label: 'Máximo por equipo',
+                            controller: _maxJugadoresController,
+                            keyboardType: TextInputType.number,
+                            prefixIcon: Icons.groups_2_outlined,
+                            validator: _numberValidator,
+                          ),
+                        ],
+                      ),
+                      if (_esVolley) ...[
+                        const SizedBox(height: 16),
+                        _ResponsiveFields(
+                          children: [
+                            AppDropdownField<int>(
+                              label: 'Formato del partido',
+                              value: _setsParaGanar,
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 2,
+                                  child: Text('Al mejor de 3 sets'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 3,
+                                  child: Text('Al mejor de 5 sets'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  _setsParaGanar = value;
+                                });
+                              },
+                            ),
+                            AppTextField(
+                              label: 'Puntos por set normal',
+                              controller: _puntosSetNormalController,
+                              keyboardType: TextInputType.number,
+                              prefixIcon: Icons.scoreboard_outlined,
+                              validator: _numberValidator,
+                            ),
+                            AppTextField(
+                              label: 'Puntos set decisivo',
+                              controller: _puntosSetDecisivoController,
+                              keyboardType: TextInputType.number,
+                              prefixIcon: Icons.flag_outlined,
+                              validator: _numberValidator,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        AppInfoBox(
+                          title: 'Vóley',
+                          text:
+                              'Los sets se ganan por diferencia de 2 puntos. No existen empates: gana quien alcance los sets necesarios.',
+                        ),
+                      ],
+                      if (_esBasket) ...[
+                        const SizedBox(height: 16),
+                        _ResponsiveFields(
+                          children: [
+                            AppTextField(
+                              label: 'Cantidad de periodos',
+                              controller: _periodosController,
+                              keyboardType: TextInputType.number,
+                              prefixIcon: Icons.timer_outlined,
+                              validator: _numberValidator,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        AppInfoBox(
+                          title: 'Básquet',
+                          text:
+                              'No se permite empate final: si el marcador queda igualado se juega prórroga hasta definir un ganador.',
+                        ),
+                      ],
+                      const SizedBox(height: 28),
+                      const AppFormSectionTitle(
+                        title: 'Formato del campeonato',
+                        subtitle:
+                            'Elige cómo se organizarán los partidos. Esta información se usará luego para generar el fixture.',
+                      ),
+                      const SizedBox(height: 18),
+                      _FormatoSelector(
+                        formatos: _formatos,
+                        selected: _tipoCampeonato,
+                        onSelected: _aplicarFormato,
+                      ),
+                      const SizedBox(height: 24),
+                      _DynamicFormatSection(
+                        tipoCampeonato: _tipoCampeonato,
+                        esFutbol: _esFutbol,
+                        vueltasController: _vueltasController,
+                        cantidadGruposController: _cantidadGruposController,
+                        clasificanPorGrupoController:
+                            _clasificanPorGrupoController,
+                        mejoresTercerosController: _mejoresTercerosController,
+                        clasificadosPlayoffsController:
+                            _clasificadosPlayoffsController,
+                        generaCrucesAleatorios: _generaCrucesAleatorios,
+                        generaGruposAleatorios: _generaGruposAleatorios,
+                        permiteEmpate: _permiteEmpate,
+                        idaYVueltaEnGrupos: _idaYVueltaEnGrupos,
+                        incluyeTercerLugar: _incluyeTercerLugar,
+                        onGeneraCrucesChanged: (value) {
+                          setState(() {
+                            _generaCrucesAleatorios = value;
+                          });
+                        },
+                        onGeneraGruposChanged: (value) {
+                          setState(() {
+                            _generaGruposAleatorios = value;
+                          });
+                        },
+                        onPermiteEmpateChanged: (value) {
+                          setState(() {
+                            _permiteEmpate = value;
+                          });
+                        },
+                        onIdaYVueltaGruposChanged: (value) {
+                          setState(() {
+                            _idaYVueltaEnGrupos = value;
+                          });
+                        },
+                        onTercerLugarChanged: (value) {
+                          setState(() {
+                            _incluyeTercerLugar = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      AppInfoBox(
+                        tone: AppInfoBoxTone.primary,
+                        title: 'Estado inicial',
+                        text:
+                            'El campeonato se creará en estado inscripción. En ese estado podrás registrar equipos y jugadores antes de activarlo.',
+                      ),
+                      const SizedBox(height: 12),
+                      AppInfoBox(
+                        title: 'Fixture',
+                        text:
+                            'Cuando el campeonato tenga sus equipos, el fixture se genera desde el módulo Fixture respetando este formato.',
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -1606,80 +1587,6 @@ class _ResponsiveFields extends StatelessWidget {
           }),
         );
       },
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final String title;
-  final String subtitle;
-
-  const _SectionTitle({required this.title, required this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 12,
-          height: 12,
-          decoration: const BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: AppTextStyles.heading3),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: AppTextStyles.body.copyWith(
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DropdownField<T> extends StatelessWidget {
-  final String label;
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final void Function(T?) onChanged;
-
-  const _DropdownField({
-    super.key,
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: AppTextStyles.label),
-        const SizedBox(height: 7),
-        DropdownButtonFormField<T>(
-          initialValue: value,
-          isExpanded: true,
-          items: items,
-          onChanged: onChanged,
-          decoration: const InputDecoration(),
-          style: AppTextStyles.body,
-          dropdownColor: AppColors.surface,
-        ),
-      ],
     );
   }
 }

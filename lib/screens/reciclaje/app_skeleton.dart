@@ -102,7 +102,7 @@ class AppSkeletonBox extends StatelessWidget {
 
 /// Placeholder con la silueta de una card de listado (ícono/avatar +
 /// título + un par de líneas), del mismo tamaño aproximado que
-/// [ChampionshipPublicCard]/[AppStandingCard]/[StatCard], para que la
+/// [AppCampeonatoCard]/[AppStandingCard]/[StatCard], para que la
 /// pantalla no "salte" cuando el contenido real reemplaza al esqueleto.
 class AppSkeletonCard extends StatelessWidget {
   const AppSkeletonCard({super.key});

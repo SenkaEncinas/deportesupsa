@@ -68,5 +68,4 @@ class JugadorModel {
 
   bool get estaActivo => estado == JugadorEstado.activo;
   bool get estaSuspendido => estado == JugadorEstado.suspendido;
-  bool get estaRetirado => estado == JugadorEstado.retirado;
 }

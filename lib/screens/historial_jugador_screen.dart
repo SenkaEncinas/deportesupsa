@@ -14,7 +14,7 @@ import '../utils/fechas.dart';
 import '../utils/mensajes.dart';
 import '../utils/etiquetas.dart';
 
-class HistorialJugadorScreen extends StatelessWidget {
+class HistorialJugadorScreen extends StatefulWidget {
   final String campeonatoId;
   final String jugadorId;
   final String jugadorNombre;
@@ -26,12 +26,20 @@ class HistorialJugadorScreen extends StatelessWidget {
     required this.jugadorNombre,
   });
 
+  @override
+  State<HistorialJugadorScreen> createState() => _HistorialJugadorScreenState();
+}
+
+class _HistorialJugadorScreenState extends State<HistorialJugadorScreen> {
+  // Se abre una sola vez: dentro de build se reabría en cada redibujado.
+  late final Stream<List<HistorialCambioModel>> _historial = _streamHistorial();
+
   Stream<List<HistorialCambioModel>> _streamHistorial() {
     return FirebaseFirestore.instance
         .collection('campeonatos')
-        .doc(campeonatoId)
+        .doc(widget.campeonatoId)
         .collection('jugadores')
-        .doc(jugadorId)
+        .doc(widget.jugadorId)
         .collection('historial_cambios')
         .orderBy('fecha', descending: true)
         .snapshots()
@@ -61,7 +69,7 @@ class HistorialJugadorScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: StreamBuilder<List<HistorialCambioModel>>(
-        stream: _streamHistorial(),
+        stream: _historial,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const AppLoading(message: 'Cargando historial...');
@@ -80,7 +88,7 @@ class HistorialJugadorScreen extends StatelessWidget {
           return SingleChildScrollView(
             child: AppPage(
               title: 'Historial del jugador',
-              subtitle: jugadorNombre,
+              subtitle: widget.jugadorNombre,
               actions: [
                 AppButton.secondary(
                   text: 'Volver',
