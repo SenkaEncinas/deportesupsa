@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/link.dart';
 
 import '../../utils/patrocinadores_assets.dart';
 import '../../utils/version_build.dart';
@@ -10,31 +10,16 @@ import 'responsive.dart';
 /// Sitio de quien desarrolló la app, al que lleva el crédito del footer.
 const String _kSitio57Nations = 'https://nations-2b049.web.app';
 
-/// Abre [url] en una pestaña nueva.
-///
-/// Se lanza derecho, sin consultar antes `canLaunchUrl`: en web, esperar
-/// cualquier cosa antes de abrir hace que el navegador deje de tratarlo
-/// como una acción del usuario y bloquee la pestaña, así que el click no
-/// hacía nada. En Windows, además, `canLaunchUrl` devuelve `false` para
-/// `https` salvo que el esquema esté declarado.
-///
-/// Si igual falla, se ignora: es un enlace de cortesía, no vale romper
-/// el footer por eso.
-Future<void> _abrir(String url) async {
-  try {
-    await launchUrl(
-      Uri.parse(url),
-      mode: LaunchMode.platformDefault,
-      webOnlyWindowName: '_blank',
-    );
-  } catch (_) {
-    // Sin navegador disponible no hay nada que hacer.
-  }
-}
-
 /// Envuelve un logo para que se pueda tocar cuando tiene sitio web, y lo
 /// deja tal cual cuando no. Así el footer no tiene que preguntar dos
 /// veces por el mismo caso.
+///
+/// Usa el [Link] de url_launcher y no `launchUrl` dentro de un `onTap`.
+/// En la web, [Link] dibuja un enlace `<a>` de verdad sobre el logo, así
+/// que el clic lo resuelve el navegador como cualquier link. Abrir la
+/// pestaña con `launchUrl` es un `window.open` desde JavaScript, y
+/// Safari, los celulares y Chrome con el bloqueo de ventanas activado lo
+/// trataban como una ventana emergente y no abrían nada.
 class _EnlaceOpcional extends StatelessWidget {
   final String? url;
   final String? tooltip;
@@ -44,16 +29,21 @@ class _EnlaceOpcional extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (url == null) return child;
+    final destino = url;
+    if (destino == null) return child;
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: Tooltip(
-        message: tooltip ?? url!,
-        child: InkWell(
-          onTap: () => _abrir(url!),
-          borderRadius: BorderRadius.circular(8),
-          child: child,
+    return Tooltip(
+      message: tooltip ?? destino,
+      child: Link(
+        uri: Uri.parse(destino),
+        target: LinkTarget.blank,
+        builder: (context, abrir) => MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: abrir,
+            child: child,
+          ),
         ),
       ),
     );
