@@ -154,6 +154,7 @@ lado, se llaman; nunca se copian ni se reescriben:
 | Campos de formulario (desplegable, título de sección) | `AppDropdownField`, `AppFormSectionTitle` |
 | Datos en vivo de la página pública (una conexión por dato) | `DatosCampeonato` + `StreamCompartido` |
 | Próximos partidos / últimos resultados | `PublicHomeService.proximos()`, `.ultimosResultados()` |
+| Nombre del equipo en partidos, jugadores, goles, tabla... | `EquipoService.sincronizarNombresEquipos()` |
 
 Por qué importa: la tabla general desempataba por sets mientras la del
 grupo desempataba por puntos, porque había **tres** copias del mismo
@@ -180,3 +181,12 @@ Cómo se reconoce un partido de fase final en una liga: es del cuadro
 generado o lo cargó el admin a mano (la liga la arma siempre el
 sistema). Por eso, en estos formatos, un cruce manual cuenta como fase
 final aunque se cargue durante la liga.
+
+## Nombres de equipo copiados
+
+Partidos, jugadores, goles, tarjetas, ranking y tabla guardan una copia
+del nombre del equipo (para no buscarlo al dibujar cada fila o PDF).
+Al editar un equipo, `sincronizarNombresEquipos()` actualiza todas las
+copias; también corre sola al abrir el detalle de un campeonato en el
+admin, por si alguna quedó vieja. Para saber de qué equipo es un gol o
+una tarjeta se compara siempre el **id**, nunca el nombre.

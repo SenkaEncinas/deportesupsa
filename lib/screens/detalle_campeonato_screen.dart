@@ -70,6 +70,18 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
 
   bool _loadingEstado = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Repara en segundo plano las copias del nombre de los equipos que
+    // hayan quedado viejas (partidos, jugadores, tabla...), así los PDF
+    // y el fixture usan siempre el nombre actual. Solo escribe lo que no
+    // coincide; si falla, no bloquea la pantalla.
+    EquipoService()
+        .sincronizarNombresEquipos(widget.campeonatoId)
+        .catchError((_) => 0);
+  }
+
   Future<void> _activarCampeonato() async {
     final confirm = await AppDialogs.confirm(
       context: context,

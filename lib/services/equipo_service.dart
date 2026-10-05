@@ -87,6 +87,76 @@ class EquipoService {
     return equipoDoc.id;
   }
 
+  /// Colecciones que guardan una copia del nombre del equipo, con los
+  /// campos (id, nombre) de cada copia.
+  static const _copiasDelNombre = <String, List<(String, String)>>{
+    'partidos': [
+      ('equipoLocalId', 'equipoLocalNombre'),
+      ('equipoVisitanteId', 'equipoVisitanteNombre'),
+    ],
+    'jugadores': [('equipoId', 'equipoNombre')],
+    'goles': [('equipoId', 'equipoNombre')],
+    'tarjetas': [('equipoId', 'equipoNombre')],
+    'ranking_goleadores': [('equipoId', 'equipoNombre')],
+    'tabla_posiciones': [('equipoId', 'equipoNombre')],
+  };
+
+  /// Pone el nombre actual de cada equipo en todas las copias que lo
+  /// repiten (partidos, jugadores, goles, tarjetas, ranking y tabla).
+  ///
+  /// Cada documento guarda el nombre del equipo al crearse, para no
+  /// tener que buscarlo cada vez que se dibuja un partido o un PDF. El
+  /// costo es que, al renombrar un equipo, esas copias quedaban con el
+  /// nombre viejo. Solo escribe las que no coinciden, así que correrla
+  /// de más no cuesta escrituras; también corrige los renombres que
+  /// quedaron mal de antes.
+  ///
+  /// Devuelve cuántos documentos actualizó.
+  Future<int> sincronizarNombresEquipos(String campeonatoId) async {
+    final nombres = {
+      for (final equipo in await getEquipos(campeonatoId))
+        equipo.id: equipo.nombre,
+    };
+    final campeonato = _db.collection('campeonatos').doc(campeonatoId);
+
+    var batch = _db.batch();
+    var enLote = 0;
+    var actualizados = 0;
+
+    for (final MapEntry(key: coleccion, value: campos)
+        in _copiasDelNombre.entries) {
+      final snap = await campeonato.collection(coleccion).get();
+
+      for (final doc in snap.docs) {
+        final datos = doc.data();
+        final cambios = <String, dynamic>{};
+
+        for (final (campoId, campoNombre) in campos) {
+          final nombre = nombres[datos[campoId]];
+          if (nombre != null && datos[campoNombre] != nombre) {
+            cambios[campoNombre] = nombre;
+          }
+        }
+
+        if (cambios.isEmpty) continue;
+
+        batch.update(doc.reference, cambios);
+        actualizados++;
+
+        // Firestore acepta hasta 500 escrituras por lote.
+        if (++enLote == 450) {
+          await batch.commit();
+          batch = _db.batch();
+          enLote = 0;
+        }
+      }
+    }
+
+    if (enLote > 0) await batch.commit();
+
+    return actualizados;
+  }
+
   Future<void> editarEquipo({
     required String campeonatoId,
     required String equipoId,
@@ -118,6 +188,11 @@ class EquipoService {
     };
 
     await equipoRef.update(datosNuevos);
+
+    // Los partidos, jugadores, goles, tarjetas, ranking y tabla guardan
+    // una copia del nombre del equipo. Sin esto, un equipo renombrado
+    // seguía saliendo con el nombre viejo en el fixture y en los PDF.
+    await sincronizarNombresEquipos(campeonatoId);
 
     final historial = HistorialCambioModel(
       id: '',

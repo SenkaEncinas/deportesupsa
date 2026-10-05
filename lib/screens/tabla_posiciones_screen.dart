@@ -118,6 +118,7 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
       golesPorPartido[partidoId]!.add(
         _GolHistorial(
           jugadorNombre: (data['jugadorNombre'] ?? '').toString(),
+          equipoId: (data['equipoId'] ?? '').toString(),
           equipoNombre: (data['equipoNombre'] ?? '').toString(),
           cantidad: (data['cantidad'] as num?)?.toInt() ?? 0,
         ),
@@ -136,6 +137,7 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
       tarjetasPorPartido[partidoId]!.add(
         _TarjetaHistorial(
           jugadorNombre: (data['jugadorNombre'] ?? '').toString(),
+          equipoId: (data['equipoId'] ?? '').toString(),
           equipoNombre: (data['equipoNombre'] ?? '').toString(),
           amarillas: (data['amarillas'] as num?)?.toInt() ?? 0,
           rojas: (data['rojas'] as num?)?.toInt() ?? 0,
@@ -424,19 +426,19 @@ class _PartidoHistorialCard extends StatelessWidget {
     final partido = item.partido;
 
     final golesLocal = item.goles.where((gol) {
-      return gol.equipoNombre == partido.equipoLocalNombre;
+      return gol.equipoId == partido.equipoLocalId;
     }).toList();
 
     final golesVisitante = item.goles.where((gol) {
-      return gol.equipoNombre == partido.equipoVisitanteNombre;
+      return gol.equipoId == partido.equipoVisitanteId;
     }).toList();
 
     final tarjetasLocal = item.tarjetas.where((tarjeta) {
-      return tarjeta.equipoNombre == partido.equipoLocalNombre;
+      return tarjeta.equipoId == partido.equipoLocalId;
     }).toList();
 
     final tarjetasVisitante = item.tarjetas.where((tarjeta) {
-      return tarjeta.equipoNombre == partido.equipoVisitanteNombre;
+      return tarjeta.equipoId == partido.equipoVisitanteId;
     }).toList();
 
     return AppCard(
@@ -800,11 +802,13 @@ class _PartidoHistorialItem {
 
 class _GolHistorial {
   final String jugadorNombre;
+  final String equipoId;
   final String equipoNombre;
   final int cantidad;
 
   const _GolHistorial({
     required this.jugadorNombre,
+    required this.equipoId,
     required this.equipoNombre,
     required this.cantidad,
   });
@@ -812,6 +816,7 @@ class _GolHistorial {
 
 class _TarjetaHistorial {
   final String jugadorNombre;
+  final String equipoId;
   final String equipoNombre;
   final int amarillas;
   final int rojas;
@@ -819,6 +824,7 @@ class _TarjetaHistorial {
 
   const _TarjetaHistorial({
     required this.jugadorNombre,
+    required this.equipoId,
     required this.equipoNombre,
     required this.amarillas,
     required this.rojas,

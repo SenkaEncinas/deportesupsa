@@ -13,11 +13,13 @@ import '../utils/fechas.dart';
 
 class PdfGolPartidoItem {
   final String jugadorNombre;
+  final String equipoId;
   final String equipoNombre;
   final int cantidad;
 
   const PdfGolPartidoItem({
     required this.jugadorNombre,
+    required this.equipoId,
     required this.equipoNombre,
     required this.cantidad,
   });
@@ -1255,15 +1257,13 @@ class PdfService {
 
     final golesLocal = item.goles
         .where(
-          (gol) =>
-              gol.equipoNombre == partido.equipoLocalNombre && gol.cantidad > 0,
+          (gol) => gol.equipoId == partido.equipoLocalId && gol.cantidad > 0,
         )
         .toList();
     final golesVisitante = item.goles
         .where(
           (gol) =>
-              gol.equipoNombre == partido.equipoVisitanteNombre &&
-              gol.cantidad > 0,
+              gol.equipoId == partido.equipoVisitanteId && gol.cantidad > 0,
         )
         .toList();
 

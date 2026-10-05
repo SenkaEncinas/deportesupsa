@@ -279,6 +279,7 @@ class _PdfsScreenState extends State<PdfsScreen> {
             .add(
               PdfGolPartidoItem(
                 jugadorNombre: (data['jugadorNombre'] ?? '').toString(),
+                equipoId: (data['equipoId'] ?? '').toString(),
                 equipoNombre: (data['equipoNombre'] ?? '').toString(),
                 cantidad: (data['cantidad'] as num?)?.toInt() ?? 0,
               ),
