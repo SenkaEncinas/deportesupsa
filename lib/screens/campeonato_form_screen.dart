@@ -61,7 +61,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
 
   bool _generaCrucesAleatorios = true;
   bool _generaGruposAleatorios = true;
-  bool _permiteEmpate = true;
   bool _idaYVueltaEnGrupos = false;
   bool _incluyeTercerLugar = false;
 
@@ -148,20 +147,17 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
         _setsParaGanar = 2;
         _puntosSetNormalController.text = '25';
         _puntosSetDecisivoController.text = '15';
-        _permiteEmpate = false; // el vóley nunca empata
       } else if (deporte == DeporteTipo.basket) {
         _modalidad = ModalidadDeporte.basket5;
         _jugadoresCanchaController.text = '5';
         _minJugadoresController.text = '5';
         _maxJugadoresController.text = '12';
         _periodosController.text = '4';
-        _permiteEmpate = false; // el básquet no permite empate final
       } else {
         _modalidad = ModalidadDeporte.futsal;
         _jugadoresCanchaController.text = '5';
         _minJugadoresController.text = '5';
         _maxJugadoresController.text = '12';
-        _permiteEmpate = _tipoCampeonato != TipoCampeonato.eliminacionDirecta;
       }
     });
   }
@@ -209,16 +205,12 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
   }
 
   void _aplicarFormato(String tipo) {
-    // El empate solo aplica a fútbol/futsal en formatos de liga o grupos.
-    final permiteEmpateBase = _esFutbol;
-
     setState(() {
       _tipoCampeonato = tipo;
 
       switch (tipo) {
         case TipoCampeonato.soloIda:
           _vueltasController.text = '1';
-          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = false;
           _idaYVueltaEnGrupos = false;
@@ -227,7 +219,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
 
         case TipoCampeonato.idaVuelta:
           _vueltasController.text = '2';
-          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = false;
           _idaYVueltaEnGrupos = false;
@@ -237,7 +228,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
         case TipoCampeonato.ligaFinal:
           _vueltasController.text = '1';
           _clasificadosPlayoffsController.text = '2';
-          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = false;
           _idaYVueltaEnGrupos = false;
@@ -247,7 +237,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
         case TipoCampeonato.ligaPlayoffs:
           _vueltasController.text = '1';
           _clasificadosPlayoffsController.text = '4';
-          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = false;
           _idaYVueltaEnGrupos = false;
@@ -258,7 +247,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
           _vueltasController.text = '1';
           _cantidadGruposController.text = '2';
           _clasificanPorGrupoController.text = '0';
-          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = true;
           _idaYVueltaEnGrupos = false;
@@ -270,7 +258,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
           _cantidadGruposController.text = '2';
           _clasificanPorGrupoController.text = '2';
           _mejoresTercerosController.text = '0';
-          _permiteEmpate = permiteEmpateBase;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = true;
           _idaYVueltaEnGrupos = false;
@@ -279,7 +266,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
 
         case TipoCampeonato.eliminacionDirecta:
           _vueltasController.text = '1';
-          _permiteEmpate = false;
           _generaCrucesAleatorios = true;
           _generaGruposAleatorios = false;
           _idaYVueltaEnGrupos = false;
@@ -395,9 +381,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
         ? _intValue(_clasificadosPlayoffsController, 4)
         : 0;
 
-    // El vóley y el básquet nunca permiten empate.
-    final permiteEmpateFinal = _esFutbol && _permiteEmpate;
-
     return CampeonatoConfig(
       formato: _formatoBase(),
       cantidadVueltas: _usaGrupos ? (_idaYVueltaEnGrupos ? 2 : 1) : vueltas,
@@ -406,7 +389,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
           : vueltas >= 2 || _tipoCampeonato == TipoCampeonato.idaVuelta,
       generaCrucesAleatorios: _generaCrucesAleatorios,
       generaGruposAleatorios: _usaGrupos ? _generaGruposAleatorios : false,
-      permiteEmpate: permiteEmpateFinal,
       generaTablaPosiciones: _generaTablaPosiciones(),
       cantidadJugadoresEnCancha: jugadoresEnCancha,
       cantidadMinimaJugadoresPorEquipo: minJugadores,
@@ -431,8 +413,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
           ? _intValue(_puntosSetDecisivoController, 15)
           : 15,
       cantidadPeriodos: _esBasket ? _intValue(_periodosController, 4) : 0,
-      // En fútbol, si el formato no permite empate se definen penales.
-      permitePenales: _esFutbol && !permiteEmpateFinal,
       // El básquet define los empates con prórroga.
       permiteProrroga: _esBasket,
     );
@@ -831,7 +811,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                             _clasificadosPlayoffsController,
                         generaCrucesAleatorios: _generaCrucesAleatorios,
                         generaGruposAleatorios: _generaGruposAleatorios,
-                        permiteEmpate: _permiteEmpate,
                         idaYVueltaEnGrupos: _idaYVueltaEnGrupos,
                         incluyeTercerLugar: _incluyeTercerLugar,
                         onGeneraCrucesChanged: (value) {
@@ -842,11 +821,6 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
                         onGeneraGruposChanged: (value) {
                           setState(() {
                             _generaGruposAleatorios = value;
-                          });
-                        },
-                        onPermiteEmpateChanged: (value) {
-                          setState(() {
-                            _permiteEmpate = value;
                           });
                         },
                         onIdaYVueltaGruposChanged: (value) {
@@ -1013,12 +987,10 @@ class _DynamicFormatSection extends StatelessWidget {
   final TextEditingController clasificadosPlayoffsController;
   final bool generaCrucesAleatorios;
   final bool generaGruposAleatorios;
-  final bool permiteEmpate;
   final bool idaYVueltaEnGrupos;
   final bool incluyeTercerLugar;
   final ValueChanged<bool> onGeneraCrucesChanged;
   final ValueChanged<bool> onGeneraGruposChanged;
-  final ValueChanged<bool> onPermiteEmpateChanged;
   final ValueChanged<bool> onIdaYVueltaGruposChanged;
   final ValueChanged<bool> onTercerLugarChanged;
 
@@ -1032,12 +1004,10 @@ class _DynamicFormatSection extends StatelessWidget {
     required this.clasificadosPlayoffsController,
     required this.generaCrucesAleatorios,
     required this.generaGruposAleatorios,
-    required this.permiteEmpate,
     required this.idaYVueltaEnGrupos,
     required this.incluyeTercerLugar,
     required this.onGeneraCrucesChanged,
     required this.onGeneraGruposChanged,
-    required this.onPermiteEmpateChanged,
     required this.onIdaYVueltaGruposChanged,
     required this.onTercerLugarChanged,
   });
@@ -1097,15 +1067,13 @@ class _DynamicFormatSection extends StatelessWidget {
                       tipoCampeonato != TipoCampeonato.idaVuelta,
                   validator: _numberValidator,
                 ),
-                // El empate solo es configurable en fútbol/futsal:
-                // vóley y básquet siempre definen un ganador.
+                // El empate lo define la fase, no una opción: en la fase
+                // regular vale 1 punto; en la eliminatoria se desempata.
                 if (esFutbol)
-                  _ConfigSwitch(
-                    title: 'Permitir empate',
+                  const _ConfigInfoTile(
+                    title: 'Empates',
                     subtitle:
-                        'Aplica para partidos de liga o fase de clasificación.',
-                    value: permiteEmpate,
-                    onChanged: onPermiteEmpateChanged,
+                        'En liga o grupos valen 1 punto. En la fase final se definen por penales.',
                   )
                 else
                   const _ConfigInfoTile(

@@ -1174,23 +1174,28 @@ void main() {
       expect(jugado.definidoPorPenales, isFalse);
     });
 
-    test('en la fase de grupos, el admin puede cargar penales', () async {
-      final db = await _baseConCampeonato();
-      final partido = await deGrupo(db);
+    test(
+      'en la fase de grupos no hay penales: si llegan, se ignoran',
+      () async {
+        final db = await _baseConCampeonato();
+        final partido = await deGrupo(db);
 
-      await empate(
-        ResultadoService(firestore: db),
-        partido,
-        penalesLocal: 5,
-        penalesVisitante: 4,
-      );
+        await empate(
+          ResultadoService(firestore: db),
+          partido,
+          penalesLocal: 5,
+          penalesVisitante: 4,
+        );
 
-      final jugado = (await _partidos(
-        db,
-      )).firstWhere((p) => p.id == partido.id);
-      expect(jugado.definidoPorPenales, isTrue);
-      expect(jugado.ganadorId, partido.equipoLocalId);
-    });
+        final jugado = (await _partidos(
+          db,
+        )).firstWhere((p) => p.id == partido.id);
+        expect(jugado.empate, isTrue);
+        expect(jugado.definidoPorPenales, isFalse);
+        expect(jugado.penalesLocal, isNull);
+        expect(jugado.ganadorId, isNull);
+      },
+    );
 
     test('los penales no cambian los puntos de la tabla de grupos', () async {
       final db = await _baseConCampeonato();
@@ -1223,11 +1228,11 @@ void main() {
       });
     }
 
-    CampeonatoModel campeonato(String tipo, {bool permiteEmpate = true}) {
+    CampeonatoModel campeonato(String tipo) {
       return CampeonatoModel.fromMap('c', {
         'deporte': DeporteTipo.futbol,
         'tipoCampeonato': tipo,
-        'configuracion': {'formato': tipo, 'permiteEmpate': permiteEmpate},
+        'configuracion': {'formato': tipo},
       });
     }
 
@@ -1276,20 +1281,27 @@ void main() {
       );
     });
 
-    test('eliminación directa y formatos sin empate: siempre', () {
+    test('eliminación directa: siempre', () {
       expect(
         campeonato(
           TipoCampeonato.eliminacionDirecta,
         ).requiereGanador(partido({'grupoId': 'Grupo A'})),
         isTrue,
       );
-      expect(
-        campeonato(
-          TipoCampeonato.soloIda,
-          permiteEmpate: false,
-        ).requiereGanador(partido({})),
-        isTrue,
-      );
+    });
+
+    test('una liga o fase de grupos nunca pide penales', () {
+      for (final tipo in [
+        TipoCampeonato.soloIda,
+        TipoCampeonato.idaVuelta,
+        TipoCampeonato.faseGrupos,
+      ]) {
+        expect(
+          campeonato(tipo).requiereGanador(partido({})),
+          isFalse,
+          reason: tipo,
+        );
+      }
     });
   });
 

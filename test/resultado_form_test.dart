@@ -1,5 +1,5 @@
-// La pantalla de cargar resultado: que ofrezca los penales cuando hay
-// empate. Es la parte que fallaba — el registro de resultados ya los
+// La pantalla de cargar resultado: que pida los penales cuando hay
+// empate en la fase final, y nunca en la fase de grupos. Es la parte que fallaba — el registro de resultados ya los
 // aceptaba, pero la pantalla no los mostraba en los cruces del cuadro.
 
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
@@ -10,9 +10,7 @@ import 'package:futsal/models/partido_model.dart';
 import 'package:futsal/screens/resultado_form_screen.dart';
 
 const _avisoObligatorio =
-    'Empate en un cruce eliminatorio: registrá los penales para definir quién avanza.';
-const _avisoOpcional =
-    'Empate. Si se definió por penales, cargalos; si no, dejalos vacíos y queda empate.';
+    'Empate en la fase final: registrá los penales para definir quién avanza.';
 
 CampeonatoModel _campeonato() {
   return CampeonatoModel.fromMap('c', {
@@ -109,13 +107,15 @@ void main() {
   });
 
   group('Partido de la fase de grupos', () {
-    testWidgets('con empate aparecen los penales, opcionales', (tester) async {
+    // En grupos el empate vale 1 punto y no hay penales. Antes la
+    // pantalla mostraba los penales como "opcionales", pero sus campos
+    // no dejaban guardar vacíos: en la práctica obligaba a cargarlos.
+    testWidgets('con empate no aparecen los penales', (tester) async {
       await _abrir(tester, _deGrupo());
-      await _marcador(tester, '3', '3');
+      await _marcador(tester, '0', '0');
 
-      expect(find.text(_avisoOpcional), findsOneWidget);
       expect(find.text(_avisoObligatorio), findsNothing);
-      expect(find.text('Penales Britanico'), findsOneWidget);
+      expect(find.text('Penales Britanico'), findsNothing);
     });
   });
 }

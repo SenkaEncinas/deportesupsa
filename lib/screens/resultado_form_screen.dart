@@ -280,13 +280,13 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
   bool _requiereGanador(CampeonatoModel? campeonato) =>
       campeonato != null && campeonato.requiereGanador(widget.partido);
 
-  /// Los penales aparecen ante cualquier empate de fútbol. En la
-  /// eliminatoria son obligatorios; en la fase regular los decide el
-  /// admin: los carga si el partido se definió así, o los deja vacíos y
-  /// queda empate.
+  /// Los penales aparecen solo en un partido de fútbol de la fase final
+  /// que va empatado: ahí alguien tiene que avanzar. En la fase de
+  /// grupos o de liga el empate queda como empate y no se muestran.
   bool _mostrarPenales(CampeonatoModel? campeonato) {
     if (!_esFutbol(campeonato)) return false;
     if (_tipoResultado != TipoResultado.normal) return false;
+    if (!_requiereGanador(campeonato)) return false;
 
     final local = _golesLocalController.text.trim();
     final visitante = _golesVisitanteController.text.trim();
@@ -369,19 +369,12 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
         golesLocal = _parseInt(_golesLocalController.text);
         golesVisitante = _parseInt(_golesVisitanteController.text);
 
+        // Los campos ya se validaron (son obligatorios cuando se ven).
         if (_mostrarPenales(campeonato)) {
-          // Un campo vacío quiere decir "no hubo penales", no cero: con
-          // penales opcionales, leerlo como 0 mandaría un 0 a 0 y el
-          // registro lo rechazaría por empatado.
           penalesLocal = int.tryParse(_penalesLocalController.text.trim());
           penalesVisitante = int.tryParse(
             _penalesVisitanteController.text.trim(),
           );
-
-          final cargoUno = (penalesLocal == null) != (penalesVisitante == null);
-          if (cargoUno) {
-            throw Exception('Completá los penales de los dos equipos.');
-          }
         }
       }
 
@@ -691,7 +684,6 @@ class _ResultadoFormScreenState extends State<ResultadoFormScreen> {
                       if (_mostrarPenales(campeonato)) ...[
                         const SizedBox(height: 22),
                         _PenalesSection(
-                          obligatorio: _requiereGanador(campeonato),
                           localNombre: widget.partido.equipoLocalNombre,
                           visitanteNombre: widget.partido.equipoVisitanteNombre,
                           penalesLocalController: _penalesLocalController,
@@ -772,16 +764,12 @@ class _FormData {
 }
 
 class _PenalesSection extends StatelessWidget {
-  /// En la eliminatoria alguien tiene que avanzar: los penales hacen
-  /// falta. En la fase regular son opcionales.
-  final bool obligatorio;
   final String localNombre;
   final String visitanteNombre;
   final TextEditingController penalesLocalController;
   final TextEditingController penalesVisitanteController;
 
   const _PenalesSection({
-    required this.obligatorio,
     required this.localNombre,
     required this.visitanteNombre,
     required this.penalesLocalController,
@@ -810,9 +798,7 @@ class _PenalesSection extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  obligatorio
-                      ? 'Empate en un cruce eliminatorio: registrá los penales para definir quién avanza.'
-                      : 'Empate. Si se definió por penales, cargalos; si no, dejalos vacíos y queda empate.',
+                  'Empate en la fase final: registrá los penales para definir quién avanza.',
                   style: AppTextStyles.body.copyWith(
                     color: const Color(0xFF92600A),
                     fontWeight: FontWeight.w700,

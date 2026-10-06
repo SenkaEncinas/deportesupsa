@@ -133,8 +133,8 @@ class ResultadoService {
   /// Registra el resultado de un partido según el deporte del campeonato.
   ///
   /// - Fútbol/futsal: [golesLocal]/[golesVisitante] son goles. Si el
-  ///   formato no permite empate y el marcador queda igualado, se exigen
-  ///   [penalesLocal]/[penalesVisitante] con un ganador.
+  ///   partido es de la fase final y el marcador queda igualado, se
+  ///   exigen [penalesLocal]/[penalesVisitante] con un ganador.
   /// - Vóley: se envía [sets] con el detalle de cada set;
   ///   [golesLocal]/[golesVisitante] guardan los sets ganados.
   /// - Básquet: [golesLocal]/[golesVisitante] son puntos; no se permite
@@ -401,14 +401,13 @@ class ResultadoService {
       } else {
         // ---- Fútbol/futsal: goles, y penales si hubo empate. ----
         //
-        // En la eliminatoria son obligatorios: alguien tiene que avanzar.
-        // En la fase regular los decide el admin: si los carga, quedan
-        // registrados y marcan al ganador, pero la tabla igual lo cuenta
-        // como empate (mira el marcador, no los penales).
+        // Solo en la fase final: alguien tiene que avanzar. En la fase de
+        // grupos o de liga el empate queda como empate y no hay penales
+        // (si llegaran cargados, se ignoran).
         final requiereGanador = campeonato.requiereGanador(partido);
         final hayPenales = penalesLocal != null && penalesVisitante != null;
 
-        if (empate && (requiereGanador || hayPenales)) {
+        if (empate && requiereGanador) {
           if (!hayPenales) {
             throw Exception(
               'Este partido necesita un ganador: registra los penales para definir quién avanza.',

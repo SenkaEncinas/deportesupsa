@@ -96,7 +96,6 @@ class CampeonatoConfig {
   final bool idaYVuelta;
   final bool generaCrucesAleatorios;
   final bool generaGruposAleatorios;
-  final bool permiteEmpate;
   final bool generaTablaPosiciones;
   final int cantidadJugadoresEnCancha;
   final int cantidadMinimaJugadoresPorEquipo;
@@ -125,7 +124,6 @@ class CampeonatoConfig {
   final int puntosSetNormal;
   final int puntosSetDecisivo;
   final int cantidadPeriodos;
-  final bool permitePenales;
   final bool permiteProrroga;
 
   const CampeonatoConfig({
@@ -134,7 +132,6 @@ class CampeonatoConfig {
     required this.idaYVuelta,
     required this.generaCrucesAleatorios,
     required this.generaGruposAleatorios,
-    required this.permiteEmpate,
     required this.generaTablaPosiciones,
     required this.cantidadJugadoresEnCancha,
     required this.cantidadMinimaJugadoresPorEquipo,
@@ -155,7 +152,6 @@ class CampeonatoConfig {
     this.puntosSetNormal = 25,
     this.puntosSetDecisivo = 15,
     this.cantidadPeriodos = 0,
-    this.permitePenales = false,
     this.permiteProrroga = false,
   });
 
@@ -166,7 +162,6 @@ class CampeonatoConfig {
       idaYVuelta: true,
       generaCrucesAleatorios: true,
       generaGruposAleatorios: false,
-      permiteEmpate: true,
       generaTablaPosiciones: true,
       cantidadJugadoresEnCancha: 5,
       cantidadMinimaJugadoresPorEquipo: 5,
@@ -199,7 +194,6 @@ class CampeonatoConfig {
         map['generaGruposAleatorios'],
         defaultValue: false,
       ),
-      permiteEmpate: boolFromJson(map['permiteEmpate'], defaultValue: true),
       generaTablaPosiciones: boolFromJson(
         map['generaTablaPosiciones'],
         defaultValue: true,
@@ -264,7 +258,6 @@ class CampeonatoConfig {
         defaultValue: 15,
       ),
       cantidadPeriodos: intFromJson(map['cantidadPeriodos'], defaultValue: 0),
-      permitePenales: boolFromJson(map['permitePenales'], defaultValue: false),
       permiteProrroga: boolFromJson(
         map['permiteProrroga'],
         defaultValue: false,
@@ -279,7 +272,6 @@ class CampeonatoConfig {
       'idaYVuelta': idaYVuelta,
       'generaCrucesAleatorios': generaCrucesAleatorios,
       'generaGruposAleatorios': generaGruposAleatorios,
-      'permiteEmpate': permiteEmpate,
       'generaTablaPosiciones': generaTablaPosiciones,
       'cantidadJugadoresEnCancha': cantidadJugadoresEnCancha,
       'cantidadMinimaJugadoresPorEquipo': cantidadMinimaJugadoresPorEquipo,
@@ -300,7 +292,6 @@ class CampeonatoConfig {
       'puntosSetNormal': puntosSetNormal,
       'puntosSetDecisivo': puntosSetDecisivo,
       'cantidadPeriodos': cantidadPeriodos,
-      'permitePenales': permitePenales,
       'permiteProrroga': permiteProrroga,
     };
   }
@@ -470,26 +461,21 @@ class CampeonatoModel {
   /// Puntos de igualación de un equipo (0 si no tiene).
   int igualacionDe(String equipoId) => igualaciones[equipoId] ?? 0;
 
-  /// Si el partido tiene que terminar con un ganador. En fútbol eso
-  /// quiere decir que un empate se define por penales.
+  /// Si el partido tiene que terminar con un ganador: en fútbol, un
+  /// empate se define por penales.
   ///
-  /// La fase regular (grupos, liga) admite empate; la eliminatoria no,
-  /// porque alguien tiene que avanzar. Cuál es cuál depende del formato:
+  /// Es así **solo en la fase final** (el cuadro, la final o los
+  /// playoffs, y todos los partidos de una eliminación directa): alguien
+  /// tiene que avanzar. En la fase de grupos o de liga el empate es un
+  /// resultado válido, vale 1 punto, y no hay penales.
   ///
-  /// - Grupos + eliminación: los de fase final, que son los que no
-  ///   tienen grupo (generados por el cuadro o cargados a mano).
-  /// - Liga + final / playoffs: la liga la arma el sistema y no tiene
-  ///   grupos, así que ahí la señal es otra: que sea del cuadro o que lo
-  ///   haya cargado el admin.
+  /// Antes dependía también de una opción "Permitir empate" del
+  /// formulario, que si se apagaba exigía penales en los partidos de
+  /// grupos. Lo que define si hay penales es la fase, no una opción.
   ///
   /// Es la única definición: la usan el registro de resultados y el
-  /// formulario. Antes había una copia en cada lado, y el formulario
-  /// quedó sin reconocer los cruces del cuadro generado: no mostraba
-  /// los penales y no dejaba cerrar un empate.
-  bool requiereGanador(PartidoModel partido) {
-    if (!configuracion.permiteEmpate) return true;
-    return esDeFaseFinal(partido);
-  }
+  /// formulario.
+  bool requiereGanador(PartidoModel partido) => esDeFaseFinal(partido);
 
   /// Si el partido es de la fase final (la eliminatoria) y no de la fase
   /// regular. Es la única definición: la usan la tabla (la fase final no

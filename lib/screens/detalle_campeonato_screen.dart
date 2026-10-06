@@ -884,7 +884,11 @@ class _FormatSummaryCard extends StatelessWidget {
       _ConfigItem(
         icon: Icons.handshake_outlined,
         label: 'Empates',
-        value: config.permiteEmpate ? 'Permitidos' : 'No permitidos',
+        value: campeonato.esFutbol
+            ? 'Valen 1 punto; penales en la fase final'
+            : campeonato.esBasket
+            ? 'No hay: se juega prórroga'
+            : 'No hay: se juega por sets',
       ),
       _ConfigItem(
         icon: Icons.shuffle_rounded,

@@ -137,7 +137,7 @@ lado, se llaman; nunca se copian ni se reescriben:
 | Marcador de un walkover | `TablaCalculo.marcadorPorNoPresentarse()` |
 | ¿Tiene grupo? / ¿Es de fase final? | `PartidoModel.tieneGrupo` / `.esDeFaseFinal` |
 | ¿Quién ganó? / ¿Quién pasa? | `PartidoModel.ganoLocal`, `.nombreGanador`, `.quienPasa` |
-| ¿El partido necesita ganador? (penales) | `CampeonatoModel.requiereGanador()` |
+| ¿El partido necesita ganador? (penales: solo en la fase final) | `CampeonatoModel.requiereGanador()` |
 | Nombre de una ronda | `RondaLlave.nombre()` |
 | Formato de fechas | `Fechas` (`lib/utils/fechas.dart`) |
 | Texto de un error (incluye los de Firebase) | `mensajeDeError()` (`lib/utils/mensajes.dart`) |
@@ -190,3 +190,15 @@ Al editar un equipo, `sincronizarNombresEquipos()` actualiza todas las
 copias; también corre sola al abrir el detalle de un campeonato en el
 admin, por si alguna quedó vieja. Para saber de qué equipo es un gol o
 una tarjeta se compara siempre el **id**, nunca el nombre.
+
+## Empates y penales
+
+En fútbol, el empate lo define la fase y no una opción del campeonato:
+
+- Fase de grupos o de liga: el empate vale 1 punto y **no hay penales**.
+  Si llegaran penales cargados, el registro los ignora.
+- Fase final (cuadro, final, playoffs, eliminación directa): no puede
+  quedar empate; los penales son obligatorios y definen quién avanza.
+
+El formulario de campeonato tenía una opción "Permitir empate" que, si
+se apagaba, pedía penales también en grupos. Se sacó.
