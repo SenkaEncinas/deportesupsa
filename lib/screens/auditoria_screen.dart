@@ -17,6 +17,8 @@ import 'reciclaje/app_text_styles.dart';
 import '../utils/fechas.dart';
 import '../utils/mensajes.dart';
 import '../utils/etiquetas.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 class AuditoriaScreen extends StatefulWidget {
   final String campeonatoId;
@@ -119,6 +121,10 @@ class _AuditoriaScreenState extends State<AuditoriaScreen> {
                       text: 'Volver',
                       icon: Icons.arrow_back,
                       onPressed: () => Navigator.pop(context),
+                    ),
+                    AyudaBoton(
+                      pantalla: PantallaAyuda.auditoria,
+                      campeonatoId: widget.campeonatoId,
                     ),
                   ],
                   child: auditorias.isEmpty

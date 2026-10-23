@@ -161,6 +161,34 @@ class CampeonatoService {
     });
   }
 
+  /// Activa la fase eliminatoria si el campeonato ya tiene cuadro
+  /// generado pero la fase quedó sin activar (pasaba cuando las llaves
+  /// se generaban antes de activarla). Devuelve si cambió algo.
+  Future<bool> activarFaseSiHayCuadro(String campeonatoId) async {
+    final doc = await _campeonatos.doc(campeonatoId).get();
+    final data = doc.data();
+    if (data == null) return false;
+
+    final campeonato = CampeonatoModel.fromMap(doc.id, data);
+    if (!campeonato.tieneFasesSeparadas || campeonato.estaEnFaseEliminatoria) {
+      return false;
+    }
+
+    final cuadro = await _campeonatos
+        .doc(campeonatoId)
+        .collection('partidos')
+        .where('rondaLlave', isNull: false)
+        .limit(1)
+        .get();
+    if (cuadro.docs.isEmpty) return false;
+
+    await _campeonatos.doc(campeonatoId).update({
+      'faseActual': FaseCampeonato.eliminatoria,
+      'fechaActualizacion': FieldValue.serverTimestamp(),
+    });
+    return true;
+  }
+
   /// Guarda los puntos de igualación de un campeonato (`equipoId` ->
   /// puntos) y deja la tabla recalculada.
   ///

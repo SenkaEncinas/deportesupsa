@@ -41,6 +41,8 @@ import '../utils/llaves.dart';
 import 'reciclaje/app_match_card.dart';
 import 'reciclaje/app_info_box.dart';
 import 'reciclaje/app_fondo.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 class DetalleCampeonatoScreen extends StatefulWidget {
   final String campeonatoId;
@@ -80,6 +82,11 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
     EquipoService()
         .sincronizarNombresEquipos(widget.campeonatoId)
         .catchError((_) => 0);
+    // Y si el cuadro se generó sin activar la fase eliminatoria, la
+    // activa: si no, el público sigue viendo la fase de grupos.
+    _service
+        .activarFaseSiHayCuadro(widget.campeonatoId)
+        .catchError((_) => false);
   }
 
   Future<void> _activarCampeonato() async {
@@ -225,6 +232,10 @@ class _DetalleCampeonatoScreenState extends State<DetalleCampeonatoScreen> {
                   text: 'Volver',
                   icon: Icons.arrow_back_rounded,
                   onPressed: () => Navigator.pop(context),
+                ),
+                AyudaBoton(
+                  pantalla: PantallaAyuda.detalleCampeonato,
+                  campeonatoId: widget.campeonatoId,
                 ),
                 AppButton.secondary(
                   text: isMobile ? 'Editar' : 'Editar datos',

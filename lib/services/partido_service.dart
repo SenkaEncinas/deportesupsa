@@ -796,6 +796,16 @@ class PartidoService {
       batch.delete(_partidos(campeonatoId).doc(partido.id));
     }
 
+    // Generar el cuadro es pasar a la eliminatoria. Antes se podía armar
+    // "por adelantado" sin activar la fase, y el público seguía viendo la
+    // fase de grupos aunque el cuadro ya se estuviera jugando.
+    if (campeonato.tieneFasesSeparadas && !campeonato.estaEnFaseEliminatoria) {
+      batch.update(_campeonato(campeonatoId), {
+        'faseActual': FaseCampeonato.eliminatoria,
+        'fechaActualizacion': FieldValue.serverTimestamp(),
+      });
+    }
+
     await batch.commit();
 
     // Los "libres" ya tienen ganador desde el momento en que se arma el
@@ -861,6 +871,45 @@ class PartidoService {
 
   /// Borra un partido. Pensado para sacar un cruce de la llave que ya no
   /// va; no se permite si tiene resultado cargado.
+  /// Borra todo el fixture para generarlo de nuevo (por ejemplo, si se
+  /// generó antes de terminar de inscribir equipos o con los grupos
+  /// mal armados). Solo se puede mientras ningún partido tenga
+  /// resultado: con resultados, borrar el fixture borraría la historia
+  /// del campeonato. Si ya estaba en la fase eliminatoria, vuelve a la
+  /// fase regular.
+  Future<int> borrarFixture(String campeonatoId) async {
+    final snap = await _partidos(campeonatoId).get();
+    final partidos = snap.docs
+        .map((doc) => PartidoModel.fromMap(doc.id, doc.data()))
+        .toList();
+
+    final jugados = partidos.where((p) => p.resultadoRegistrado).length;
+    if (jugados > 0) {
+      throw Exception(
+        'Hay $jugados partido(s) con resultado. Anulá esos resultados antes de borrar el fixture.',
+      );
+    }
+
+    var batch = _db.batch();
+    var enLote = 0;
+    for (final doc in snap.docs) {
+      batch.delete(doc.reference);
+      if (++enLote == 450) {
+        await batch.commit();
+        batch = _db.batch();
+        enLote = 0;
+      }
+    }
+    batch.update(_campeonato(campeonatoId), {
+      'faseActual': FaseCampeonato.grupos,
+      'fechaActualizacion': FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+
+    await _resultadoService.recalcularTablaYRanking(campeonatoId);
+    return partidos.length;
+  }
+
   Future<void> eliminarPartido({
     required String campeonatoId,
     required String partidoId,
@@ -875,7 +924,7 @@ class PartidoService {
 
     if (partido.resultadoRegistrado) {
       throw Exception(
-        'Ese partido ya tiene resultado cargado. Borra el resultado antes de eliminarlo.',
+        'Ese partido ya tiene resultado cargado. Anulá el resultado (en Resultados) antes de eliminarlo.',
       );
     }
 

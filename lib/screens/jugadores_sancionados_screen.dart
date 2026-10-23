@@ -20,6 +20,8 @@ import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/stat_card.dart';
 import '../utils/fechas.dart';
 import '../utils/mensajes.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 enum _FiltroSancion { todas, amarillas, rojas }
 
@@ -278,6 +280,10 @@ class _JugadoresSancionadosScreenState
                           text: 'Volver',
                           icon: Icons.arrow_back,
                           onPressed: () => Navigator.pop(context),
+                        ),
+                        AyudaBoton(
+                          pantalla: PantallaAyuda.sancionados,
+                          campeonatoId: widget.campeonatoId,
                         ),
                       ],
                       child: Column(

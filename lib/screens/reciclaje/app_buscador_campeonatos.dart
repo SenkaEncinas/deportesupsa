@@ -112,17 +112,22 @@ class _AppBuscadorCampeonatosState extends State<AppBuscadorCampeonatos> {
                 ),
               ),
               const SizedBox(height: 14),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final (texto, estado) in _filtros)
-                    AppFilterPill(
-                      text: texto,
-                      selected: _estado == estado,
-                      onTap: () => setState(() => _estado = estado),
-                    ),
-                ],
+              // Una sola fila que se desliza: en celular los cuatro filtros
+              // ocupaban dos renglones.
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final (texto, estado) in _filtros) ...[
+                      AppFilterPill(
+                        text: texto,
+                        selected: _estado == estado,
+                        onTap: () => setState(() => _estado = estado),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),

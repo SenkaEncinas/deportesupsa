@@ -22,6 +22,8 @@ import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/responsive.dart';
 import '../utils/mensajes.dart';
 import 'reciclaje/app_fondo.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 /// Pantalla de inicio del administrador.
 ///
@@ -126,6 +128,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       ? 'Gestión de campeonatos universitarios.'
                       : 'Hola, ${admin.nombre}.',
                   actions: [
+                    const AyudaBoton(pantalla: PantallaAyuda.panel),
                     AppButton.secondary(
                       text: isMobile ? 'Pública' : 'Ver página pública',
                       icon: Icons.visibility_outlined,

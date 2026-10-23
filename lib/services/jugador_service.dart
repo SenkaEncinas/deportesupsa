@@ -43,21 +43,6 @@ class JugadorService {
     });
   }
 
-  Stream<List<JugadorModel>> streamJugadoresPorEquipo({
-    required String campeonatoId,
-    required String equipoId,
-  }) {
-    return _jugadores(campeonatoId)
-        .where('equipoId', isEqualTo: equipoId)
-        .orderBy('nombreCompleto')
-        .snapshots()
-        .map((snap) {
-          return snap.docs.map((doc) {
-            return JugadorModel.fromMap(doc.id, doc.data());
-          }).toList();
-        });
-  }
-
   Future<List<JugadorModel>> getJugadoresPorEquipo({
     required String campeonatoId,
     required String equipoId,
@@ -294,31 +279,13 @@ class JugadorService {
     );
   }
 
-  Future<void> cambiarEstadoJugador({
-    required String campeonatoId,
-    required String jugadorId,
-    required String estado,
-    required String observacion,
-    required String usuarioId,
-    required String usuarioNombre,
-  }) async {
-    await editarJugador(
-      campeonatoId: campeonatoId,
-      jugadorId: jugadorId,
-      cambios: {'estado': estado},
-      observacion: observacion,
-      usuarioId: usuarioId,
-      usuarioNombre: usuarioNombre,
-    );
-  }
-
   /// Borra un jugador para siempre (no es un cambio de estado): pensado
   /// para corregir errores de carga, como registrar a alguien en el
   /// equipo equivocado. Solo se permite mientras el campeonato está en
   /// inscripción, porque una vez activo el jugador puede tener goles,
   /// tarjetas o historial asociado que quedaría huérfano; para sacar a
-  /// alguien de un campeonato ya activo se usa [cambiarEstadoJugador]
-  /// con `retirado`, que sí deja rastro.
+  /// alguien de un campeonato ya activo se lo edita con estado
+  /// `retirado`, que sí deja rastro.
   Future<void> eliminarJugador({
     required String campeonatoId,
     required String jugadorId,

@@ -21,6 +21,8 @@ import 'reciclaje/app_responsive_grid.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/mensajes.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 /// Inscribe equipos activos en los grupos de la fase de grupos. Antes,
 /// esta asignación se hacía automáticamente y en silencio cada vez que se
@@ -265,6 +267,10 @@ class _GruposScreenState extends State<GruposScreen> {
                           text: 'Volver',
                           icon: Icons.arrow_back,
                           onPressed: () => Navigator.pop(context),
+                        ),
+                        AyudaBoton(
+                          pantalla: PantallaAyuda.grupos,
+                          campeonatoId: widget.campeonatoId,
                         ),
                         if (puedeEditar && grupos.isEmpty)
                           AppButton.primary(

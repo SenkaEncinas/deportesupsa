@@ -24,6 +24,8 @@ import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import '../utils/mensajes.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 /// Llaves de la fase eliminatoria, del lado del admin: se generan solas
 /// a partir de los clasificados (1° contra el último, 2° contra el
@@ -250,6 +252,10 @@ class _LlavesScreenState extends State<LlavesScreen> {
                           icon: Icons.arrow_back,
                           onPressed: () => Navigator.pop(context),
                         ),
+                        AyudaBoton(
+                          pantalla: PantallaAyuda.llaves,
+                          campeonatoId: widget.campeonatoId,
+                        ),
                         AppButton.primary(
                           text: rondas.isEmpty
                               ? 'Generar llaves'
@@ -344,7 +350,7 @@ class _AyudaCard extends StatelessWidget {
           Text(
             faseActivada
                 ? 'Se arma el cuadro completo, de la primera ronda hasta la final. La llave 1 se cruza con la última, la 2 con la anteúltima, y así en todas las rondas: por eso el 1° y el 2° de la tabla recién se pueden encontrar en la final.'
-                : 'Podés dejar las llaves preparadas, pero recién cuando actives la fase eliminatoria en Fixture los usuarios van a ver solo las llaves.',
+                : 'Al generar el cuadro se activa la fase eliminatoria: desde ese momento el público ve las llaves en vez de la fase de grupos.',
             style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 8),
@@ -874,7 +880,9 @@ class _GenerarLlavesDialogState extends State<_GenerarLlavesDialog> {
               const SizedBox(height: 10),
               Text(
                 'Si ya había llaves armadas sin resultados, se reemplazan. '
-                'Las que tengan resultado cargado no se tocan.',
+                'Las que tengan resultado cargado no se tocan. Si el '
+                'campeonato todavía estaba en fase de grupos, pasa a la '
+                'fase eliminatoria.',
                 style: AppTextStyles.small.copyWith(color: AppColors.textMuted),
               ),
             ],

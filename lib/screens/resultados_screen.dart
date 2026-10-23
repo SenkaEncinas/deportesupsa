@@ -22,6 +22,12 @@ import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import 'reciclaje/responsive.dart';
 import 'resultado_form_screen.dart';
+import '../services/auth_service.dart';
+import '../services/resultado_service.dart';
+import 'reciclaje/app_dialogs.dart';
+import 'reciclaje/app_snackbars.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 /// Qué partidos se listan. Arranca en "por cargar": es lo que se viene a
 /// hacer a esta pantalla, y antes había que buscar los pendientes entre
@@ -118,6 +124,35 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
     return null;
   }
 
+  Future<void> _anular(PartidoModel partido) async {
+    final motivo = await AppDialogs.pedirMotivo(
+      context: context,
+      title: 'Anular resultado',
+      message:
+          '${partido.equipoLocalNombre} ${partido.marcadorTexto} ${partido.equipoVisitanteNombre} '
+          'vuelve a quedar sin jugar: se borran sus goles y tarjetas y la tabla se recalcula.',
+      confirmText: 'Anular',
+      danger: true,
+    );
+    if (motivo == null || !mounted) return;
+
+    try {
+      final admin = await AuthService().requireAdmin();
+      await ResultadoService().anularResultado(
+        campeonatoId: widget.campeonatoId,
+        partidoId: partido.id,
+        motivo: motivo,
+        usuarioId: admin.id,
+        usuarioNombre: admin.nombre,
+      );
+      if (!mounted) return;
+      AppSnackbars.success(context, 'Resultado anulado.');
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbars.error(context, mensajeDeError(e));
+    }
+  }
+
   void _abrirFormulario(PartidoModel partido, CampeonatoModel? campeonato) {
     Navigator.push(
       context,
@@ -172,6 +207,10 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
                       text: 'Volver',
                       icon: Icons.arrow_back,
                       onPressed: () => Navigator.pop(context),
+                    ),
+                    AyudaBoton(
+                      pantalla: PantallaAyuda.resultados,
+                      campeonatoId: widget.campeonatoId,
                     ),
                   ],
                   child: partidos.isEmpty
@@ -261,6 +300,7 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
                                     motivoBloqueo: motivo,
                                     onEditar: () =>
                                         _abrirFormulario(partido, campeonato),
+                                    onAnular: () => _anular(partido),
                                   ),
                                 );
                               }),
@@ -283,12 +323,14 @@ class _ResultadoCard extends StatelessWidget {
   /// Si no es null, el partido no se puede cargar y esto dice por qué.
   final String? motivoBloqueo;
   final VoidCallback onEditar;
+  final VoidCallback onAnular;
 
   const _ResultadoCard({
     required this.partido,
     required this.campeonato,
     required this.motivoBloqueo,
     required this.onEditar,
+    required this.onAnular,
   });
 
   /// Dónde se juega el partido dentro del campeonato: el grupo, la ronda
@@ -420,10 +462,22 @@ class _ResultadoCard extends StatelessWidget {
     );
 
     final boton = partido.resultadoRegistrado
-        ? AppButton.secondary(
-            text: 'Editar',
-            icon: Icons.edit_outlined,
-            onPressed: bloqueado ? null : onEditar,
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                tooltip: 'Anular resultado',
+                onPressed: bloqueado ? null : onAnular,
+                icon: const Icon(Icons.undo_rounded),
+                color: AppColors.danger,
+              ),
+              const SizedBox(width: 4),
+              AppButton.secondary(
+                text: 'Editar',
+                icon: Icons.edit_outlined,
+                onPressed: bloqueado ? null : onEditar,
+              ),
+            ],
           )
         : AppButton.primary(
             text: 'Cargar resultado',

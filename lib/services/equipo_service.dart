@@ -87,6 +87,70 @@ class EquipoService {
     return equipoDoc.id;
   }
 
+  /// Borra un equipo cargado por error, junto con sus jugadores, su lugar
+  /// en los grupos y su fila de la tabla. Solo si todavía no figura en
+  /// ningún partido: un equipo que ya jugó no se borra (se lo marca como
+  /// retirado desde su ficha).
+  Future<void> eliminarEquipo({
+    required String campeonatoId,
+    required String equipoId,
+    required String usuarioId,
+    required String usuarioNombre,
+  }) async {
+    final campeonato = _db.collection('campeonatos').doc(campeonatoId);
+    final equipoDoc = await _equipos(campeonatoId).doc(equipoId).get();
+    if (!equipoDoc.exists) throw Exception('El equipo no existe.');
+    final nombre = (equipoDoc.data()?['nombre'] ?? equipoId).toString();
+
+    final partidos = campeonato.collection('partidos');
+    final comoLocal = await partidos
+        .where('equipoLocalId', isEqualTo: equipoId)
+        .limit(1)
+        .get();
+    final comoVisitante = await partidos
+        .where('equipoVisitanteId', isEqualTo: equipoId)
+        .limit(1)
+        .get();
+    if (comoLocal.docs.isNotEmpty || comoVisitante.docs.isNotEmpty) {
+      throw Exception(
+        '$nombre ya figura en el fixture. Si dejó de participar, márcalo como retirado desde su ficha.',
+      );
+    }
+
+    final jugadores = await campeonato
+        .collection('jugadores')
+        .where('equipoId', isEqualTo: equipoId)
+        .get();
+    final grupos = await campeonato
+        .collection('grupos')
+        .where('equipoIds', arrayContains: equipoId)
+        .get();
+
+    final batch = _db.batch();
+    for (final doc in jugadores.docs) {
+      batch.delete(doc.reference);
+    }
+    for (final doc in grupos.docs) {
+      batch.update(doc.reference, {
+        'equipoIds': FieldValue.arrayRemove([equipoId]),
+      });
+    }
+    batch.delete(_tabla(campeonatoId).doc(equipoId));
+    batch.delete(equipoDoc.reference);
+    await batch.commit();
+
+    await _auditoriaService.registrar(
+      campeonatoId: campeonatoId,
+      usuarioId: usuarioId,
+      usuarioNombre: usuarioNombre,
+      accion: 'Eliminar equipo',
+      modulo: 'Equipos',
+      documentoAfectado: equipoId,
+      detalle:
+          'Se eliminó el equipo $nombre y sus ${jugadores.docs.length} jugadores.',
+    );
+  }
+
   /// Colecciones que guardan una copia del nombre del equipo, con los
   /// campos (id, nombre) de cada copia.
   static const _copiasDelNombre = <String, List<(String, String)>>{

@@ -18,6 +18,11 @@ import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/mensajes.dart';
 import '../utils/etiquetas.dart';
+import '../services/auth_service.dart';
+import 'reciclaje/app_dialogs.dart';
+import 'reciclaje/app_snackbars.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 class EquiposScreen extends StatefulWidget {
   final String campeonatoId;
@@ -104,6 +109,10 @@ class _EquiposScreenState extends State<EquiposScreen> {
                       icon: Icons.arrow_back,
                       onPressed: () => Navigator.pop(context),
                     ),
+                    AyudaBoton(
+                      pantalla: PantallaAyuda.equipos,
+                      campeonatoId: widget.campeonatoId,
+                    ),
                     if (campeonato?.estado != CampeonatoEstado.finalizado)
                       AppButton.primary(
                         text: 'Nuevo equipo',
@@ -182,6 +191,41 @@ class _EquiposScreenState extends State<EquiposScreen> {
   }
 }
 
+/// Borra un equipo cargado por error. El servicio lo impide si el
+/// equipo ya figura en el fixture (ahí corresponde marcarlo retirado).
+Future<void> _eliminarEquipo(
+  BuildContext context,
+  String campeonatoId,
+  EquipoModel equipo,
+) async {
+  final confirmar = await AppDialogs.confirm(
+    context: context,
+    title: 'Eliminar equipo',
+    message:
+        '¿Eliminar a "${equipo.nombre}" y a sus ${equipo.cantidadJugadoresRegistrados} '
+        'jugadores? Solo se puede si todavía no figura en el fixture. '
+        'Esta acción no se puede deshacer.',
+    confirmText: 'Eliminar',
+    danger: true,
+  );
+  if (!confirmar || !context.mounted) return;
+
+  try {
+    final admin = await AuthService().requireAdmin();
+    await EquipoService().eliminarEquipo(
+      campeonatoId: campeonatoId,
+      equipoId: equipo.id,
+      usuarioId: admin.id,
+      usuarioNombre: admin.nombre,
+    );
+    if (!context.mounted) return;
+    AppSnackbars.success(context, '${equipo.nombre} eliminado.');
+  } catch (e) {
+    if (!context.mounted) return;
+    AppSnackbars.error(context, mensajeDeError(e));
+  }
+}
+
 class _EquiposGrid extends StatelessWidget {
   final String campeonatoId;
   final CampeonatoModel? campeonato;
@@ -221,12 +265,26 @@ class _EquiposGrid extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppBadge(
-                text: Etiquetas.formatear(equipo.estado),
-                type: AppBadge.typeFromEstado(equipo.estado),
-                icon: Icons.verified_outlined,
+              Row(
+                children: [
+                  AppBadge(
+                    text: Etiquetas.formatear(equipo.estado),
+                    type: AppBadge.typeFromEstado(equipo.estado),
+                    icon: Icons.verified_outlined,
+                  ),
+                  const Spacer(),
+                  if (campeonato?.estado != CampeonatoEstado.finalizado)
+                    IconButton(
+                      tooltip: 'Eliminar equipo',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () =>
+                          _eliminarEquipo(context, campeonatoId, equipo),
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      color: AppColors.danger,
+                    ),
+                ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               Text(
                 equipo.nombre,
                 maxLines: 2,

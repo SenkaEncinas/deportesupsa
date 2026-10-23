@@ -31,6 +31,8 @@ import 'reciclaje/stat_card.dart';
 import '../utils/mensajes.dart';
 import '../utils/etiquetas.dart';
 import 'reciclaje/app_info_box.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 /// Filtros disponibles para la lista de partidos del fixture.
 enum _FixtureFiltro { todos, sinProgramar, programados, manuales, automaticos }
@@ -63,6 +65,35 @@ class _FixtureScreenState extends State<FixtureScreen> {
 
   bool _loading = false;
   _FixtureFiltro _filtro = _FixtureFiltro.todos;
+
+  Future<void> _borrarFixture(int cantidad) async {
+    final confirm = await AppDialogs.confirm(
+      context: context,
+      title: 'Borrar fixture',
+      message:
+          'Se borran los $cantidad partidos para poder generar el fixture de '
+          'nuevo. Solo se puede porque ninguno tiene resultado. Las fechas '
+          'que ya hayas programado se pierden.',
+      confirmText: 'Borrar',
+      danger: true,
+    );
+    if (!confirm) return;
+
+    setState(() => _loading = true);
+    try {
+      await _partidoService.borrarFixture(widget.campeonatoId);
+      if (!mounted) return;
+      AppSnackbars.success(
+        context,
+        'Fixture borrado. Ya podés generarlo de nuevo.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbars.error(context, mensajeDeError(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   Future<void> _generarFixture(CampeonatoModel campeonato) async {
     setState(() {
@@ -381,6 +412,10 @@ class _FixtureScreenState extends State<FixtureScreen> {
                       icon: Icons.arrow_back,
                       onPressed: () => Navigator.pop(context),
                     ),
+                    AyudaBoton(
+                      pantalla: PantallaAyuda.fixture,
+                      campeonatoId: widget.campeonatoId,
+                    ),
                     if (campeonato != null &&
                         campeonato.usaGrupos &&
                         partidos.isEmpty)
@@ -432,6 +467,17 @@ class _FixtureScreenState extends State<FixtureScreen> {
                         icon: Icons.add,
                         loading: _loading,
                         onPressed: () => _crearCruceManual(campeonato),
+                      ),
+                    // Solo mientras nada se jugó: borrar con resultados
+                    // borraría la historia del campeonato.
+                    if (puedeEditarFixture &&
+                        partidos.isNotEmpty &&
+                        !partidos.any((p) => p.resultadoRegistrado))
+                      AppButton.danger(
+                        text: 'Borrar fixture',
+                        icon: Icons.delete_sweep_outlined,
+                        loading: _loading,
+                        onPressed: () => _borrarFixture(partidos.length),
                       ),
                     if (partidos.isNotEmpty && campeonato != null)
                       AppButton.secondary(

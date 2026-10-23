@@ -15,6 +15,8 @@ import 'reciclaje/app_page.dart';
 import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/mensajes.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 class RankingGoleadoresScreen extends StatefulWidget {
   final String campeonatoId;
@@ -84,6 +86,10 @@ class _RankingGoleadoresScreenState extends State<RankingGoleadoresScreen> {
                       text: 'Volver',
                       icon: Icons.arrow_back,
                       onPressed: () => Navigator.pop(context),
+                    ),
+                    AyudaBoton(
+                      pantalla: PantallaAyuda.goleadores,
+                      campeonatoId: widget.campeonatoId,
                     ),
                   ],
                   child: ranking.isEmpty

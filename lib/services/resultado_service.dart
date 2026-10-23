@@ -533,6 +533,105 @@ class ResultadoService {
     );
   }
 
+  /// Borra el resultado de un partido cargado por error: el partido
+  /// vuelve a quedar "por jugar" (programado si tiene fecha), se borran
+  /// sus goles y tarjetas, y la tabla y el ranking se recalculan.
+  ///
+  /// En el cuadro eliminatorio, el lugar que había ganado en la ronda
+  /// siguiente vuelve a decir "Ganador llave N". Si ese cruce siguiente
+  /// ya tiene resultado, no se puede: hay que anular primero ese.
+  Future<void> anularResultado({
+    required String campeonatoId,
+    required String partidoId,
+    required String motivo,
+    required String usuarioId,
+    required String usuarioNombre,
+  }) async {
+    if (motivo.trim().isEmpty) {
+      throw Exception('Indica por qué se anula el resultado.');
+    }
+
+    final snap = await _partidos(campeonatoId).get();
+    final partidos = snap.docs
+        .map((doc) => PartidoModel.fromMap(doc.id, doc.data()))
+        .toList();
+    final partido = partidos.firstWhere(
+      (p) => p.id == partidoId,
+      orElse: () => throw Exception('El partido no existe.'),
+    );
+
+    if (!partido.resultadoRegistrado) {
+      throw Exception('Ese partido no tiene resultado cargado.');
+    }
+
+    if (partido.esDeLlave) {
+      final siguienteJugado = partidos.any(
+        (p) =>
+            p.esDeLlave &&
+            p.resultadoRegistrado &&
+            RondaLlave.orden(p.rondaLlave!) ==
+                RondaLlave.orden(partido.rondaLlave!) + 1 &&
+            (p.vieneDeLocal == partido.llave ||
+                p.vieneDeVisitante == partido.llave),
+      );
+      if (siguienteJugado) {
+        throw Exception(
+          'El ganador de este cruce ya jugó la ronda siguiente. Anulá primero ese resultado.',
+        );
+      }
+    }
+
+    final goles = await _goles(
+      campeonatoId,
+    ).where('partidoId', isEqualTo: partidoId).get();
+    final tarjetas = await _tarjetas(
+      campeonatoId,
+    ).where('partidoId', isEqualTo: partidoId).get();
+
+    final batch = _db.batch();
+    for (final doc in [...goles.docs, ...tarjetas.docs]) {
+      batch.delete(doc.reference);
+    }
+
+    batch.update(_partidos(campeonatoId).doc(partidoId), {
+      'estado': partido.fechaHora == null
+          ? PartidoEstado.pendienteProgramacion
+          : PartidoEstado.programado,
+      'golesLocal': null,
+      'golesVisitante': null,
+      'ganadorId': null,
+      'empate': false,
+      'resultadoRegistrado': false,
+      'tipoResultado': TipoResultado.normal,
+      'observacionResultado': null,
+      'penalesLocal': null,
+      'penalesVisitante': null,
+      'definidoPorPenales': false,
+      'definidoPorProrroga': false,
+      'tipoDefinicion': TipoDefinicion.normal,
+      'sets': <Map<String, dynamic>>[],
+      'fechaActualizacion': FieldValue.serverTimestamp(),
+    });
+
+    await batch.commit();
+    await recalcularTablaYRanking(campeonatoId);
+    if (partido.esDeLlave) await avanzarGanadoresDeLlave(campeonatoId);
+
+    await _auditoriaService.registrar(
+      campeonatoId: campeonatoId,
+      usuarioId: usuarioId,
+      usuarioNombre: usuarioNombre,
+      accion: 'Anular resultado',
+      modulo: 'Resultados',
+      documentoAfectado: partidoId,
+      detalle:
+          'Se anuló el resultado de ${partido.equipoLocalNombre} '
+          '${partido.golesLocal} - ${partido.golesVisitante} '
+          '${partido.equipoVisitanteNombre}.',
+      observacion: motivo,
+    );
+  }
+
   /// Lleva a los ganadores de cada ronda de la llave al cruce que les
   /// toca en la ronda siguiente, y vuelve a dejar el hueco en "Ganador
   /// llave N" si el resultado que lo definía se editó o se borró.

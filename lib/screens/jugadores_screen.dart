@@ -22,6 +22,8 @@ import 'reciclaje/responsive.dart';
 import '../utils/mensajes.dart';
 import '../utils/etiquetas.dart';
 import 'historial_jugador_screen.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 /// Borra un jugador para siempre, con confirmación: pensado para corregir
 /// un error de carga (jugador cargado en el equipo equivocado), no para
@@ -167,6 +169,10 @@ class _JugadoresScreenState extends State<JugadoresScreen> {
                       text: 'Volver',
                       icon: Icons.arrow_back,
                       onPressed: () => Navigator.pop(context),
+                    ),
+                    AyudaBoton(
+                      pantalla: PantallaAyuda.jugadores,
+                      campeonatoId: widget.campeonatoId,
                     ),
                     if (campeonato?.estado != CampeonatoEstado.finalizado)
                       AppButton.primary(

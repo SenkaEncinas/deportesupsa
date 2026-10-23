@@ -60,8 +60,11 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 AppPage(
                   title: 'UPSA Campeonatos',
-                  subtitle:
-                      'Fixture, resultados, tabla de posiciones y goleadores de los campeonatos universitarios.',
+                  // En celular el banner de abajo ya dice lo mismo: repetirlo
+                  // empujaba el primer campeonato fuera de la pantalla.
+                  subtitle: isMobile
+                      ? null
+                      : 'Fixture, resultados, tabla de posiciones y goleadores de los campeonatos universitarios.',
                   actions: [
                     AppButton.secondary(
                       text: isMobile ? 'Admin' : 'Ingresar admin',

@@ -12,6 +12,8 @@ import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/mensajes.dart';
 import 'reciclaje/app_form_fields.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 class EquipoFormScreen extends StatefulWidget {
   final String campeonatoId;
@@ -146,6 +148,10 @@ class _EquipoFormScreenState extends State<EquipoFormScreen> {
               text: 'Cancelar',
               icon: Icons.close,
               onPressed: _loading ? null : () => Navigator.pop(context),
+            ),
+            AyudaBoton(
+              pantalla: PantallaAyuda.equipoForm,
+              campeonatoId: widget.campeonatoId,
             ),
             AppButton.primary(
               text: widget.isEditing ? 'Actualizar' : 'Guardar',

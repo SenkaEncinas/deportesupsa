@@ -19,6 +19,8 @@ import 'reciclaje/responsive.dart';
 import '../utils/fechas.dart';
 import '../utils/mensajes.dart';
 import '../utils/etiquetas.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 class TablaPosicionesScreen extends StatefulWidget {
   final String campeonatoId;
@@ -261,6 +263,10 @@ class _TablaPosicionesScreenState extends State<TablaPosicionesScreen> {
                   text: 'Volver',
                   icon: Icons.arrow_back,
                   onPressed: () => Navigator.pop(context),
+                ),
+                AyudaBoton(
+                  pantalla: PantallaAyuda.historial,
+                  campeonatoId: widget.campeonatoId,
                 ),
               ],
               child: data.partidos.isEmpty

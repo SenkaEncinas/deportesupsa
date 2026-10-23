@@ -18,6 +18,8 @@ import 'reciclaje/app_section_header.dart';
 import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/mensajes.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 /// Puntos de igualación: el ajuste manual que el admin le carga a los
 /// equipos de un grupo que tiene menos equipos que los demás.
@@ -147,6 +149,10 @@ class _IgualacionScreenState extends State<IgualacionScreen> {
                           text: 'Volver',
                           icon: Icons.arrow_back,
                           onPressed: () => Navigator.pop(context),
+                        ),
+                        AyudaBoton(
+                          pantalla: PantallaAyuda.igualacion,
+                          campeonatoId: widget.campeonatoId,
                         ),
                         AppButton.primary(
                           text: 'Guardar',

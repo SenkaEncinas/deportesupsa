@@ -20,6 +20,8 @@ import 'reciclaje/app_text_field.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/mensajes.dart';
 import 'reciclaje/app_form_fields.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 class JugadorFormScreen extends StatefulWidget {
   final String campeonatoId;
@@ -646,6 +648,10 @@ class _JugadorFormScreenState extends State<JugadorFormScreen> {
                   text: 'Cancelar',
                   icon: Icons.close,
                   onPressed: _loading ? null : () => Navigator.pop(context),
+                ),
+                AyudaBoton(
+                  pantalla: PantallaAyuda.jugadorForm,
+                  campeonatoId: widget.campeonatoId,
                 ),
                 AppButton.primary(
                   text: widget.isEditing ? 'Actualizar' : 'Guardar jugadores',

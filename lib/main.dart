@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'firebase_options.dart';
 import 'screens/home_screen.dart';
@@ -22,6 +23,11 @@ class MyApp extends StatelessWidget {
       title: 'UPSA Campeonatos',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme(),
+      // Sin esto el calendario y el reloj (al programar un partido)
+      // salían en inglés: "Select date", "Cancel", "OK".
+      locale: const Locale('es'),
+      supportedLocales: const [Locale('es')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       home: const HomeScreen(),
     );
   }

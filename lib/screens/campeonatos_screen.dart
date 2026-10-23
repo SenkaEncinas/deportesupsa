@@ -15,6 +15,8 @@ import 'reciclaje/app_hero_card.dart';
 import 'reciclaje/app_loading.dart';
 import 'reciclaje/app_page.dart';
 import 'reciclaje/responsive.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 /// Listado completo de campeonatos del administrador, con buscador y
 /// filtro por estado (incluye los finalizados, que el panel no muestra).
@@ -80,6 +82,7 @@ class _CampeonatosScreenState extends State<CampeonatosScreen> {
                   icon: Icons.arrow_back_rounded,
                   onPressed: () => Navigator.pop(context),
                 ),
+                AyudaBoton(pantalla: PantallaAyuda.campeonatos),
                 AppButton.primary(
                   text: isMobile ? 'Nuevo' : 'Nuevo campeonato',
                   icon: Icons.add_rounded,

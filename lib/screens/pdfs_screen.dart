@@ -21,6 +21,8 @@ import 'reciclaje/app_snackbars.dart';
 import 'reciclaje/app_text_styles.dart';
 import '../utils/fechas.dart';
 import '../utils/mensajes.dart';
+import '../ayuda/ayuda_modelo.dart';
+import '../ayuda/centro_ayuda.dart';
 
 class PdfsScreen extends StatefulWidget {
   final String campeonatoId;
@@ -495,6 +497,10 @@ class _PdfsScreenState extends State<PdfsScreen> {
                   text: 'Volver',
                   icon: Icons.arrow_back,
                   onPressed: () => Navigator.pop(context),
+                ),
+                AyudaBoton(
+                  pantalla: PantallaAyuda.pdfs,
+                  campeonatoId: widget.campeonatoId,
                 ),
               ],
               child: Column(

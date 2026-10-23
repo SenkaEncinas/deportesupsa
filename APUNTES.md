@@ -202,3 +202,40 @@ En fútbol, el empate lo define la fase y no una opción del campeonato:
 
 El formulario de campeonato tenía una opción "Permitir empate" que, si
 se apagaba, pedía penales también en grupos. Se sacó.
+
+## Archivos grandes divididos en partes
+
+Para que ninguna pantalla o servicio sea un solo archivo enorme, los más
+grandes se partieron con `part` / `part of` (mismo código, mismo
+comportamiento, solo repartido por tema):
+
+| Archivo principal | Partes |
+|---|---|
+| `services/pdf_service.dart` | `services/pdf/`: `flyers`, `planilla_futbol`, `planilla_voley`, `comunes` (extensiones privadas de `PdfService`) |
+| `screens/championship_detail_screen.dart` | `screens/campeonato_publico/`: `navegacion`, `partidos`, `tabla` |
+| `screens/campeonato_form_screen.dart` | `screens/campeonato_form/secciones` |
+| `screens/resultado_form_screen.dart` | `screens/resultado_form/secciones` |
+
+Los colores y medidas de los PDF son constantes del archivo
+(`_verdeOscuro`, `_flyerFormat`...), no `static` de la clase: así las
+extensiones de las partes los ven.
+
+## Ayuda del administrador (botón "?")
+
+Cada pantalla del admin tiene un botón "?" al lado de "Volver" que abre
+guías paso a paso con una maqueta de la pantalla y una mano que muestra
+qué tocar. Todo vive en `lib/ayuda/`:
+
+- `ayuda_modelo.dart`: `GuiaAyuda`, `PasoAyuda`, `PantallaAyuda`, `RolAyuda`
+  y `guiasDe(pantalla, rol)`.
+- `maqueta.dart`: piezas para dibujar (marco, botón, campo, fila, diálogo,
+  calendario, reloj) y el indicador `MqTocaAca`.
+- `guias/escenas.dart`: una maqueta por pantalla.
+- `guias/guias_*.dart`: el contenido de las guías, por tema.
+- `centro_ayuda.dart`: el botón, la lista y el reproductor.
+
+**Si cambia el texto de un botón o un título, actualizar su guía y su
+maqueta.** El test `ayuda_test.dart` recorre cada paso de cada guía en
+320 px, 390 px, tablet y escritorio, y revisa ids, cantidad de pasos y
+roles. Usa la fuente Roboto del SDK (`test/fuente_real.dart`): con la
+fuente de prueba de Flutter, cada letra mide 1 em y todo parece desbordar.
