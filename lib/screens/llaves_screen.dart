@@ -203,6 +203,49 @@ class _LlavesScreenState extends State<LlavesScreen> {
     }
   }
 
+  Future<void> _pasarAFaseFinal(
+    CampeonatoModel campeonato,
+    List<PartidoModel> partidos,
+  ) async {
+    final nombres = partidos
+        .map((p) => '${p.equipoLocalNombre} vs ${p.equipoVisitanteNombre}')
+        .join('\n');
+
+    final confirmar = await AppDialogs.confirm(
+      context: context,
+      title: 'Pasar a la fase final',
+      message:
+          '$nombres\n\nDejan de ser partidos con privilegio y pasan a ser '
+          'cruces de la fase eliminatoria: si terminan empatados se definen '
+          'por penales y no suman para la tabla.',
+      confirmText: 'Pasar',
+    );
+
+    if (!confirmar || !mounted) return;
+
+    setState(() => _loading = true);
+
+    try {
+      final cambiados = await _partidoService.pasarPrivilegiosAFaseFinal(
+        campeonato: campeonato,
+        partidoIds: partidos.map((p) => p.id).toList(),
+      );
+
+      if (!mounted) return;
+      AppSnackbars.success(
+        context,
+        cambiados == 1
+            ? '1 partido pasó a la fase final.'
+            : '$cambiados partidos pasaron a la fase final.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbars.error(context, mensajeDeError(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -299,7 +342,14 @@ class _LlavesScreenState extends State<LlavesScreen> {
                           ],
                           if (privilegios.isNotEmpty) ...[
                             const SizedBox(height: 6),
-                            _PrivilegiosCard(partidos: privilegios),
+                            _PrivilegiosCard(
+                              partidos: privilegios,
+                              onPasarAFaseFinal:
+                                  campeonato.estaEnFaseEliminatoria
+                                  ? (lista) =>
+                                        _pasarAFaseFinal(campeonato, lista)
+                                  : null,
+                            ),
                           ],
                           const SizedBox(height: 24),
                         ],
@@ -580,19 +630,38 @@ class _CrucesSueltosCard extends StatelessWidget {
 class _PrivilegiosCard extends StatelessWidget {
   final List<PartidoModel> partidos;
 
-  const _PrivilegiosCard({required this.partidos});
+  /// Pasa los partidos a la fase final. `null` cuando el campeonato
+  /// todavía no está en la eliminatoria: ahí un privilegio sí es un
+  /// partido especial.
+  final ValueChanged<List<PartidoModel>>? onPasarAFaseFinal;
+
+  const _PrivilegiosCard({required this.partidos, this.onPasarAFaseFinal});
 
   @override
   Widget build(BuildContext context) {
+    final pasar = onPasarAFaseFinal;
+    final pendientes = partidos.where((p) => !p.resultadoRegistrado).toList();
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AppSectionHeader(
+          AppSectionHeader(
             title: 'Partidos con privilegio',
-            subtitle:
-                'Partidos especiales fuera de grupos. No forman parte de la llave ni suman para la tabla.',
+            subtitle: pasar == null
+                ? 'Partidos especiales fuera de grupos. No forman parte de la llave ni suman para la tabla.'
+                : 'Son amistosos: no suman, no forman parte de la llave y un '
+                      'empate NO se define por penales. Si en realidad son '
+                      'cruces de la fase eliminatoria, pasalos a la fase final.',
           ),
+          if (pasar != null && pendientes.length > 1) ...[
+            const SizedBox(height: 12),
+            AppButton.primary(
+              text: 'Pasar todos a la fase final',
+              icon: Icons.sports_soccer_outlined,
+              onPressed: () => pasar(pendientes),
+            ),
+          ],
           const SizedBox(height: 12),
           ...partidos.map(
             (partido) => Padding(
@@ -613,12 +682,23 @@ class _PrivilegiosCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Text(
-                    'Jornada ${partido.jornada}',
-                    style: AppTextStyles.small.copyWith(
-                      color: AppColors.textSecondary,
+                  if (pasar != null)
+                    IconButton(
+                      tooltip: partido.resultadoRegistrado
+                          ? 'Tiene resultado: anulalo en Resultados para pasarlo'
+                          : 'Pasar a la fase final',
+                      onPressed: partido.resultadoRegistrado
+                          ? null
+                          : () => pasar([partido]),
+                      icon: const Icon(Icons.move_up_outlined),
+                    )
+                  else
+                    Text(
+                      'Jornada ${partido.jornada}',
+                      style: AppTextStyles.small.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),

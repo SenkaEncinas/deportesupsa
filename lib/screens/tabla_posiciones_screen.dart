@@ -461,8 +461,8 @@ class _PartidoHistorialCard extends StatelessWidget {
                 icon: Icons.fact_check_outlined,
               ),
               AppBadge(
-                text: Etiquetas.estadoPartido(partido.estado),
-                type: AppBadge.typeFromEstado(partido.estado),
+                text: Etiquetas.estadoPartido(partido.estadoEfectivo),
+                type: AppBadge.typeFromEstado(partido.estadoEfectivo),
                 icon: Icons.sports_soccer,
               ),
             ],

@@ -5,6 +5,7 @@ import '../models/campeonato_model.dart';
 import '../models/equipo_model.dart';
 import '../models/grupo_model.dart';
 import '../models/partido_model.dart';
+import '../services/auth_service.dart';
 import '../services/campeonato_service.dart';
 import '../services/equipo_service.dart';
 import '../services/grupo_service.dart';
@@ -15,6 +16,7 @@ import 'grupos_screen.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_button.dart';
 import 'reciclaje/app_card.dart';
+import 'reciclaje/app_clasificacion_dialog.dart';
 import 'reciclaje/app_colors.dart';
 import 'reciclaje/app_dialogs.dart';
 import 'reciclaje/app_empty_state.dart';
@@ -52,6 +54,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
   final GrupoService _grupoService = GrupoService();
   final PartidoService _partidoService = PartidoService();
   final PdfService _pdfService = PdfService();
+  final AuthService _authService = AuthService();
 
   // Los streams se crean una sola vez y no dentro de build(): si se
   // reconstruyen en cada build, cada setState (una tecla en un
@@ -243,6 +246,69 @@ class _FixtureScreenState extends State<FixtureScreen> {
           _loading = false;
         });
       }
+    }
+  }
+
+  /// Un campeonato creado como "Fase de grupos" no tiene segunda fase,
+  /// así que nunca mostraba "Activar fase eliminatoria". Esto lo pasa a
+  /// "Grupos + eliminación" (sin tocar grupos ni resultados) y sigue
+  /// directo con la activación, que es lo que el admin vino a hacer.
+  Future<void> _agregarFaseEliminatoria(CampeonatoModel campeonato) async {
+    final grupos = campeonato.configuracion.cantidadGrupos;
+
+    final resultado = await showDialog<ClasificacionResult>(
+      context: context,
+      builder: (_) => ClasificacionDialog(
+        grupos: grupos,
+        clasificanInicial: 2,
+        tercerosInicial: 0,
+        titulo: 'Agregar fase eliminatoria',
+        descripcion:
+            'Este campeonato se creó como "Fase de grupos", que no tiene '
+            'llaves. Elegí cuántos pasan de cada uno de los $grupos grupos y '
+            'el formato pasa a "Grupos + eliminación". Los grupos, equipos y '
+            'resultados no cambian.',
+        textoConfirmar: 'Agregar',
+      ),
+    );
+
+    if (resultado == null || !mounted) return;
+
+    setState(() => _loading = true);
+
+    CampeonatoModel? actualizado;
+
+    try {
+      final admin = await _authService.requireAdmin();
+
+      await _campeonatoService.agregarFaseEliminatoria(
+        campeonato: campeonato,
+        clasificanPorGrupo: resultado.clasificanPorGrupo,
+        mejoresTerceros: resultado.mejoresTerceros,
+        usuarioId: admin.id,
+        usuarioNombre: admin.nombre,
+      );
+
+      actualizado = await _campeonatoService.getCampeonato(campeonato.id);
+
+      if (!mounted) return;
+      AppSnackbars.success(
+        context,
+        'Listo: clasifican ${resultado.total(grupos)} equipos a la fase eliminatoria.',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbars.error(context, mensajeDeError(e));
+      return;
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+
+    // Se ofrece activar enseguida. Si el admin todavía tiene partidos de
+    // grupo por jugar, cancela y el botón "Activar fase eliminatoria"
+    // queda a mano en esta misma pantalla.
+    if (actualizado != null && actualizado.estaEnFaseRegular && mounted) {
+      await _activarFaseEliminatoria(actualizado);
     }
   }
 
@@ -441,6 +507,14 @@ class _FixtureScreenState extends State<FixtureScreen> {
                         icon: Icons.shuffle,
                         loading: _loading,
                         onPressed: () => _generarFixture(campeonato),
+                      ),
+                    if (puedeEditarFixture &&
+                        campeonato.tipoCampeonato == TipoCampeonato.faseGrupos)
+                      AppButton.secondary(
+                        text: 'Agregar fase eliminatoria',
+                        icon: Icons.bolt_outlined,
+                        loading: _loading,
+                        onPressed: () => _agregarFaseEliminatoria(campeonato),
                       ),
                     if (puedeEditarFixture && campeonato.estaEnFaseRegular)
                       AppButton.secondary(
@@ -713,8 +787,8 @@ class _FixturePartidoCard extends StatelessWidget {
       runSpacing: 8,
       children: [
         AppBadge(
-          text: Etiquetas.estadoPartido(partido.estado),
-          type: AppBadge.typeFromEstado(partido.estado),
+          text: Etiquetas.estadoPartido(partido.estadoEfectivo),
+          type: AppBadge.typeFromEstado(partido.estadoEfectivo),
         ),
         AppBadge(
           text: partido.generadoPorSistema ? 'Aleatorio' : 'Manual',
@@ -867,8 +941,8 @@ class _CruceManualDialogState extends State<_CruceManualDialog> {
               if (widget.restringirAGrupo) ...[
                 AppInfoBox(
                   text: _privilegio
-                      ? 'Privilegio activado: puedes cruzar equipos de cualquier grupo. El partido queda fuera de los grupos y no suma para la tabla.'
-                      : 'Todavía es fase de grupos: solo puedes cruzar equipos del mismo grupo. Actíva "Privilegio" para un partido especial entre grupos distintos.',
+                      ? 'Privilegio activado: es un amistoso entre grupos. No suma para la tabla, no es parte de la llave y un empate NO se define por penales. Para cruces de eliminación, primero activá la fase eliminatoria.'
+                      : 'Todavía es fase de grupos: solo puedes cruzar equipos del mismo grupo. Si vas a armar los cruces de eliminación (cuartos, semis...), no uses "Privilegio": activá primero la fase eliminatoria.',
                 ),
                 const SizedBox(height: 10),
                 SwitchListTile(

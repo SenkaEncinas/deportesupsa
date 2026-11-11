@@ -128,10 +128,7 @@ class TablaCalculo {
     CampeonatoModel campeonato,
     PartidoModel partido,
   ) {
-    if (partido.estado != PartidoEstado.finalizado ||
-        !partido.resultadoRegistrado) {
-      return false;
-    }
+    if (!partido.estaJugado) return false;
     if (partido.golesLocal == null || partido.golesVisitante == null) {
       return false;
     }

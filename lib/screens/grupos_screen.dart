@@ -7,9 +7,9 @@ import '../services/campeonato_service.dart';
 import '../services/equipo_service.dart';
 import '../services/grupo_service.dart';
 import '../services/public_home_service.dart';
-import '../utils/fixture_grouping.dart';
 import 'reciclaje/app_badge.dart';
 import 'reciclaje/app_button.dart';
+import 'reciclaje/app_clasificacion_dialog.dart';
 import 'reciclaje/app_card.dart';
 import 'reciclaje/app_clasificados_card.dart';
 import 'reciclaje/app_colors.dart';
@@ -119,9 +119,17 @@ class _GruposScreenState extends State<GruposScreen> {
   }
 
   Future<void> _editarClasificacion(CampeonatoModel campeonato) async {
-    final resultado = await showDialog<_ClasificacionResult>(
+    final grupos = campeonato.configuracion.cantidadGrupos;
+    final resultado = await showDialog<ClasificacionResult>(
       context: context,
-      builder: (_) => _EditarClasificacionDialog(campeonato: campeonato),
+      builder: (_) => ClasificacionDialog(
+        grupos: grupos,
+        clasificanInicial: campeonato.configuracion.clasificanPorGrupo,
+        tercerosInicial: campeonato.configuracion.mejoresTerceros,
+        titulo: 'Editar clasificación',
+        descripcion:
+            'Este campeonato tiene $grupos grupos ya armados. Ajusta cuántos clasifican directo por grupo y cuántos mejores terceros pasan a la fase final.',
+      ),
     );
 
     if (resultado == null) return;
@@ -544,148 +552,6 @@ class _SinGrupoBox extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ClasificacionResult {
-  final int clasificanPorGrupo;
-  final int mejoresTerceros;
-
-  const _ClasificacionResult({
-    required this.clasificanPorGrupo,
-    required this.mejoresTerceros,
-  });
-}
-
-class _EditarClasificacionDialog extends StatefulWidget {
-  final CampeonatoModel campeonato;
-
-  const _EditarClasificacionDialog({required this.campeonato});
-
-  @override
-  State<_EditarClasificacionDialog> createState() =>
-      _EditarClasificacionDialogState();
-}
-
-class _EditarClasificacionDialogState
-    extends State<_EditarClasificacionDialog> {
-  late final TextEditingController _clasificanController =
-      TextEditingController(
-        text: '${widget.campeonato.configuracion.clasificanPorGrupo}',
-      );
-  late final TextEditingController _tercerosController = TextEditingController(
-    text: '${widget.campeonato.configuracion.mejoresTerceros}',
-  );
-
-  @override
-  void dispose() {
-    _clasificanController.dispose();
-    _tercerosController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final grupos = widget.campeonato.configuracion.cantidadGrupos;
-
-    return AlertDialog(
-      backgroundColor: AppColors.surface,
-      surfaceTintColor: Colors.transparent,
-      title: Text('Editar clasificación', style: AppTextStyles.heading3),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 380),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Este campeonato tiene $grupos grupos ya armados. Ajusta cuántos clasifican directo por grupo y cuántos mejores terceros pasan a la fase final.',
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _clasificanController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Clasifican por grupo',
-                prefixIcon: Icon(Icons.military_tech_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _tercerosController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Mejores terceros',
-                prefixIcon: Icon(Icons.workspace_premium_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            AnimatedBuilder(
-              animation: Listenable.merge([
-                _clasificanController,
-                _tercerosController,
-              ]),
-              builder: (context, _) {
-                final clasifican =
-                    int.tryParse(_clasificanController.text.trim()) ?? 0;
-                final terceros =
-                    int.tryParse(_tercerosController.text.trim()) ?? 0;
-                final total = grupos * clasifican + terceros;
-                final cuadra = FixtureGrouping.esPotenciaDeDos(total);
-                final color = cuadra ? AppColors.success : AppColors.warning;
-
-                return Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: cuadra
-                        ? AppColors.successLight
-                        : AppColors.warningLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: color.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(
-                    total < 2
-                        ? 'Define al menos 2 equipos clasificados.'
-                        : cuadra
-                        ? '$total equipos clasifican · arranca en ${FixtureGrouping.rondaSegunEquipos(total).toLowerCase()}.'
-                        : '$total equipos clasifican, pero eso no arma una llave pareja (2, 4, 8, 16, 32).',
-                    style: AppTextStyles.body.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        AppButton.ghost(
-          text: 'Cancelar',
-          onPressed: () => Navigator.pop(context),
-        ),
-        AppButton.primary(
-          text: 'Guardar',
-          onPressed: () {
-            final clasifican =
-                int.tryParse(_clasificanController.text.trim()) ?? 0;
-            final terceros = int.tryParse(_tercerosController.text.trim()) ?? 0;
-
-            Navigator.pop(
-              context,
-              _ClasificacionResult(
-                clasificanPorGrupo: clasifican,
-                mejoresTerceros: terceros,
-              ),
-            );
-          },
-        ),
-      ],
     );
   }
 }

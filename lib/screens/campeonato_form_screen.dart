@@ -98,7 +98,7 @@ class _CampeonatoFormScreenState extends State<CampeonatoFormScreen> {
     _FormatoOption(
       value: TipoCampeonato.faseGrupos,
       title: 'Fase de grupos',
-      subtitle: 'Equipos divididos en grupos.',
+      subtitle: 'Solo grupos, sin llaves finales.',
       icon: Icons.grid_view_rounded,
     ),
     _FormatoOption(

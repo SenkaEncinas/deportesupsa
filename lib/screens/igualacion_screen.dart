@@ -237,12 +237,7 @@ class _IgualacionScreenState extends State<IgualacionScreen> {
         return p.grupoId == clave;
       }).toList();
 
-      final pendientes = delGrupo
-          .where(
-            (p) =>
-                p.estado != PartidoEstado.finalizado || !p.resultadoRegistrado,
-          )
-          .length;
+      final pendientes = delGrupo.where((p) => !p.estaJugado).length;
 
       return _GrupoDatos(
         grupoId: clave,

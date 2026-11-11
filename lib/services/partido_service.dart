@@ -910,6 +910,59 @@ class PartidoService {
     return partidos.length;
   }
 
+  /// Pasa partidos cargados con privilegio a la fase eliminatoria: dejan
+  /// de ser "especiales" y quedan como cruces de fase final (con penales
+  /// si terminan empatados, fuera de la tabla).
+  ///
+  /// Hace falta porque, mientras el campeonato estaba en grupos, la única
+  /// forma de cruzar equipos de distintos grupos era marcar "Privilegio".
+  /// Así se cargaron los cruces de INTERCARRERAS 2/2026, y como un
+  /// partido con privilegio nunca es fase final, no pedían penales.
+  ///
+  /// Solo partidos sin resultado: uno ya jugado como amistoso pudo
+  /// quedar empatado sin ganador, y pasarlo a la llave lo dejaría roto.
+  Future<int> pasarPrivilegiosAFaseFinal({
+    required CampeonatoModel campeonato,
+    required List<String> partidoIds,
+  }) async {
+    if (!campeonato.tieneFasesSeparadas) {
+      throw Exception('Este formato no tiene fase eliminatoria.');
+    }
+
+    if (partidoIds.isEmpty) return 0;
+
+    final batch = _db.batch();
+    var cambiados = 0;
+
+    for (final id in partidoIds) {
+      final doc = await _partidos(campeonato.id).doc(id).get();
+      final data = doc.data();
+      if (data == null) continue;
+
+      final partido = PartidoModel.fromMap(doc.id, data);
+      if (!partido.privilegio) continue;
+
+      if (partido.resultadoRegistrado) {
+        throw Exception(
+          '${partido.equipoLocalNombre} vs ${partido.equipoVisitanteNombre} '
+          'ya tiene resultado. Anulalo en Resultados y volvé a intentar.',
+        );
+      }
+
+      batch.update(doc.reference, {
+        'privilegio': false,
+        // Sin grupo: es lo que lo marca como fase final en
+        // "grupos + eliminación".
+        'grupoId': null,
+        'fechaActualizacion': FieldValue.serverTimestamp(),
+      });
+      cambiados++;
+    }
+
+    await batch.commit();
+    return cambiados;
+  }
+
   Future<void> eliminarPartido({
     required String campeonatoId,
     required String partidoId,
@@ -948,9 +1001,16 @@ class PartidoService {
       }
     }
 
+    // Reprogramar un partido que ya tiene resultado solo corrige la
+    // fecha: no puede volverlo a "programado". Antes lo hacía, y la tabla
+    // (que solo cuenta los finalizados) dejaba de sumar ese partido; así
+    // quedó BEREA vs CAMBRIDGE en el vóley damas.
+    final actual = await _partidos(campeonatoId).doc(partidoId).get();
+    final yaJugado = actual.data()?['resultadoRegistrado'] == true;
+
     await _partidos(campeonatoId).doc(partidoId).update({
       'fechaHora': Timestamp.fromDate(fechaHora),
-      'estado': PartidoEstado.programado,
+      'estado': yaJugado ? PartidoEstado.finalizado : PartidoEstado.programado,
       'fechaActualizacion': FieldValue.serverTimestamp(),
     });
   }

@@ -112,7 +112,7 @@ class PublicHomeService {
 
     return partidos.where((partido) {
       final fecha = partido.fechaHora;
-      return partido.estado == PartidoEstado.programado &&
+      return partido.estadoEfectivo == PartidoEstado.programado &&
           fecha != null &&
           !fecha.isBefore(rango.desde) &&
           fecha.isBefore(rango.hasta);
@@ -126,7 +126,9 @@ class PublicHomeService {
         p.fechaActualizacion ?? p.fechaHora ?? DateTime(1900);
 
     return (partidos
-            .where((partido) => partido.estado == PartidoEstado.finalizado)
+            .where(
+              (partido) => partido.estadoEfectivo == PartidoEstado.finalizado,
+            )
             .toList()
           ..sort((a, b) => fecha(b).compareTo(fecha(a))))
         .take(5)

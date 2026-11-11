@@ -412,6 +412,22 @@ class _PendientesCard extends StatelessWidget {
                 .length;
             final sinFecha = partidos.where((p) => p.faltaProgramar).length;
 
+            // La fase regular (grupos o liga) ya se jugó entera: es el
+            // momento de pasar a las llaves. Antes no había ningún aviso
+            // y el botón quedaba escondido entre las acciones de Fixture.
+            final regulares = partidos
+                .where((p) => !p.privilegio && !campeonato.esDeFaseFinal(p))
+                .toList();
+            final faseRegularTerminada =
+                campeonato.estado == CampeonatoEstado.activo &&
+                regulares.isNotEmpty &&
+                regulares.every((p) => p.estaJugado || !p.admiteResultado);
+            final puedeActivar =
+                faseRegularTerminada && campeonato.estaEnFaseRegular;
+            final soloGruposTerminado =
+                faseRegularTerminada &&
+                campeonato.tipoCampeonato == TipoCampeonato.faseGrupos;
+
             final items = <Widget>[
               if (equipos.isEmpty)
                 _PendienteItem(
@@ -429,6 +445,25 @@ class _PendientesCard extends StatelessWidget {
                   accion: 'Cargar resultados',
                   onTap: onResultados,
                   urgente: true,
+                ),
+              if (puedeActivar)
+                _PendienteItem(
+                  icon: Icons.bolt_outlined,
+                  texto:
+                      'La ${campeonato.nombreFaseRegular.toLowerCase()} terminó. '
+                      'Activá la fase eliminatoria para armar las llaves.',
+                  accion: 'Ir a Fixture',
+                  onTap: onFixture,
+                ),
+              if (soloGruposTerminado)
+                _PendienteItem(
+                  icon: Icons.bolt_outlined,
+                  texto:
+                      'Se jugaron todos los partidos. Este campeonato es solo '
+                      'de grupos: si querés llaves, usá "Agregar fase '
+                      'eliminatoria" en Fixture.',
+                  accion: 'Ir a Fixture',
+                  onTap: onFixture,
                 ),
               if (sinFecha > 0)
                 _PendienteItem(

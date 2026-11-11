@@ -161,6 +161,87 @@ class CampeonatoService {
     });
   }
 
+  /// Convierte un campeonato de "Fase de grupos" (solo grupos, sin
+  /// llaves) en "Grupos + eliminación", conservando grupos, equipos y
+  /// resultados.
+  ///
+  /// Hace falta porque el formato se elige al crear el campeonato y no
+  /// se puede editar después: un campeonato creado como "Fase de grupos"
+  /// nunca mostraba el botón "Activar fase eliminatoria" (ese formato no
+  /// tiene segunda fase) y no había forma de llegar a las llaves. Pasó
+  /// con INTERCARRERAS 2/2026.
+  ///
+  /// Los partidos ya jugados tienen grupo, así que siguen siendo de la
+  /// fase de grupos y la tabla no cambia. El campeonato queda en la fase
+  /// de grupos: la eliminatoria se activa después, como en cualquier
+  /// campeonato de dos fases.
+  Future<void> agregarFaseEliminatoria({
+    required CampeonatoModel campeonato,
+    required int clasificanPorGrupo,
+    required int mejoresTerceros,
+    required String usuarioId,
+    required String usuarioNombre,
+  }) async {
+    if (campeonato.tipoCampeonato != TipoCampeonato.faseGrupos) {
+      throw Exception(
+        campeonato.tieneFasesSeparadas
+            ? 'Este campeonato ya tiene fase eliminatoria.'
+            : 'Solo se puede agregar una fase eliminatoria a un campeonato de "Fase de grupos".',
+      );
+    }
+
+    if (campeonato.estaFinalizado) {
+      throw Exception('El campeonato ya está finalizado.');
+    }
+
+    final grupos = campeonato.configuracion.cantidadGrupos;
+
+    if (clasificanPorGrupo <= 0) {
+      throw Exception('Debe clasificar al menos 1 equipo por grupo.');
+    }
+
+    if (mejoresTerceros < 0) {
+      throw Exception('La cantidad de mejores terceros no puede ser negativa.');
+    }
+
+    if (mejoresTerceros > grupos) {
+      throw Exception(
+        'Los mejores terceros no pueden ser más que la cantidad de grupos ($grupos).',
+      );
+    }
+
+    final total = grupos * clasificanPorGrupo + mejoresTerceros;
+
+    if (total < 2) {
+      throw Exception('Tienen que clasificar al menos 2 equipos.');
+    }
+
+    await _campeonatos.doc(campeonato.id).update({
+      'tipoCampeonato': TipoCampeonato.gruposEliminacion,
+      'faseActual': FaseCampeonato.grupos,
+      'configuracion.formato': 'grupos_eliminacion',
+      'configuracion.clasificanPorGrupo': clasificanPorGrupo,
+      'configuracion.mejoresTerceros': mejoresTerceros,
+      'configuracion.generaFaseEliminatoria': true,
+      'configuracion.rondaEliminatoriaInicial':
+          FixtureGrouping.claveRondaSegunEquipos(total),
+      'fechaActualizacion': FieldValue.serverTimestamp(),
+    });
+
+    await _auditoriaService.registrar(
+      campeonatoId: campeonato.id,
+      usuarioId: usuarioId,
+      usuarioNombre: usuarioNombre,
+      accion: 'Agregar fase eliminatoria',
+      modulo: 'Campeonato',
+      documentoAfectado: campeonato.id,
+      detalle:
+          'El formato pasó de "Fase de grupos" a "Grupos + eliminación": '
+          '$clasificanPorGrupo por grupo + $mejoresTerceros mejores terceros '
+          '($total clasificados).',
+    );
+  }
+
   /// Activa la fase eliminatoria si el campeonato ya tiene cuadro
   /// generado pero la fase quedó sin activar (pasaba cuando las llaves
   /// se generaban antes de activarla). Devuelve si cambió algo.

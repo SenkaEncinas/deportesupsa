@@ -337,6 +337,17 @@ class PartidoModel {
 
   bool get estaFinalizado => estado == PartidoEstado.finalizado;
 
+  /// El estado que corresponde de verdad. Manda `resultadoRegistrado`:
+  /// hay partidos jugados que quedaron guardados como "programado"
+  /// porque se reprogramaron después de cargar el resultado (bug ya
+  /// corregido). Sin esto la tabla no los sumaba y la portada los
+  /// mostraba como próximos.
+  String get estadoEfectivo =>
+      resultadoRegistrado ? PartidoEstado.finalizado : estado;
+
+  /// Se jugó y tiene resultado, sin importar cómo quedó guardado `estado`.
+  bool get estaJugado => resultadoRegistrado;
+
   bool get estaSuspendido => estado == PartidoEstado.suspendido;
 
   /// Marcador legible: "1 - 1 (4 - 3 pen.)", "2 - 1" (sets) o "Sin resultado".

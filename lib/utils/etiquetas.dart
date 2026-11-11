@@ -80,7 +80,7 @@ class Etiquetas {
       case TipoCampeonato.ligaPlayoffs:
         return 'Primero se juega una liga general. Luego los mejores clasifican a una fase final.';
       case TipoCampeonato.faseGrupos:
-        return 'Los equipos se dividen en grupos. Cada grupo maneja su propia tabla de posiciones.';
+        return 'Los equipos se dividen en grupos. Cada grupo maneja su propia tabla de posiciones. No tiene llaves finales; si después hacen falta, se agregan desde Fixture con "Agregar fase eliminatoria".';
       case TipoCampeonato.gruposEliminacion:
         return 'Primero se juega una fase de grupos. Luego los clasificados pasan a llaves eliminatorias.';
       case TipoCampeonato.eliminacionDirecta:

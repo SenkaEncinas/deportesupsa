@@ -134,6 +134,10 @@ final guiasCompetencia = <GuiaAyuda>[
         explicacion:
             'Arriba del fixture. Aparece mientras el campeonato está en fase '
             'de grupos o de liga.',
+        consejo:
+            '¿No aparece? Si el campeonato se creó como "Fase de grupos" '
+            '(solo grupos), primero tocá "Agregar fase eliminatoria" y elegí '
+            'cuántos pasan por grupo.',
         escena: () => escenaFixture(FocoFixture.activar),
       ),
       PasoAyuda(
