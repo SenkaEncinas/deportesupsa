@@ -7,8 +7,9 @@ import 'app_colors.dart';
 import 'app_text_styles.dart';
 import 'responsive.dart';
 
-/// Sitio de quien desarrolló la app, al que lleva el crédito del footer.
-const String _kSitio57Nations = 'https://nations-2b049.web.app';
+/// Sitio de EM Business Group, al que lleva el crédito de diseño y
+/// desarrollo del footer.
+const String _kSitioEmBusinessGroup = 'https://www.embusinessgroup.com';
 
 /// Envuelve un logo para que se pueda tocar cuando tiene sitio web, y lo
 /// deja tal cual cuando no. Así el footer no tiene que preguntar dos
@@ -322,9 +323,13 @@ class _Copyright extends StatelessWidget {
   }
 }
 
-/// Crédito de quien desarrolló la aplicación. Va discreto: texto chico y
-/// el isotipo en su versión monocromática blanca, que es la que el manual
-/// de marca de 57 Nations define para fondos oscuros.
+/// Crédito de quien diseñó y desarrolló la aplicación: una cápsula
+/// discreta con el isotipo de EM Business Group, en el mismo lenguaje del
+/// pie verde de la UPSA (blanco con transparencias, sin colores nuevos).
+///
+/// El logo es el mismo PNG del auspiciante principal (negro sobre fondo
+/// transparente): acá se pinta de blanco con un filtro para que se lea
+/// sobre el verde.
 class _CreditoCreador extends StatelessWidget {
   const _CreditoCreador();
 
@@ -335,55 +340,88 @@ class _CreditoCreador extends StatelessWidget {
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerRight,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Desarrollado por',
-            style: AppTextStyles.small.copyWith(
-              color: Colors.white.withValues(alpha: 0.55),
-            ),
+      child: _EnlaceOpcional(
+        url: _kSitioEmBusinessGroup,
+        tooltip: 'Ir al sitio de EM Business Group',
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 9, 18, 9),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
           ),
-          const SizedBox(width: 8),
-          // El logo y el nombre son un solo botón: tocar cualquiera de
-          // los dos lleva al sitio de 57 Nations.
-          _EnlaceOpcional(
-            url: _kSitio57Nations,
-            tooltip: 'Ir al sitio de 57 Nations',
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Opacity(
-                    opacity: 0.9,
-                    child: Image.asset(
-                      'assets/images/logo_57nations_blanco.png',
-                      height: 17,
-                      fit: BoxFit.contain,
-                      filterQuality: FilterQuality.medium,
-                      errorBuilder: (_, _, _) => Text(
-                        '57 Nations',
-                        style: AppTextStyles.small.copyWith(
-                          color: AppColors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ColorFiltered(
+                colorFilter: const ColorFilter.mode(
+                  AppColors.white,
+                  BlendMode.srcIn,
+                ),
+                child: Image.asset(
+                  'assets/images/patrocinadores/principal/em_business_group.png',
+                  height: 26,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.medium,
+                  errorBuilder: (_, _, _) => Text(
+                    'EM',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.white,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 1,
+                height: 26,
+                color: Colors.white.withValues(alpha: 0.18),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    'Nations',
+                    'DISEÑO Y DESARROLLO',
                     style: AppTextStyles.small.copyWith(
-                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 9.5,
+                      height: 1.1,
+                      letterSpacing: 1.6,
                       fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.55),
                     ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: 'Senka Encinas Delgadillo',
+                          style: AppTextStyles.small.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.white,
+                          ),
+                        ),
+                        TextSpan(
+                          text: '  ·  EM Business Group',
+                          style: AppTextStyles.small.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.62),
+                          ),
+                        ),
+                      ],
+                    ),
+                    maxLines: 1,
                   ),
                 ],
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

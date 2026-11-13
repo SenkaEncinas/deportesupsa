@@ -45,25 +45,28 @@ void main() {
     UrlLauncherPlatform.instance = lanzador;
   });
 
-  testWidgets('el crédito de 57 Nations abre su sitio', (tester) async {
-    await tester.binding.setSurfaceSize(const Size(1440, 2400));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets(
+    'el crédito de diseño y desarrollo abre el sitio de EM Business Group',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1440, 2400));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(_app());
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
 
-    final credito = find.byTooltip('Ir al sitio de 57 Nations');
-    expect(
-      credito,
-      findsOneWidget,
-      reason: 'el crédito tiene que ser un enlace',
-    );
+      final credito = find.byTooltip('Ir al sitio de EM Business Group');
+      expect(
+        credito,
+        findsOneWidget,
+        reason: 'el crédito tiene que ser un enlace',
+      );
 
-    await tester.tap(credito, warnIfMissed: false);
-    await tester.pumpAndSettle();
+      await tester.tap(credito, warnIfMissed: false);
+      await tester.pumpAndSettle();
 
-    expect(lanzador.abiertos, ['https://nations-2b049.web.app']);
-  });
+      expect(lanzador.abiertos, ['https://www.embusinessgroup.com']);
+    },
+  );
 
   // La franja de auspiciantes se arma leyendo el manifiesto de assets,
   // que en un widget test viene vacío: por eso el logo de EM no se puede

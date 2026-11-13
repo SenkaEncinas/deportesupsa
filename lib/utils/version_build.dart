@@ -13,4 +13,4 @@
 /// `app_public_footer.dart`.
 library;
 
-const String kVersionApp = '1.2.5.2';
+const String kVersionApp = '1.2.5.3';
