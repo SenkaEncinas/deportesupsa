@@ -11,6 +11,7 @@ import '../services/equipo_service.dart';
 import '../services/grupo_service.dart';
 import '../services/partido_service.dart';
 import '../services/pdf_service.dart';
+import '../services/resultado_service.dart';
 import '../utils/fixture_grouping.dart';
 import 'grupos_screen.dart';
 import 'reciclaje/app_badge.dart';
@@ -55,6 +56,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
   final PartidoService _partidoService = PartidoService();
   final PdfService _pdfService = PdfService();
   final AuthService _authService = AuthService();
+  final ResultadoService _resultadoService = ResultadoService();
 
   // Los streams se crean una sola vez y no dentro de build(): si se
   // reconstruyen en cada build, cada setState (una tecla en un
@@ -309,6 +311,45 @@ class _FixtureScreenState extends State<FixtureScreen> {
     // queda a mano en esta misma pantalla.
     if (actualizado != null && actualizado.estaEnFaseRegular && mounted) {
       await _activarFaseEliminatoria(actualizado);
+    }
+  }
+
+  Future<void> _eliminarPartidoManual(PartidoModel partido) async {
+    final confirm = await AppDialogs.confirm(
+      context: context,
+      title: 'Eliminar partido manual',
+      message: partido.resultadoRegistrado
+          ? '${partido.equipoLocalNombre} ${partido.marcadorTexto} '
+                '${partido.equipoVisitanteNombre}\n\nYa tiene resultado: se '
+                'borran también sus goles y tarjetas, y la tabla, los '
+                'goleadores y los sancionados se recalculan sin este partido. '
+                'No se puede deshacer.'
+          : '${partido.equipoLocalNombre} vs ${partido.equipoVisitanteNombre} '
+                'se va a borrar del fixture.',
+      confirmText: 'Eliminar',
+      danger: true,
+    );
+
+    if (!confirm || !mounted) return;
+
+    setState(() => _loading = true);
+
+    try {
+      final admin = await _authService.requireAdmin();
+      await _resultadoService.eliminarPartidoManual(
+        campeonatoId: widget.campeonatoId,
+        partidoId: partido.id,
+        usuarioId: admin.id,
+        usuarioNombre: admin.nombre,
+      );
+
+      if (!mounted) return;
+      AppSnackbars.success(context, 'Partido eliminado.');
+    } catch (e) {
+      if (!mounted) return;
+      AppSnackbars.error(context, mensajeDeError(e));
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -693,6 +734,7 @@ class _FixtureScreenState extends State<FixtureScreen> {
                                       campeonato?.deporteEfectivo ??
                                       DeporteTipo.futbol,
                                   onProgramar: _programarPartido,
+                                  onEliminar: _eliminarPartidoManual,
                                 );
                               }),
                           ],
@@ -713,6 +755,7 @@ class _SeccionFixture extends StatelessWidget {
   final bool puedeEditar;
   final String deporte;
   final void Function(PartidoModel) onProgramar;
+  final void Function(PartidoModel) onEliminar;
 
   const _SeccionFixture({
     required this.titulo,
@@ -720,6 +763,7 @@ class _SeccionFixture extends StatelessWidget {
     required this.puedeEditar,
     required this.deporte,
     required this.onProgramar,
+    required this.onEliminar,
   });
 
   @override
@@ -756,6 +800,7 @@ class _SeccionFixture extends StatelessWidget {
               puedeEditar: puedeEditar,
               deporte: deporte,
               onProgramar: () => onProgramar(partido),
+              onEliminar: () => onEliminar(partido),
             ),
           );
         }),
@@ -770,13 +815,20 @@ class _FixturePartidoCard extends StatelessWidget {
   final bool puedeEditar;
   final String deporte;
   final VoidCallback onProgramar;
+  final VoidCallback onEliminar;
 
   const _FixturePartidoCard({
     required this.partido,
     required this.puedeEditar,
     required this.deporte,
     required this.onProgramar,
+    required this.onEliminar,
   });
+
+  /// Solo los cargados a mano: los del fixture generado se rehacen con
+  /// "Borrar fixture" y los del cuadro con "Regenerar llaves".
+  bool get _eliminable =>
+      puedeEditar && !partido.generadoPorSistema && !partido.esDeLlave;
 
   @override
   Widget build(BuildContext context) {
@@ -809,6 +861,15 @@ class _FixturePartidoCard extends StatelessWidget {
       onPressed: puedeEditar ? onProgramar : null,
     );
 
+    final eliminar = _eliminable
+        ? IconButton(
+            tooltip: 'Eliminar partido manual',
+            onPressed: onEliminar,
+            icon: const Icon(Icons.delete_outline),
+            color: AppColors.danger,
+          )
+        : null;
+
     if (isMobile) {
       return AppCard(
         padding: const EdgeInsets.all(14),
@@ -819,7 +880,12 @@ class _FixturePartidoCard extends StatelessWidget {
             const SizedBox(height: 12),
             AppMatchCard(partido: partido, deporte: deporte),
             const SizedBox(height: 12),
-            SizedBox(width: double.infinity, child: boton),
+            Row(
+              children: [
+                Expanded(child: boton),
+                ?eliminar,
+              ],
+            ),
           ],
         ),
       );
@@ -839,6 +905,7 @@ class _FixturePartidoCard extends StatelessWidget {
               ),
               const SizedBox(width: 14),
               boton,
+              ?eliminar,
             ],
           ),
         ],

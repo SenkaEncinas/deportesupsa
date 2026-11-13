@@ -4,10 +4,12 @@ import '../models/campeonato_model.dart';
 import '../models/equipo_model.dart';
 import '../models/partido_model.dart';
 import '../models/tabla_posicion_model.dart';
+import '../services/auth_service.dart';
 import '../services/campeonato_service.dart';
 import '../services/equipo_service.dart';
 import '../services/partido_service.dart';
 import '../services/public_home_service.dart';
+import '../services/resultado_service.dart';
 import '../utils/clasificacion.dart';
 import '../utils/fixture_grouping.dart';
 import '../utils/llaves.dart';
@@ -47,6 +49,8 @@ class _LlavesScreenState extends State<LlavesScreen> {
   final PartidoService _partidoService = PartidoService();
   final EquipoService _equipoService = EquipoService();
   final PublicHomeService _tablaService = PublicHomeService();
+  final ResultadoService _resultadoService = ResultadoService();
+  final AuthService _authService = AuthService();
 
   // Los streams se crean una sola vez y no dentro de build(): si se
   // reconstruyen en cada build, cada setState (una tecla en un
@@ -176,9 +180,14 @@ class _LlavesScreenState extends State<LlavesScreen> {
   Future<void> _eliminarCruce(PartidoModel partido) async {
     final confirmar = await AppDialogs.confirm(
       context: context,
-      title: 'Eliminar cruce',
-      message:
-          '${partido.equipoLocalNombre} vs ${partido.equipoVisitanteNombre} se va a borrar de la llave.',
+      title: 'Eliminar partido',
+      message: partido.resultadoRegistrado
+          ? '${partido.equipoLocalNombre} ${partido.marcadorTexto} '
+                '${partido.equipoVisitanteNombre}\n\nYa tiene resultado: se '
+                'borran también sus goles y tarjetas, y la tabla, los '
+                'goleadores y los sancionados se recalculan. No se puede '
+                'deshacer.'
+          : '${partido.equipoLocalNombre} vs ${partido.equipoVisitanteNombre} se va a borrar.',
       confirmText: 'Eliminar',
       danger: true,
     );
@@ -188,9 +197,12 @@ class _LlavesScreenState extends State<LlavesScreen> {
     setState(() => _loading = true);
 
     try {
-      await _partidoService.eliminarPartido(
+      final admin = await _authService.requireAdmin();
+      await _resultadoService.eliminarPartidoManual(
         campeonatoId: widget.campeonatoId,
         partidoId: partido.id,
+        usuarioId: admin.id,
+        usuarioNombre: admin.nombre,
       );
 
       if (!mounted) return;
@@ -344,6 +356,7 @@ class _LlavesScreenState extends State<LlavesScreen> {
                             const SizedBox(height: 6),
                             _PrivilegiosCard(
                               partidos: privilegios,
+                              onEliminar: _eliminarCruce,
                               onPasarAFaseFinal:
                                   campeonato.estaEnFaseEliminatoria
                                   ? (lista) =>
@@ -541,12 +554,15 @@ class _CruceFila extends StatelessWidget {
           icon: const Icon(Icons.edit_outlined),
         ),
         IconButton(
-          tooltip: bloqueado
-              ? 'Tiene resultado cargado'
-              : partido.esDeLlave
+          // Los cruces cargados a mano se pueden borrar aunque ya se
+          // hayan jugado (se van con sus goles y tarjetas). Los del cuadro
+          // se rehacen con "Regenerar llaves".
+          tooltip: partido.esDeLlave
               ? 'Forma parte del cuadro: usá "Regenerar llaves"'
-              : 'Eliminar cruce',
-          onPressed: bloqueado || partido.esDeLlave ? null : onEliminar,
+              : 'Eliminar partido',
+          onPressed: partido.esDeLlave || partido.generadoPorSistema
+              ? null
+              : onEliminar,
           icon: const Icon(Icons.delete_outline),
           color: AppColors.danger,
         ),
@@ -634,8 +650,13 @@ class _PrivilegiosCard extends StatelessWidget {
   /// todavía no está en la eliminatoria: ahí un privilegio sí es un
   /// partido especial.
   final ValueChanged<List<PartidoModel>>? onPasarAFaseFinal;
+  final ValueChanged<PartidoModel> onEliminar;
 
-  const _PrivilegiosCard({required this.partidos, this.onPasarAFaseFinal});
+  const _PrivilegiosCard({
+    required this.partidos,
+    required this.onEliminar,
+    this.onPasarAFaseFinal,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -699,6 +720,12 @@ class _PrivilegiosCard extends StatelessWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
+                  IconButton(
+                    tooltip: 'Eliminar partido',
+                    onPressed: () => onEliminar(partido),
+                    icon: const Icon(Icons.delete_outline),
+                    color: AppColors.danger,
+                  ),
                 ],
               ),
             ),

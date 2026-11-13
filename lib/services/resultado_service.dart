@@ -632,6 +632,79 @@ class ResultadoService {
     );
   }
 
+  /// Borra un partido cargado a mano, aunque ya tenga resultado: se
+  /// llevan con él sus goles y tarjetas, y la tabla, goleadores y
+  /// sancionados se rehacen sin ese partido.
+  ///
+  /// Hacía falta porque `PartidoService.eliminarPartido` solo borra
+  /// partidos sin resultado y no estaba en el Fixture. En INTERCARRERAS
+  /// 2/2026 los cruces de eliminación se cargaron como "privilegio"
+  /// (amistosos, sin penales) y ya se habían jugado: la única salida era
+  /// anular uno por uno y aun así no había botón para borrarlos.
+  ///
+  /// Los partidos del cuadro (los que arma "Generar llaves") no se borran
+  /// acá: el cuadro se rehace con "Regenerar llaves".
+  Future<void> eliminarPartidoManual({
+    required String campeonatoId,
+    required String partidoId,
+    required String usuarioId,
+    required String usuarioNombre,
+  }) async {
+    final doc = await _partidos(campeonatoId).doc(partidoId).get();
+    final data = doc.data();
+
+    if (data == null) throw Exception('El partido no existe.');
+
+    final partido = PartidoModel.fromMap(doc.id, data);
+
+    if (partido.generadoPorSistema) {
+      throw Exception(
+        'Solo se pueden eliminar partidos cargados a mano. Los del fixture '
+        'generado se rehacen con "Borrar fixture" o "Regenerar llaves".',
+      );
+    }
+
+    if (partido.esDeLlave) {
+      throw Exception(
+        'Este cruce es parte del cuadro: rehacelo con "Regenerar llaves".',
+      );
+    }
+
+    final goles = await _goles(
+      campeonatoId,
+    ).where('partidoId', isEqualTo: partidoId).get();
+    final tarjetas = await _tarjetas(
+      campeonatoId,
+    ).where('partidoId', isEqualTo: partidoId).get();
+
+    final batch = _db.batch();
+    for (final d in [...goles.docs, ...tarjetas.docs]) {
+      batch.delete(d.reference);
+    }
+    batch.delete(doc.reference);
+    await batch.commit();
+
+    if (partido.resultadoRegistrado) {
+      await recalcularTablaYRanking(campeonatoId);
+    }
+
+    await _auditoriaService.registrar(
+      campeonatoId: campeonatoId,
+      usuarioId: usuarioId,
+      usuarioNombre: usuarioNombre,
+      accion: 'Eliminar partido manual',
+      modulo: 'Fixture',
+      documentoAfectado: partidoId,
+      detalle: partido.resultadoRegistrado
+          ? 'Se eliminó ${partido.equipoLocalNombre} '
+                '${partido.golesLocal} - ${partido.golesVisitante} '
+                '${partido.equipoVisitanteNombre}, con '
+                '${goles.size} gol(es) y ${tarjetas.size} tarjeta(s).'
+          : 'Se eliminó ${partido.equipoLocalNombre} vs '
+                '${partido.equipoVisitanteNombre} (sin resultado).',
+    );
+  }
+
   /// Lleva a los ganadores de cada ronda de la llave al cruce que les
   /// toca en la ronda siguiente, y vuelve a dejar el hueco en "Ganador
   /// llave N" si el resultado que lo definía se editó o se borró.

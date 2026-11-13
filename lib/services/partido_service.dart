@@ -653,7 +653,16 @@ class PartidoService {
         .map((doc) => PartidoModel.fromMap(doc.id, doc.data()))
         .toList();
 
-    final deLlave = soloDeLlave(campeonato, existentes);
+    // Los cruces cargados a mano que ya se jugaron quedan totalmente
+    // afuera: el generador nunca los borra ni los reaprovecha. Es el
+    // formato del vóley damas y de INTERCARRERAS (las primeras rondas a
+    // mano, jugadas, y después el cuadro desde semifinales); antes esos
+    // resultados bloqueaban "Generar llaves" con "la llave ya tiene
+    // partidos con resultado".
+    final deLlave = soloDeLlave(
+      campeonato,
+      existentes,
+    ).where((p) => p.generadoPorSistema || !p.resultadoRegistrado).toList();
 
     // No se pisa una llave que ya se empezó a jugar.
     final conResultado = deLlave.where((p) => p.resultadoRegistrado).toList();
